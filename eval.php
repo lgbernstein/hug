@@ -1,6 +1,5 @@
 <?php
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['error'=>'POST only']); exit; }
 
 $target     = trim($_POST['target'] ?? '');
@@ -36,28 +35,44 @@ if ($mode === 'interview' && $who !== 'All') {
 
 // Build prompt
 if ($mode === 'interview') {
-    $prompt = 'You are simulating a Hungarian simplified naturalization (egyszerűsített honosítás) interview examiner. '
-            . 'Since 2020 these interviews are a real B1-level conversational language check — not a formality, but not an academic grammar test either. '
-            . 'Real examiners are strict on CONTENT and INTELLIGIBILITY, but forgiving on grammar mechanics. '
+    $prompt = 'You are a friendly Hungarian language coach helping a learner prepare for the simplified naturalization (egyszerűsített honosítás) interview. '
+            . 'Your job is to help them LEARN, not just grade them. Every response should teach something.' . "\n\n"
+            . 'CONTEXT:'
+            . "\n- These interviews are B1-level conversational checks — natural speech, not academic grammar"
+            . "\n- In Hungarian, family name comes FIRST (Bernstein Lawrence, not Lawrence Bernstein)"
+            . "\n- Some prompts are greetings/commands, not questions — a natural conversational reply is correct"
             . "\n\n"
-            . 'PASS conditions (any of these):'
-            . "\n- The answer communicates the correct meaning in intelligible Hungarian, even with grammar errors (wrong case endings, wrong conjugation, awkward word order are all fine if meaning is clear)"
-            . "\n- Pronunciation is imperfect but the words can be understood"
+            . 'PASS if the learner:'
+            . "\n- Communicates the right idea in intelligible Hungarian, even with grammar errors"
+            . "\n- Responds naturally to greetings/commands (e.g. \"köszönöm\" to \"Jöjjön be!\")"
+            . "\n- Gets the meaning across even with wrong tense, case endings, or word order"
             . "\n\n"
-            . 'FAIL conditions (any of these):'
-            . "\n- The answer is factually wrong or contradicts known facts"
-            . "\n- The answer is completely off-topic or nonsensical"
-            . "\n- The answer is in English or mostly English (giving up on Hungarian)"
-            . "\n- The answer is so garbled it cannot be understood at all"
-            . "\n- The answer is silence or just filler words with no real content"
+            . 'FAIL only if the learner:'
+            . "\n- Says something factually wrong (wrong name, wrong city, etc.)"
+            . "\n- Responds in English or gives up"
+            . "\n- Says something with zero connection to the prompt"
+            . "\n- Is completely unintelligible"
             . "\n\n"
-            . 'Question asked: "' . $target . '". '
-            . 'Learner said: "' . $transcript . '". '
-            . $bio_context
+            . 'Prompt: "' . $target . '"' . "\n"
+            . 'Learner said: "' . $transcript . '"' . "\n";
+
+    // If we have an expected Hungarian answer from the DB, use it as guidance (not strict)
+    $expected_hu = trim($_POST['expected_hu'] ?? '');
+    if ($expected_hu) {
+        $prompt .= 'Expected answer (use as guidance, not strict match): "' . $expected_hu . '"' . "\n"
+                . 'The learner does NOT need to match this exactly — any answer that conveys similar meaning is fine. '
+                . 'But use this as the basis for the "correct" field in your response.' . "\n";
+    }
+
+    $prompt .= $bio_context
             . "\n\n"
-            . 'Give ONE sentence of feedback in English. If they passed with grammar errors, briefly name the main error as coaching. If they failed, say specifically why. Keep it direct, not over-encouraging. '
-            . 'Set pronunciation_poor:true only if the speech was genuinely hard to understand. '
-            . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"one sentence","pronunciation_poor":true/false}';
+            . 'FEEDBACK RULES:'
+            . "\n- ALWAYS include \"correct\": the ideal Hungarian answer an interviewer would expect"
+            . "\n- Keep feedback to ONE short sentence (under 15 words). Examples: \"Wrong tense — say utaztam not utazom\", \"Right idea, good job!\", \"That answers a different question\""
+            . "\n- Do NOT repeat the correct answer in the feedback — it goes in the \"correct\" field"
+            . "\n- Do NOT be chatty or encouraging with multiple sentences"
+            . "\n\n"
+            . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"coaching feedback in English with Hungarian corrections","correct":"the ideal complete Hungarian answer","pronunciation_poor":true/false}';
 } else {
     $prompt = 'You are simulating a Hungarian simplified naturalization interview examiner evaluating pronunciation. '
             . 'The learner was asked to say: "' . $target . '". '
@@ -66,8 +81,8 @@ if ($mode === 'interview') {
             . 'PASS: The words are recognisably the right Hungarian words — a Hungarian speaker would understand them. Minor accent or mispronunciation is fine. '
             . 'FAIL: Key words are missing, replaced with wrong words, or so mispronounced they would confuse a listener. '
             . "\n\n"
-            . 'Give ONE sentence of feedback in English. If passed with errors, briefly name the main pronunciation issue as coaching. Keep it direct. '
-            . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"one sentence in English","pronunciation_poor":true/false}';
+            . 'Give ONE short sentence of feedback in English. If passed with errors, briefly name the main pronunciation issue. Keep it direct. '
+            . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"short feedback","correct":"the exact target phrase","pronunciation_poor":true/false}';
 }
 
 $payload = json_encode([
