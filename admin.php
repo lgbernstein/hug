@@ -390,13 +390,13 @@ body { background: #060b18; color: #e2e8f0; }
                     <td class="py-2 px-2 text-slate-400 cell-ae"><?php echo htmlspecialchars($p['answer_en']); ?></td>
                     <td class="py-2 px-2 cell-cat"><a href="?cat=<?php echo urlencode($p['category']); ?>" class="text-slate-500 hover:text-indigo-400 underline decoration-dotted underline-offset-2 transition-colors"><?php echo htmlspecialchars($p['category']); ?></a></td>
                     <td class="py-2 px-2 space-x-1 whitespace-nowrap">
-                        <button onclick="editRow(<?php echo $p['id']; ?>)" class="border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors text-xs font-semibold px-2 py-1 rounded">edit</button>
-                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_answer')" class="border border-violet-500/50 text-violet-400 hover:bg-violet-500/20 hover:text-violet-300 transition-colors text-xs px-2 py-1 rounded" title="AI Generate Hungarian Answer">AI ans</button>
-                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_question')" class="border border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors text-xs px-2 py-1 rounded" title="AI Generate Question">AI q</button>
+                        <button onclick="editRow(<?php echo $p['id']; ?>)" class="border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors text-xs font-semibold px-2 py-1 rounded">Edit</button>
+                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_answer')" class="border border-violet-500/50 text-violet-400 hover:bg-violet-500/20 hover:text-violet-300 transition-colors text-xs px-2 py-1 rounded" title="AI Generate Hungarian Answer">AI Ans</button>
+                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_question')" class="border border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors text-xs px-2 py-1 rounded" title="AI Generate Question">AI Q</button>
                         <form method="POST" class="inline" onsubmit="return confirm('Delete this phrase?')">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="id" value="<?php echo $p['id']; ?>">
-                            <button type="submit" class="border border-red-500/30 text-slate-600 hover:bg-red-500/20 hover:text-red-400 transition-colors text-xs px-2 py-1 rounded">del</button>
+                            <button type="submit" class="border border-red-500/30 text-slate-600 hover:bg-red-500/20 hover:text-red-400 transition-colors text-xs px-2 py-1 rounded">Del</button>
                         </form>
                     </td>
                 </tr>
