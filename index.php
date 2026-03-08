@@ -345,7 +345,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <!-- Control Bar -->
         <div class="px-5 pb-4">
             <div class="flex items-center justify-center gap-3">
-                <button onclick="setSpeed(0.5);speak(0.5)" title="Slow playback" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
+                <button id="slowBtn" onclick="toggleSlow()" title="Slow playback" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
                     <i data-lucide="snail" class="w-5 h-5"></i>
                     <span class="text-[9px] font-semibold">Slow</span>
                 </button>
@@ -626,9 +626,31 @@ function speak(rate) {
 }
 
 // ── Speed control ─────────────────────────────────────────────────────
+function toggleSlow() {
+    var btn = document.getElementById('slowBtn');
+    if (currentSpeed === 0.5) {
+        setSpeed(1.0);
+        btn.classList.remove('bg-amber-600', 'text-white');
+        btn.classList.add('bg-surface-300', 'text-slate-200');
+    } else {
+        setSpeed(0.5);
+        btn.classList.remove('bg-surface-300', 'text-slate-200');
+        btn.classList.add('bg-amber-600', 'text-white');
+    }
+    speak(currentSpeed);
+}
+
 function setSpeed(speed) {
     currentSpeed = speed;
     localStorage.setItem('hugSpeed', speed);
+    var slowBtn = document.getElementById('slowBtn');
+    if (speed === 0.5) {
+        slowBtn.classList.remove('bg-surface-300', 'text-slate-200');
+        slowBtn.classList.add('bg-amber-600', 'text-white');
+    } else {
+        slowBtn.classList.remove('bg-amber-600', 'text-white');
+        slowBtn.classList.add('bg-surface-300', 'text-slate-200');
+    }
     document.querySelectorAll('.speed-btn').forEach(function(btn) {
         var s = parseFloat(btn.dataset.speed);
         if (s === speed) {
@@ -1211,7 +1233,7 @@ document.addEventListener('keydown', function(e) {
         closeBrowse();
         closeStats();
     } else if (e.key === 's' || e.key === 'S') {
-        speak(0.5);
+        toggleSlow();
     } else if (e.key === 't' || e.key === 'T') {
         toggleTranslation();
     } else if (e.key === 'p' || e.key === 'P') {
