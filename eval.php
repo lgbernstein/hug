@@ -85,9 +85,12 @@ if ($mode === 'interview') {
             . "\n\n"
             . 'FEEDBACK RULES:'
             . "\n- ALWAYS include \"correct\": the ideal Hungarian answer an interviewer would expect"
-            . "\n- Keep feedback to ONE short sentence (under 15 words). Examples: \"Wrong tense — say utaztam not utazom\", \"Right idea, good job!\", \"That answers a different question\""
-            . "\n- Do NOT repeat the correct answer in the feedback — it goes in the \"correct\" field"
-            . "\n- Do NOT be chatty or encouraging with multiple sentences"
+            . "\n- Be specific about WHAT was wrong. Name the exact word, suffix, or conjugation error."
+            . "\n- Format: what you said → what it should be, plus a brief reason."
+            . "\n- Examples: \"utazni → utaztam (past tense needed)\", \"autó → autóval (need -val suffix = by/with)\", \"Perfect answer!\""
+            . "\n- Keep it to 1-2 short sentences max. Direct and helpful."
+            . "\n- Do NOT repeat the full correct answer in feedback — it goes in the \"correct\" field"
+            . "\n- If multiple errors, mention the most important one or two"
             . "\n\n"
             . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"coaching feedback in English with Hungarian corrections","correct":"the ideal complete Hungarian answer","pronunciation_poor":true/false}';
 } else {
@@ -105,7 +108,7 @@ if ($mode === 'interview') {
             . 'PASS: The words are recognisably the right Hungarian words — a Hungarian speaker would understand them. Minor accent or mispronunciation is fine. '
             . 'FAIL: Key words are missing, replaced with wrong words, or so mispronounced they would confuse a listener. '
             . "\n\n"
-            . 'Give ONE short sentence of feedback in English. If passed with errors, briefly name the main pronunciation issue. Keep it direct. '
+            . 'Be specific about what was wrong. Name the exact word that was mispronounced or missing, and show the correction (e.g. "hívnak → hívják (á sound, not a)" or "missed üljön at the end"). 1-2 short sentences max. '
             . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"short feedback","correct":"the exact target phrase","pronunciation_poor":true/false}';
 }
 
