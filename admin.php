@@ -358,6 +358,12 @@ body { background: #060b18; color: #e2e8f0; }
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="flex flex-wrap gap-2 mb-4">
+            <span class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold self-center mr-1">Show missing:</span>
+            <button onclick="toggleMissing('ah')" id="btn-ah" class="border border-yellow-500/30 text-yellow-500/70 hover:bg-yellow-500/10 text-xs px-3 py-1 rounded transition-all">Empty HU Answer</button>
+            <button onclick="toggleMissing('ae')" id="btn-ae" class="border border-yellow-500/30 text-yellow-500/70 hover:bg-yellow-500/10 text-xs px-3 py-1 rounded transition-all">Empty English</button>
+            <button onclick="toggleMissing('')" id="btn-all" class="border border-slate-500/30 text-slate-400 hover:bg-slate-500/10 text-xs px-3 py-1 rounded transition-all">Show All</button>
+        </div>
 
         <!-- Phrases Table -->
         <div class="overflow-x-auto">
@@ -522,6 +528,15 @@ function confirmMigrate(form) {
     return confirm('Move ' + ids.length + ' answers from English → Hungarian column?');
 }
 
+// Missing column filter
+var activeMissing = '';
+function toggleMissing(field) {
+    activeMissing = (activeMissing === field) ? '' : field;
+    document.getElementById('btn-ah').classList.toggle('bg-yellow-500/20', activeMissing === 'ah');
+    document.getElementById('btn-ae').classList.toggle('bg-yellow-500/20', activeMissing === 'ae');
+    filterTable();
+}
+
 // Live search + category filter
 var searchInput = document.getElementById('liveSearch');
 var catSelect = document.getElementById('catSelect');
@@ -537,7 +552,10 @@ function filterTable() {
         var text = (row.dataset.q + ' ' + row.dataset.ah + ' ' + row.dataset.ae).toLowerCase();
         var matchSearch = !term || text.indexOf(term) !== -1;
         var matchCat = !cat || row.dataset.cat === cat;
-        row.style.display = (matchSearch && matchCat) ? '' : 'none';
+        var matchMissing = !activeMissing
+            || (activeMissing === 'ah' && !row.dataset.ah)
+            || (activeMissing === 'ae' && !row.dataset.ae);
+        row.style.display = (matchSearch && matchCat && matchMissing) ? '' : 'none';
     });
 }
 
