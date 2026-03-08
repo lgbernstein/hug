@@ -481,7 +481,7 @@ if (localStorage.getItem('hugCat') === 'bios') localStorage.removeItem('hugCat')
 let cat          = localStorage.getItem('hugCat') || 'all';
 let listenMode   = localStorage.getItem('hugListen') === '1';
 let currentSpeed = parseFloat(localStorage.getItem('hugSpeed')) || 1.0;
-let autoAdvance    = localStorage.getItem('hugAutoAdvance') !== '0';
+let autoAdvance    = localStorage.getItem('hugAutoAdvance') === '1';
 let translateOn    = localStorage.getItem('hugTranslate') === '1';
 let phoneticOn     = localStorage.getItem('hugPhonetic') === '1';
 let strictness     = parseInt(localStorage.getItem('hugStrict')) || 2;
@@ -942,7 +942,29 @@ recognition.onresult = function(event) {
             }
 
             if (isPass && autoAdvance) {
-                advanceTimeout = setTimeout(nextQuestion, 4000);
+                var pauseRow = document.createElement('div');
+                pauseRow.className = 'flex items-center justify-center gap-2 mt-2';
+                var countdown = document.createElement('span');
+                countdown.className = 'text-[10px] text-slate-400';
+                countdown.textContent = 'Next in 4s...';
+                var pauseBtn = document.createElement('button');
+                pauseBtn.className = 'text-[10px] px-2 py-0.5 rounded border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 font-semibold';
+                pauseBtn.textContent = 'Pause';
+                pauseBtn.onclick = function() {
+                    clearTimeout(advanceTimeout);
+                    clearInterval(countdownInterval);
+                    pauseRow.remove();
+                };
+                pauseRow.appendChild(countdown);
+                pauseRow.appendChild(pauseBtn);
+                scoreDisplay.appendChild(pauseRow);
+                var secsLeft = 3;
+                var countdownInterval = setInterval(function() {
+                    if (secsLeft <= 0) { clearInterval(countdownInterval); return; }
+                    countdown.textContent = 'Next in ' + secsLeft + 's...';
+                    secsLeft--;
+                }, 1000);
+                advanceTimeout = setTimeout(function() { clearInterval(countdownInterval); nextQuestion(); }, 4000);
             }
             if (!questionAttempted) {
                 questionAttempted = true;
