@@ -279,7 +279,11 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                     class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold">
                     <i data-lucide="timer" class="w-3.5 h-3.5"></i> Auto
                 </button>
-                <div class="flex items-center gap-1.5 ml-1">
+                <button id="micToggle" onclick="toggleMic()" title="Mic on/off"
+                    class="p-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all">
+                    <i id="micToggleIcon" data-lucide="mic" class="w-3.5 h-3.5"></i>
+                </button>
+                <div class="flex items-center gap-1.5">
                     <div id="readyIndicator" class="status-dot dot-off"></div>
                     <div class="vol-track"><div id="volFill" class="vol-fill"></div></div>
                 </div>
@@ -352,10 +356,6 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                 <button id="recordBtn" onclick="toggleMic()" title="Record [Space]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-red-600 hover:bg-red-500 text-white glow-red">
                     <i id="recordIcon" data-lucide="mic" class="w-6 h-6"></i>
                     <span id="recordLabel" class="text-[9px] font-semibold">Record</span>
-                </button>
-                <button id="stopBtn" onclick="toggleMic()" title="Stop recording [Esc]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-slate-600 hover:bg-slate-500 text-white hidden">
-                    <i data-lucide="mic-off" class="w-5 h-5"></i>
-                    <span class="text-[9px] font-semibold">Stop</span>
                 </button>
                 <button onclick="nextQuestion()" title="Next [Enter]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
                     <i data-lucide="arrow-right" class="w-5 h-5"></i>
@@ -780,6 +780,11 @@ function setRecordIcon(iconName) {
     icon.setAttribute('data-lucide', iconName);
     lucide.createIcons({ nodes: [icon] });
 }
+function setMicToggleIcon(iconName) {
+    var icon = document.getElementById('micToggleIcon');
+    icon.setAttribute('data-lucide', iconName);
+    lucide.createIcons({ nodes: [icon] });
+}
 
 recognition.onstart = function() {
     isListening     = true;
@@ -787,8 +792,11 @@ recognition.onstart = function() {
     indicator.className = 'status-dot dot-live';
     document.getElementById('recordBtn').classList.add('mic-active');
     document.getElementById('recordLabel').textContent = 'Recording';
-    document.getElementById('stopBtn').classList.remove('hidden');
+
     setRecordIcon('headphones');
+    setMicToggleIcon('mic-off');
+    document.getElementById('micToggle').classList.add('text-red-400');
+    document.getElementById('micToggle').classList.remove('text-slate-200');
     startVolume();
     recTimeout = setTimeout(function() {
         if (isListening) recognition.stop();
@@ -810,8 +818,11 @@ recognition.onresult = function(event) {
     indicator.className = 'status-dot dot-off';
     document.getElementById('recordBtn').classList.remove('mic-active');
     document.getElementById('recordLabel').textContent = 'Record';
-    document.getElementById('stopBtn').classList.add('hidden');
+
     setRecordIcon('mic');
+    setMicToggleIcon('mic');
+    document.getElementById('micToggle').classList.remove('text-red-400');
+    document.getElementById('micToggle').classList.add('text-slate-200');
 
     if (isPractice) {
         isPractice = false;
@@ -907,8 +918,11 @@ recognition.onend = function() {
     indicator.className = 'status-dot dot-off';
     document.getElementById('recordBtn').classList.remove('mic-active');
     document.getElementById('recordLabel').textContent = 'Record';
-    document.getElementById('stopBtn').classList.add('hidden');
+
     setRecordIcon('mic');
+    setMicToggleIcon('mic');
+    document.getElementById('micToggle').classList.remove('text-red-400');
+    document.getElementById('micToggle').classList.add('text-slate-200');
 };
 
 function toggleMic() {
