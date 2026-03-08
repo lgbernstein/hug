@@ -345,13 +345,13 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <!-- Control Bar -->
         <div class="px-5 pb-4">
             <div class="flex items-center justify-center gap-3">
-                <button onclick="speak(0.5)" title="Slow playback" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
+                <button onclick="setSpeed(0.5);speak(0.5)" title="Slow playback" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
                     <i data-lucide="snail" class="w-5 h-5"></i>
                     <span class="text-[9px] font-semibold">Slow</span>
                 </button>
                 <button id="recordBtn" onclick="toggleMic()" title="Record [Space]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-red-600 hover:bg-red-500 text-white glow-red">
                     <i id="recordIcon" data-lucide="mic" class="w-6 h-6"></i>
-                    <span class="text-[9px] font-semibold">Record</span>
+                    <span id="recordLabel" class="text-[9px] font-semibold">Record</span>
                 </button>
                 <button onclick="nextQuestion()" title="Next [Enter]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
                     <i data-lucide="arrow-right" class="w-5 h-5"></i>
@@ -634,7 +634,7 @@ function setSpeed(speed) {
         if (s === speed) {
             btn.className = 'speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all bg-accent/20 text-accent-light';
         } else {
-            btn.className = 'speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all text-slate-600 hover:text-slate-400';
+            btn.className = 'speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all text-slate-300 hover:text-white';
         }
     });
 }
@@ -760,7 +760,8 @@ recognition.onstart = function() {
     listenStartTime = Date.now();
     indicator.className = 'status-dot dot-live';
     document.getElementById('recordBtn').classList.add('mic-active');
-    setRecordIcon('headphones');
+    document.getElementById('recordLabel').textContent = 'Stop';
+    setRecordIcon('mic-off');
     startVolume();
     recTimeout = setTimeout(function() {
         if (isListening) recognition.stop();
@@ -781,6 +782,7 @@ recognition.onresult = function(event) {
     isListening = false;
     indicator.className = 'status-dot dot-off';
     document.getElementById('recordBtn').classList.remove('mic-active');
+    document.getElementById('recordLabel').textContent = 'Record';
     setRecordIcon('mic');
 
     if (isPractice) {
@@ -876,6 +878,7 @@ recognition.onend = function() {
     cleanupAudio();
     indicator.className = 'status-dot dot-off';
     document.getElementById('recordBtn').classList.remove('mic-active');
+    document.getElementById('recordLabel').textContent = 'Record';
     setRecordIcon('mic');
 };
 
