@@ -48,7 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $cols = array_map('trim', $cols);
                 if (count($cols) < 2) continue;
                 $row = ['question_hu' => $cols[0], 'answer_en' => '', 'answer_hu' => '', 'category' => $defaultCat];
-                if ($format === '2col') {
+                if ($format === '2col_hu') {
+                    $row['answer_hu'] = $cols[1];
+                } elseif ($format === '2col') {
                     $row['answer_en'] = $cols[1];
                 } elseif ($format === '3col') {
                     $row['answer_hu'] = $cols[1] ?? '';
@@ -249,10 +251,13 @@ body { background: #060b18; color: #e2e8f0; }
             <input type="hidden" name="action" value="preview">
             <div class="flex flex-wrap gap-3 mb-3">
                 <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                    <input type="radio" name="format" value="2col_hu" checked class="accent-indigo-500"> 2-col: Question HU | Answer HU
+                </label>
+                <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
                     <input type="radio" name="format" value="2col" class="accent-indigo-500"> 2-col: Hungarian | English
                 </label>
                 <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
-                    <input type="radio" name="format" value="3col" checked class="accent-indigo-500"> 3-col: Hungarian | Answer HU | English
+                    <input type="radio" name="format" value="3col" class="accent-indigo-500"> 3-col: Hungarian | Answer HU | English
                 </label>
                 <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
                     <input type="radio" name="format" value="4col" class="accent-indigo-500"> 4-col: Hungarian | Answer HU | English | Category
