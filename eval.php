@@ -7,11 +7,12 @@ $transcript = trim($_POST['transcript'] ?? '');
 $mode       = $_POST['mode'] ?? 'pronunciation';
 $who        = in_array($_POST['who'] ?? '', ['Maria','Larry','All']) ? $_POST['who'] : 'All';
 $strictness = max(1, min(5, (int)($_POST['strictness'] ?? 2)));
+$alternatives = json_decode($_POST['alternatives'] ?? '[]', true);
 
 // Strictness levels adjust grading criteria
 $strictnessGuide = [
-    1 => 'Be VERY lenient. Pass if the learner communicates the general idea, even with major grammar errors, wrong word order, or mixed-in English words. Focus only on whether the right topic/meaning comes through.',
-    2 => 'Be lenient on grammar and pronunciation. Pass if the learner uses mostly correct vocabulary and conveys the right meaning. Ignore case endings, conjugation errors, and word order issues.',
+    1 => 'Be lenient. Pass if the learner uses the right key vocabulary words and communicates the general idea, even with grammar errors or wrong word order. Ignore case endings and conjugation. Only fail for completely wrong meaning, English-only responses, or silence.',
+    2 => 'Be moderately lenient. Pass if the learner conveys the right meaning with mostly correct vocabulary. Ignore minor grammar issues like case endings and word order. Fail for missing key words, wrong meaning, or mostly English.',
     3 => 'Balanced grading. Pass if meaning is clear AND key vocabulary is correct. Note grammar issues in feedback but only fail for wrong meaning, missing key words, or unintelligible speech.',
     4 => 'Be strict. Require correct vocabulary, reasonable grammar, and intelligible pronunciation. Fail for significant grammar errors (wrong verb form, missing key case endings) even if meaning is guessable.',
     5 => 'Exam-level strictness simulating a real B1 naturalization interview. Require correct vocabulary, proper grammar, good sentence structure, and clear pronunciation. Only pass responses that would satisfy an actual examiner.',
@@ -67,6 +68,11 @@ if ($mode === 'interview') {
             . 'Prompt: "' . $target . '"' . "\n"
             . 'Learner said: "' . $transcript . '"' . "\n";
 
+    if ($alternatives && count($alternatives) > 1) {
+        $prompt .= 'Speech recognition alternatives (consider ALL of these — pick the one closest to a valid Hungarian answer): ' . implode(' | ', $alternatives) . "\n"
+                . 'IMPORTANT: If ANY alternative is a reasonable Hungarian response, grade based on the best one, not the first one.' . "\n";
+    }
+
     // If we have an expected Hungarian answer from the DB, use it as guidance (not strict)
     $expected_hu = trim($_POST['expected_hu'] ?? '');
     if ($expected_hu) {
@@ -87,8 +93,14 @@ if ($mode === 'interview') {
 } else {
     $prompt = 'You are simulating a Hungarian simplified naturalization interview examiner evaluating pronunciation. '
             . 'The learner was asked to say: "' . $target . '". '
-            . 'Speech recognition heard: "' . $transcript . '". '
-            . "\n\n"
+            . 'Speech recognition heard: "' . $transcript . '". ';
+
+    if ($alternatives && count($alternatives) > 1) {
+        $prompt .= "\n" . 'Speech recognition alternatives (consider ALL — use the best match): ' . implode(' | ', $alternatives) . '. '
+                . 'If ANY alternative closely matches the target, grade based on that one. ';
+    }
+
+    $prompt .= "\n\n"
             . 'GRADING LEVEL (' . $strictness . '/5): ' . $strictnessGuide[$strictness] . "\n\n"
             . 'PASS: The words are recognisably the right Hungarian words — a Hungarian speaker would understand them. Minor accent or mispronunciation is fine. '
             . 'FAIL: Key words are missing, replaced with wrong words, or so mispronounced they would confuse a listener. '

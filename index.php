@@ -812,7 +812,7 @@ var recognition = new SpeechRecognition();
 recognition.lang            = 'hu-HU';
 recognition.interimResults  = false;
 recognition.continuous      = true;
-recognition.maxAlternatives = 1;
+recognition.maxAlternatives = 5;
 
 function setRecordIcon(iconName) {
     var icon = document.getElementById('recordIcon');
@@ -852,7 +852,13 @@ recognition.onresult = function(event) {
     }
     stopVolume();
 
-    var result = event.results[event.results.length - 1][0].transcript.trim();
+    var lastResult = event.results[event.results.length - 1];
+    var result = lastResult[0].transcript.trim();
+    var alternatives = [];
+    for (var i = 0; i < lastResult.length; i++) {
+        var alt = lastResult[i].transcript.trim();
+        if (alt && alternatives.indexOf(alt) === -1) alternatives.push(alt);
+    }
     isListening = false;
     indicator.className = 'status-dot dot-off';
     document.getElementById('recordBtn').classList.remove('mic-active');
@@ -889,6 +895,7 @@ recognition.onresult = function(event) {
     var fd = new FormData();
     fd.append('target',     targetQ);
     fd.append('transcript', result);
+    fd.append('alternatives', JSON.stringify(alternatives));
     fd.append('mode',       currentMode);
     fd.append('who',        who);
     fd.append('strictness', strictness);
