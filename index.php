@@ -290,6 +290,19 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
             </div>
         </div>
 
+        <!-- Strictness + Repeat -->
+        <div class="flex items-center justify-between px-5 py-2 border-b border-white/5 gap-3">
+            <div class="flex items-center gap-2 flex-1">
+                <span class="text-[10px] text-slate-300 font-semibold whitespace-nowrap">Strictness</span>
+                <input type="range" id="strictSlider" min="1" max="5" value="2" class="w-20 h-1 accent-indigo-500 cursor-pointer">
+                <span id="strictLabel" class="text-[10px] text-indigo-400 font-bold w-16">Meaning</span>
+            </div>
+            <button id="repeatFailBtn" onclick="toggleRepeatFail()" title="Speak correct answer after a fail"
+                class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold border border-white/5">
+                <i data-lucide="repeat" class="w-3 h-3"></i> Repeat on Fail
+            </button>
+        </div>
+
         <!-- Category Pills -->
         <div class="flex items-center gap-1.5 px-5 py-2.5 border-b border-white/5">
             <button id="cat-all"  onclick="setCat('all')"  class="pill pill-active">All</button>
@@ -471,6 +484,32 @@ let currentSpeed = parseFloat(localStorage.getItem('hugSpeed')) || 1.0;
 let autoAdvance    = localStorage.getItem('hugAutoAdvance') !== '0';
 let translateOn    = localStorage.getItem('hugTranslate') === '1';
 let phoneticOn     = localStorage.getItem('hugPhonetic') === '1';
+let strictness     = parseInt(localStorage.getItem('hugStrict')) || 2;
+let repeatOnFail   = localStorage.getItem('hugRepeatFail') === '1';
+
+var strictLabels = { 1: 'Relaxed', 2: 'Meaning', 3: 'Balanced', 4: 'Strict', 5: 'Exam' };
+document.getElementById('strictSlider').value = strictness;
+document.getElementById('strictLabel').textContent = strictLabels[strictness];
+document.getElementById('strictSlider').addEventListener('input', function() {
+    strictness = parseInt(this.value);
+    localStorage.setItem('hugStrict', strictness);
+    document.getElementById('strictLabel').textContent = strictLabels[strictness];
+});
+
+function toggleRepeatFail() {
+    repeatOnFail = !repeatOnFail;
+    localStorage.setItem('hugRepeatFail', repeatOnFail ? '1' : '0');
+    var btn = document.getElementById('repeatFailBtn');
+    if (repeatOnFail) {
+        btn.classList.add('bg-indigo-600/30', 'border-indigo-500/50', 'text-white');
+        btn.classList.remove('border-white/5', 'text-slate-300');
+    } else {
+        btn.classList.remove('bg-indigo-600/30', 'border-indigo-500/50', 'text-white');
+        btn.classList.add('border-white/5', 'text-slate-300');
+    }
+}
+// Init repeat button state
+if (repeatOnFail) toggleRepeatFail();
 
 const indicator = document.getElementById('readyIndicator');
 let isListening       = false;
@@ -852,6 +891,7 @@ recognition.onresult = function(event) {
     fd.append('transcript', result);
     fd.append('mode',       currentMode);
     fd.append('who',        who);
+    fd.append('strictness', strictness);
     if (targetAH) fd.append('expected_hu', targetAH);
     fetch('eval.php', { method: 'POST', body: fd })
         .then(function(r) { return r.json(); })
@@ -889,6 +929,16 @@ recognition.onresult = function(event) {
                 document.getElementById('playbackBtn').classList.remove('hidden');
             } else {
                 showPlaybackWhenReady = true;
+            }
+
+            // Repeat correct answer on fail
+            if (!isPass && repeatOnFail && correctAnswer) {
+                setTimeout(function() {
+                    var msg = new SpeechSynthesisUtterance(correctAnswer);
+                    msg.lang = 'hu-HU';
+                    msg.rate = 0.8;
+                    window.speechSynthesis.speak(msg);
+                }, 1500);
             }
 
             if (isPass && autoAdvance) {

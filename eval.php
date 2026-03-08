@@ -6,6 +6,16 @@ $target     = trim($_POST['target'] ?? '');
 $transcript = trim($_POST['transcript'] ?? '');
 $mode       = $_POST['mode'] ?? 'pronunciation';
 $who        = in_array($_POST['who'] ?? '', ['Maria','Larry','All']) ? $_POST['who'] : 'All';
+$strictness = max(1, min(5, (int)($_POST['strictness'] ?? 2)));
+
+// Strictness levels adjust grading criteria
+$strictnessGuide = [
+    1 => 'Be VERY lenient. Pass if the learner communicates the general idea, even with major grammar errors, wrong word order, or mixed-in English words. Focus only on whether the right topic/meaning comes through.',
+    2 => 'Be lenient on grammar and pronunciation. Pass if the learner uses mostly correct vocabulary and conveys the right meaning. Ignore case endings, conjugation errors, and word order issues.',
+    3 => 'Balanced grading. Pass if meaning is clear AND key vocabulary is correct. Note grammar issues in feedback but only fail for wrong meaning, missing key words, or unintelligible speech.',
+    4 => 'Be strict. Require correct vocabulary, reasonable grammar, and intelligible pronunciation. Fail for significant grammar errors (wrong verb form, missing key case endings) even if meaning is guessable.',
+    5 => 'Exam-level strictness simulating a real B1 naturalization interview. Require correct vocabulary, proper grammar, good sentence structure, and clear pronunciation. Only pass responses that would satisfy an actual examiner.',
+];
 
 if ($target === '' || $transcript === '') {
     echo json_encode(['pass'=>false,'feedback'=>'Missing data.','pronunciation_poor'=>false]); exit;
@@ -37,6 +47,7 @@ if ($mode === 'interview' && $who !== 'All') {
 if ($mode === 'interview') {
     $prompt = 'You are a friendly Hungarian language coach helping a learner prepare for the simplified naturalization (egyszerűsített honosítás) interview. '
             . 'Your job is to help them LEARN, not just grade them. Every response should teach something.' . "\n\n"
+            . 'GRADING LEVEL (' . $strictness . '/5): ' . $strictnessGuide[$strictness] . "\n\n"
             . 'CONTEXT:'
             . "\n- These interviews are B1-level conversational checks — natural speech, not academic grammar"
             . "\n- In Hungarian, family name comes FIRST (Bernstein Lawrence, not Lawrence Bernstein)"
@@ -78,6 +89,7 @@ if ($mode === 'interview') {
             . 'The learner was asked to say: "' . $target . '". '
             . 'Speech recognition heard: "' . $transcript . '". '
             . "\n\n"
+            . 'GRADING LEVEL (' . $strictness . '/5): ' . $strictnessGuide[$strictness] . "\n\n"
             . 'PASS: The words are recognisably the right Hungarian words — a Hungarian speaker would understand them. Minor accent or mispronunciation is fine. '
             . 'FAIL: Key words are missing, replaced with wrong words, or so mispronounced they would confuse a listener. '
             . "\n\n"
