@@ -183,12 +183,10 @@ if (isset($_GET['ajax']) && in_array($_GET['action'] ?? '', ['ai_answer', 'ai_qu
     exit;
 }
 
-// Fetch all phrases for management
-$search = $conn->real_escape_string(trim($_GET['search'] ?? ''));
+// Fetch all phrases for management (filtering is client-side)
 $catFilter = $conn->real_escape_string(trim($_GET['cat'] ?? ''));
-$sql = "SELECT * FROM hungarian_prep WHERE 1=1";
-if ($search) $sql .= " AND (question_hu LIKE '%$search%' OR answer_en LIKE '%$search%' OR answer_hu LIKE '%$search%')";
-if ($catFilter) $sql .= " AND category = '$catFilter'";
+$sql = "SELECT * FROM hungarian_prep";
+if ($catFilter) $sql .= " WHERE category = '$catFilter'";
 $sql .= " ORDER BY category, question_hu";
 $phrases = $conn->query($sql);
 
@@ -347,17 +345,19 @@ body { background: #060b18; color: #e2e8f0; }
         <h2 class="text-sm font-bold text-white uppercase tracking-wider mb-4">Manage Phrases</h2>
 
         <!-- Search + Filter -->
-        <form method="GET" class="flex flex-wrap gap-2 mb-4">
-            <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search..."
-                class="flex-1 min-w-[200px] bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-            <select name="cat" onchange="this.form.submit()" class="bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+        <div class="flex flex-wrap gap-2 mb-4">
+            <div class="flex-1 min-w-[200px] relative">
+                <input type="text" id="liveSearch" placeholder="Search..." autofocus
+                    class="w-full bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 pr-8 text-sm text-white focus:outline-none focus:border-indigo-500">
+                <button id="clearSearch" onclick="document.getElementById('liveSearch').value='';filterTable()" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-sm hidden">&times;</button>
+            </div>
+            <select id="catSelect" class="bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 <option value="">All Categories</option>
                 <?php foreach ($catList as $c): ?>
                 <option value="<?php echo htmlspecialchars($c); ?>" <?php echo $catFilter === $c ? 'selected' : ''; ?>><?php echo htmlspecialchars($c); ?></option>
                 <?php endforeach; ?>
             </select>
-            <button type="submit" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-semibold transition-all">Filter</button>
-        </form>
+        </div>
 
         <!-- Phrases Table -->
         <div class="overflow-x-auto">
@@ -521,6 +521,31 @@ function confirmMigrate(form) {
     document.getElementById('migrateIds').value = JSON.stringify(ids);
     return confirm('Move ' + ids.length + ' answers from English → Hungarian column?');
 }
+
+// Live search + category filter
+var searchInput = document.getElementById('liveSearch');
+var catSelect = document.getElementById('catSelect');
+var clearBtn = document.getElementById('clearSearch');
+var debounceTimer;
+
+function filterTable() {
+    var term = searchInput.value.toLowerCase();
+    var cat = catSelect.value;
+    clearBtn.classList.toggle('hidden', !term);
+    var rows = document.querySelectorAll('.phrase-row');
+    rows.forEach(function(row) {
+        var text = (row.dataset.q + ' ' + row.dataset.ah + ' ' + row.dataset.ae).toLowerCase();
+        var matchSearch = !term || text.indexOf(term) !== -1;
+        var matchCat = !cat || row.dataset.cat === cat;
+        row.style.display = (matchSearch && matchCat) ? '' : 'none';
+    });
+}
+
+searchInput.addEventListener('input', function() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(filterTable, 150);
+});
+catSelect.addEventListener('change', filterTable);
 
 // Close modal on Escape
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeEdit(); });
