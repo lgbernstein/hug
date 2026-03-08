@@ -271,13 +271,13 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                 </button>
             </div>
             <div class="flex items-center gap-1">
-                <button id="listenModeBtn" onclick="toggleListenMode()" title="Listen mode"
-                    class="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all">
-                    <i data-lucide="ear" class="w-4 h-4"></i>
+                <button id="listenModeBtn" onclick="toggleListenMode()" title="Listen mode — hides text until you click"
+                    class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold">
+                    <i data-lucide="ear" class="w-3.5 h-3.5"></i> Listen
                 </button>
-                <button id="autoAdvanceBtn" onclick="toggleAutoAdvance()" title="Auto-advance on pass"
-                    class="p-2 rounded-lg text-slate-500 hover:text-white hover:bg-white/5 transition-all">
-                    <i data-lucide="timer" class="w-4 h-4"></i>
+                <button id="autoAdvanceBtn" onclick="toggleAutoAdvance()" title="Auto-advance to next question on pass"
+                    class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold">
+                    <i data-lucide="timer" class="w-3.5 h-3.5"></i> Auto
                 </button>
                 <div class="flex items-center gap-1.5 ml-1">
                     <div id="readyIndicator" class="status-dot dot-off"></div>
@@ -298,11 +298,11 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <div class="px-5 pt-6 pb-4 text-center">
             <h1 id="questionText" class="question-text text-white mb-3"><?php echo htmlspecialchars($targetQ); ?></h1>
             <div class="flex justify-center gap-4 mb-2">
-                <button id="translateBtn" onclick="toggleTranslation()" class="inline-flex items-center gap-2 text-slate-500 hover:text-blue-400 transition-colors">
+                <button id="translateBtn" onclick="toggleTranslation()" class="inline-flex items-center gap-2 text-slate-400 hover:text-blue-400 transition-colors">
                     <i data-lucide="languages" class="w-5 h-5"></i>
                     <span class="text-sm font-semibold">Translate</span>
                 </button>
-                <button id="phoneticBtn" onclick="togglePhonetic()" class="inline-flex items-center gap-2 text-slate-500 hover:text-amber-400 transition-colors">
+                <button id="phoneticBtn" onclick="togglePhonetic()" class="inline-flex items-center gap-2 text-slate-400 hover:text-amber-400 transition-colors">
                     <i data-lucide="spell-check" class="w-5 h-5"></i>
                     <span class="text-sm font-semibold">Phonetic</span>
                 </button>
@@ -322,8 +322,8 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 
         <!-- Speed Control -->
         <div class="flex items-center justify-center gap-2 px-5 pb-4">
-            <i data-lucide="gauge" class="w-3.5 h-3.5 text-slate-500"></i>
-            <span class="text-[10px] text-slate-500 font-medium">Speed</span>
+            <i data-lucide="gauge" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span class="text-[10px] text-slate-400 font-medium">Speed</span>
             <div class="flex gap-1">
                 <button onclick="setSpeed(0.5)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="0.5">0.5x</button>
                 <button onclick="setSpeed(0.7)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="0.7">0.7x</button>
@@ -345,14 +345,17 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <!-- Control Bar -->
         <div class="px-5 pb-4">
             <div class="flex items-center justify-center gap-3">
-                <button onclick="speak(0.5)" title="Slow playback" class="ctrl-btn w-14 h-14 bg-surface-300 hover:bg-surface-400 text-slate-400 hover:text-white">
+                <button onclick="speak(0.5)" title="Slow playback" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-300 hover:text-white">
                     <i data-lucide="snail" class="w-5 h-5"></i>
+                    <span class="text-[9px] font-semibold">Slow</span>
                 </button>
-                <button id="recordBtn" onclick="toggleMic()" title="Record [Space]" class="ctrl-btn w-20 h-14 bg-red-600 hover:bg-red-500 text-white glow-red">
+                <button id="recordBtn" onclick="toggleMic()" title="Record [Space]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-red-600 hover:bg-red-500 text-white glow-red">
                     <i id="recordIcon" data-lucide="mic" class="w-6 h-6"></i>
+                    <span class="text-[9px] font-semibold">Record</span>
                 </button>
-                <button onclick="nextQuestion()" title="Next [Enter]" class="ctrl-btn w-14 h-14 bg-accent hover:bg-accent-dark text-white">
+                <button onclick="nextQuestion()" title="Next [Enter]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
                     <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                    <span class="text-[9px] font-semibold">Next</span>
                 </button>
             </div>
             <div class="flex items-center justify-center gap-5 mt-3 text-xs">
@@ -388,7 +391,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <div class="px-5 pb-5 border-t border-white/5 pt-4">
             <div class="flex items-center gap-2 mb-3">
                 <i data-lucide="pen-line" class="w-4 h-4 text-slate-500"></i>
-                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Practice Any Phrase</span>
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Practice Any Phrase</span>
                 <span class="kbd ml-auto hidden md:inline-flex">Ctrl+Enter</span>
             </div>
             <div class="flex gap-2">
@@ -409,7 +412,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
     </main>
 
     <!-- Keyboard Shortcuts (desktop) -->
-    <div class="hidden md:flex items-center justify-center gap-4 text-[10px] text-slate-600 mt-2">
+    <div class="hidden md:flex items-center justify-center gap-4 text-[10px] text-slate-400 mt-2">
         <span><span class="kbd">Space</span> Record</span>
         <span><span class="kbd">Enter</span> Next</span>
         <span><span class="kbd">Esc</span> Stop</span>
@@ -421,23 +424,23 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 
 <!-- BOTTOM QUICK BAR -->
 <nav class="quick-bar">
-    <button onclick="openBrowse()" class="flex flex-col items-center gap-1 p-2 text-slate-500 hover:text-accent-light transition-all">
+    <button onclick="openBrowse()" class="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-accent-light transition-all">
         <i data-lucide="book-open" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Browse</span>
     </button>
-    <button onclick="openStats()" class="flex flex-col items-center gap-1 p-2 text-slate-500 hover:text-accent-light transition-all">
+    <button onclick="openStats()" class="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-accent-light transition-all">
         <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Stats</span>
     </button>
-    <button onclick="speak(currentSpeed)" class="flex flex-col items-center gap-1 p-2 text-slate-500 hover:text-accent-light transition-all">
+    <button onclick="speak(currentSpeed)" class="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-accent-light transition-all">
         <i data-lucide="volume-2" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Listen</span>
     </button>
-    <button onclick="toggleMic()" class="flex flex-col items-center gap-1 p-2 text-slate-500 hover:text-red-400 transition-all">
+    <button onclick="toggleMic()" class="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-red-400 transition-all">
         <i data-lucide="mic" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Record</span>
     </button>
-    <button onclick="nextQuestion()" class="flex flex-col items-center gap-1 p-2 text-slate-500 hover:text-accent-light transition-all">
+    <button onclick="nextQuestion()" class="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-accent-light transition-all">
         <i data-lucide="skip-forward" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Next</span>
     </button>
