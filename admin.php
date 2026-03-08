@@ -95,6 +95,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $conn->query("UPDATE hungarian_prep SET answer_hu = " . ($answer_hu ? "'$answer_hu'" : "NULL") . " WHERE id = $id");
         $message = "Updated Hungarian answer for phrase #$id.";
     }
+
+    if ($_POST['action'] === 'update_all' && isset($_POST['id'])) {
+        $id = (int)$_POST['id'];
+        $stmt = $conn->prepare("UPDATE hungarian_prep SET question_hu=?, answer_hu=?, answer_en=?, category=? WHERE id=?");
+        $q  = trim($_POST['question_hu'] ?? '');
+        $ah = trim($_POST['answer_hu'] ?? '') ?: null;
+        $ae = trim($_POST['answer_en'] ?? '');
+        $cat = trim($_POST['category'] ?? 'General');
+        $stmt->bind_param('ssssi', $q, $ah, $ae, $cat, $id);
+        $stmt->execute();
+        $stmt->close();
+        $message = "Updated phrase #$id.";
+    }
+}
+
+// AJAX: AI generate answer or question via Gemini
+if (isset($_GET['ajax']) && in_array($_GET['action'] ?? '', ['ai_answer', 'ai_question'])) {
+    header('Content-Type: application/json');
+    $action = $_GET['action'];
+    $question_hu = trim($_POST['question_hu'] ?? '');
+    $answer_en = trim($_POST['answer_en'] ?? '');
+    $answer_hu = trim($_POST['answer_hu'] ?? '');
+
+    $apiKey = $env['GEMINI_KEY'] ?? '';
+    if (!$apiKey) { echo json_encode(['error' => 'No Gemini API key']); exit; }
+
+    if ($action === 'ai_answer') {
+        $prompt = "You are a Hungarian language expert helping someone prepare for a simplified naturalization interview.\n\n"
+            . "The interviewer asks: \"$question_hu\"\n"
+            . ($answer_en ? "The intended meaning in English: \"$answer_en\"\n" : "")
+            . "\nGenerate a grammatically correct, formal Hungarian answer that a native Hungarian speaker would give in this interview context. "
+            . "Use formal speech. Keep it concise (1-2 sentences). "
+            . "Reply with ONLY the Hungarian answer text, nothing else.";
+    } else {
+        $context = $answer_hu ?: $answer_en;
+        $prompt = "You are a Hungarian language expert helping someone prepare for a simplified naturalization interview.\n\n"
+            . "The answer in the database is: \"$context\"\n"
+            . ($answer_en ? "English meaning: \"$answer_en\"\n" : "")
+            . "\nGenerate the formal Hungarian interview question that an interviewer would ask to elicit this answer. "
+            . "Use formal speech. Keep it concise and natural. "
+            . "Reply with ONLY the Hungarian question text, nothing else.";
+    }
+
+    $payload = json_encode([
+        'contents' => [['parts' => [['text' => $prompt]]]],
+        'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 256]
+    ]);
+
+    $ch = curl_init('https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=' . $apiKey);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT        => 15
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200 || !$response) { echo json_encode(['error' => 'Gemini API error']); exit; }
+
+    $data = json_decode($response, true);
+    $text = trim($data['candidates'][0]['content']['parts'][0]['text'] ?? '');
+    $text = trim($text, '"\'');
+    echo json_encode(['result' => $text]);
+    exit;
 }
 
 // Fetch all phrases for management
@@ -238,30 +306,29 @@ body { background: #060b18; color: #e2e8f0; }
                     <th class="text-left py-2 px-2">Answer (HU)</th>
                     <th class="text-left py-2 px-2">English</th>
                     <th class="text-left py-2 px-2">Category</th>
-                    <th class="text-left py-2 px-2 w-20">Actions</th>
+                    <th class="text-left py-2 px-2 w-32">Actions</th>
                 </tr></thead>
                 <tbody>
                 <?php if ($phrases): while ($p = $phrases->fetch_assoc()): ?>
-                <tr class="border-t border-white/5 hover:bg-white/[0.02]" id="row-<?php echo $p['id']; ?>">
+                <tr class="border-t border-white/5 hover:bg-white/[0.02] phrase-row" id="row-<?php echo $p['id']; ?>"
+                    data-id="<?php echo $p['id']; ?>"
+                    data-q="<?php echo htmlspecialchars($p['question_hu'], ENT_QUOTES); ?>"
+                    data-ah="<?php echo htmlspecialchars($p['answer_hu'] ?? '', ENT_QUOTES); ?>"
+                    data-ae="<?php echo htmlspecialchars($p['answer_en'], ENT_QUOTES); ?>"
+                    data-cat="<?php echo htmlspecialchars($p['category'], ENT_QUOTES); ?>">
                     <td class="py-2 px-2 text-slate-600"><?php echo $p['id']; ?></td>
-                    <td class="py-2 px-2 text-white font-medium"><?php echo htmlspecialchars($p['question_hu']); ?></td>
-                    <td class="py-2 px-2">
-                        <form method="POST" class="flex gap-1 items-center">
-                            <input type="hidden" name="action" value="update_answer">
-                            <input type="hidden" name="id" value="<?php echo $p['id']; ?>">
-                            <input type="text" name="answer_hu" value="<?php echo htmlspecialchars($p['answer_hu'] ?? ''); ?>"
-                                placeholder="Add Hungarian answer..."
-                                class="bg-transparent border border-white/10 rounded px-2 py-1 text-green-400 text-xs w-full focus:outline-none focus:border-indigo-500 <?php echo $p['answer_hu'] ? '' : 'border-dashed border-yellow-500/30'; ?>">
-                            <button type="submit" class="text-slate-500 hover:text-green-400 transition-colors shrink-0" title="Save">&#10003;</button>
-                        </form>
-                    </td>
-                    <td class="py-2 px-2 text-slate-400"><?php echo htmlspecialchars($p['answer_en']); ?></td>
-                    <td class="py-2 px-2 text-slate-500"><?php echo htmlspecialchars($p['category']); ?></td>
-                    <td class="py-2 px-2">
-                        <form method="POST" onsubmit="return confirm('Delete this phrase?')">
+                    <td class="py-2 px-2 text-white font-medium cell-q"><?php echo htmlspecialchars($p['question_hu']); ?></td>
+                    <td class="py-2 px-2 cell-ah <?php echo $p['answer_hu'] ? 'text-green-400' : 'text-yellow-500/50 italic'; ?>"><?php echo $p['answer_hu'] ? htmlspecialchars($p['answer_hu']) : '(missing)'; ?></td>
+                    <td class="py-2 px-2 text-slate-400 cell-ae"><?php echo htmlspecialchars($p['answer_en']); ?></td>
+                    <td class="py-2 px-2 text-slate-500 cell-cat"><?php echo htmlspecialchars($p['category']); ?></td>
+                    <td class="py-2 px-2 space-x-1 whitespace-nowrap">
+                        <button onclick="editRow(<?php echo $p['id']; ?>)" class="text-indigo-400 hover:text-indigo-300 transition-colors text-xs font-semibold">edit</button>
+                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_answer')" class="text-violet-400 hover:text-violet-300 transition-colors text-xs" title="AI Generate Hungarian Answer">AI ans</button>
+                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_question')" class="text-cyan-400 hover:text-cyan-300 transition-colors text-xs" title="AI Generate Question">AI q</button>
+                        <form method="POST" class="inline" onsubmit="return confirm('Delete this phrase?')">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="id" value="<?php echo $p['id']; ?>">
-                            <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors text-xs">delete</button>
+                            <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors text-xs">del</button>
                         </form>
                     </td>
                 </tr>
@@ -272,5 +339,122 @@ body { background: #060b18; color: #e2e8f0; }
     </div>
 
 </div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden" onclick="if(event.target===this)closeEdit()">
+    <div class="bg-[#111a2e] border border-white/10 rounded-2xl p-6 w-full max-w-xl mx-4 space-y-4">
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Edit Phrase <span id="editId" class="text-indigo-400"></span></h3>
+        <form method="POST" id="editForm">
+            <input type="hidden" name="action" value="update_all">
+            <input type="hidden" name="id" id="editIdInput">
+            <div class="space-y-3">
+                <div>
+                    <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Question (HU)</label>
+                    <div class="flex gap-2 mt-1">
+                        <input type="text" name="question_hu" id="editQ" class="flex-1 bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+                        <button type="button" onclick="aiFromModal('ai_question')" class="bg-cyan-600 hover:bg-cyan-500 px-3 py-2 rounded-lg text-xs font-semibold transition-all shrink-0" title="AI Generate Question">AI Q</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Answer (HU)</label>
+                    <div class="flex gap-2 mt-1">
+                        <input type="text" name="answer_hu" id="editAH" class="flex-1 bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-green-400 focus:outline-none focus:border-indigo-500">
+                        <button type="button" onclick="aiFromModal('ai_answer')" class="bg-violet-600 hover:bg-violet-500 px-3 py-2 rounded-lg text-xs font-semibold transition-all shrink-0" title="AI Generate Answer">AI Ans</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">English</label>
+                    <input type="text" name="answer_en" id="editAE" class="w-full mt-1 bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Category</label>
+                    <input type="text" name="category" id="editCat" class="w-full mt-1 bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+            <div class="flex gap-3 mt-5">
+                <button type="submit" class="bg-green-600 hover:bg-green-500 px-5 py-2 rounded-lg text-sm font-semibold transition-all">Save</button>
+                <button type="button" onclick="closeEdit()" class="bg-slate-700 hover:bg-slate-600 px-5 py-2 rounded-lg text-sm font-semibold transition-all">Cancel</button>
+            </div>
+        </form>
+        <div id="aiStatus" class="text-xs text-slate-500 hidden"></div>
+    </div>
+</div>
+
+<script>
+function editRow(id) {
+    var row = document.getElementById('row-' + id);
+    document.getElementById('editIdInput').value = id;
+    document.getElementById('editId').textContent = '#' + id;
+    document.getElementById('editQ').value = row.dataset.q;
+    document.getElementById('editAH').value = row.dataset.ah;
+    document.getElementById('editAE').value = row.dataset.ae;
+    document.getElementById('editCat').value = row.dataset.cat;
+    document.getElementById('aiStatus').classList.add('hidden');
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEdit() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+function aiGenerate(id, action) {
+    var row = document.getElementById('row-' + id);
+    var btn = event.target;
+    var origText = btn.textContent;
+    btn.textContent = '...';
+    btn.disabled = true;
+
+    var fd = new FormData();
+    fd.append('question_hu', row.dataset.q);
+    fd.append('answer_en', row.dataset.ae);
+    fd.append('answer_hu', row.dataset.ah);
+
+    fetch('admin.php?ajax=1&action=' + action, { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { alert(data.error); return; }
+            // Open edit modal with AI result pre-filled
+            editRow(id);
+            if (action === 'ai_answer') {
+                document.getElementById('editAH').value = data.result;
+            } else {
+                document.getElementById('editQ').value = data.result;
+            }
+            var status = document.getElementById('aiStatus');
+            status.textContent = 'AI generated — review and save.';
+            status.classList.remove('hidden');
+        })
+        .catch(function() { alert('AI request failed'); })
+        .finally(function() { btn.textContent = origText; btn.disabled = false; });
+}
+
+function aiFromModal(action) {
+    var status = document.getElementById('aiStatus');
+    status.textContent = 'Generating...';
+    status.classList.remove('hidden');
+
+    var fd = new FormData();
+    fd.append('question_hu', document.getElementById('editQ').value);
+    fd.append('answer_en', document.getElementById('editAE').value);
+    fd.append('answer_hu', document.getElementById('editAH').value);
+
+    fetch('admin.php?ajax=1&action=' + action, { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { status.textContent = data.error; return; }
+            if (action === 'ai_answer') {
+                document.getElementById('editAH').value = data.result;
+            } else {
+                document.getElementById('editQ').value = data.result;
+            }
+            status.textContent = 'AI generated — review and save.';
+        })
+        .catch(function() { status.textContent = 'AI request failed'; });
+}
+
+// Close modal on Escape
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeEdit(); });
+</script>
+
 </body>
 </html>
