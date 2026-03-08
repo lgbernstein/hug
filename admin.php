@@ -322,13 +322,13 @@ body { background: #060b18; color: #e2e8f0; }
                     <td class="py-2 px-2 text-slate-400 cell-ae"><?php echo htmlspecialchars($p['answer_en']); ?></td>
                     <td class="py-2 px-2 text-slate-500 cell-cat"><?php echo htmlspecialchars($p['category']); ?></td>
                     <td class="py-2 px-2 space-x-1 whitespace-nowrap">
-                        <button onclick="editRow(<?php echo $p['id']; ?>)" class="text-indigo-400 hover:text-indigo-300 transition-colors text-xs font-semibold">edit</button>
-                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_answer')" class="text-violet-400 hover:text-violet-300 transition-colors text-xs" title="AI Generate Hungarian Answer">AI ans</button>
-                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_question')" class="text-cyan-400 hover:text-cyan-300 transition-colors text-xs" title="AI Generate Question">AI q</button>
+                        <button onclick="editRow(<?php echo $p['id']; ?>)" class="border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors text-xs font-semibold px-2 py-1 rounded">edit</button>
+                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_answer')" class="border border-violet-500/50 text-violet-400 hover:bg-violet-500/20 hover:text-violet-300 transition-colors text-xs px-2 py-1 rounded" title="AI Generate Hungarian Answer">AI ans</button>
+                        <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_question')" class="border border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors text-xs px-2 py-1 rounded" title="AI Generate Question">AI q</button>
                         <form method="POST" class="inline" onsubmit="return confirm('Delete this phrase?')">
                             <input type="hidden" name="action" value="delete">
                             <input type="hidden" name="id" value="<?php echo $p['id']; ?>">
-                            <button type="submit" class="text-slate-600 hover:text-red-400 transition-colors text-xs">del</button>
+                            <button type="submit" class="border border-red-500/30 text-slate-600 hover:bg-red-500/20 hover:text-red-400 transition-colors text-xs px-2 py-1 rounded">del</button>
                         </form>
                     </td>
                 </tr>
