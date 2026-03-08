@@ -353,6 +353,10 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                     <i id="recordIcon" data-lucide="mic" class="w-6 h-6"></i>
                     <span id="recordLabel" class="text-[9px] font-semibold">Record</span>
                 </button>
+                <button id="stopBtn" onclick="toggleMic()" title="Stop recording [Esc]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-slate-600 hover:bg-slate-500 text-white hidden">
+                    <i data-lucide="mic-off" class="w-5 h-5"></i>
+                    <span class="text-[9px] font-semibold">Stop</span>
+                </button>
                 <button onclick="nextQuestion()" title="Next [Enter]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
                     <i data-lucide="arrow-right" class="w-5 h-5"></i>
                     <span class="text-[9px] font-semibold">Next</span>
@@ -782,8 +786,9 @@ recognition.onstart = function() {
     listenStartTime = Date.now();
     indicator.className = 'status-dot dot-live';
     document.getElementById('recordBtn').classList.add('mic-active');
-    document.getElementById('recordLabel').textContent = 'Stop';
-    setRecordIcon('mic-off');
+    document.getElementById('recordLabel').textContent = 'Recording';
+    document.getElementById('stopBtn').classList.remove('hidden');
+    setRecordIcon('headphones');
     startVolume();
     recTimeout = setTimeout(function() {
         if (isListening) recognition.stop();
@@ -805,6 +810,7 @@ recognition.onresult = function(event) {
     indicator.className = 'status-dot dot-off';
     document.getElementById('recordBtn').classList.remove('mic-active');
     document.getElementById('recordLabel').textContent = 'Record';
+    document.getElementById('stopBtn').classList.add('hidden');
     setRecordIcon('mic');
 
     if (isPractice) {
@@ -901,6 +907,7 @@ recognition.onend = function() {
     indicator.className = 'status-dot dot-off';
     document.getElementById('recordBtn').classList.remove('mic-active');
     document.getElementById('recordLabel').textContent = 'Record';
+    document.getElementById('stopBtn').classList.add('hidden');
     setRecordIcon('mic');
 };
 
