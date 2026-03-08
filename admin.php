@@ -368,7 +368,7 @@ body { background: #060b18; color: #e2e8f0; }
         <!-- Phrases Table -->
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
-                <thead><tr class="text-slate-500 uppercase tracking-wider text-[10px]">
+                <thead><tr class="text-slate-500 tracking-wider text-[10px]">
                     <th class="text-left py-2 px-2 w-8">#</th>
                     <th class="text-left py-2 px-2">Question (HU)</th>
                     <th class="text-left py-2 px-2">Answer (HU)</th>
