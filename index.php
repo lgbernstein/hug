@@ -277,7 +277,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                 </button>
                 <button id="autoAdvanceBtn" onclick="toggleAutoAdvance()" title="Auto-advance to next question on pass"
                     class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold">
-                    <i data-lucide="timer" class="w-3.5 h-3.5"></i> Auto
+                    <i data-lucide="timer" class="w-3.5 h-3.5"></i> Auto-Next
                 </button>
                 <button id="micToggle" onclick="toggleMic()" title="Mic on/off"
                     class="p-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all">
