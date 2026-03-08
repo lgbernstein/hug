@@ -288,7 +288,7 @@ body { background: #060b18; color: #e2e8f0; }
         <form method="GET" class="flex flex-wrap gap-2 mb-4">
             <input type="text" name="search" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search..."
                 class="flex-1 min-w-[200px] bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-            <select name="cat" class="bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+            <select name="cat" onchange="this.form.submit()" class="bg-[#0c1222] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
                 <option value="">All Categories</option>
                 <?php foreach ($catList as $c): ?>
                 <option value="<?php echo htmlspecialchars($c); ?>" <?php echo $catFilter === $c ? 'selected' : ''; ?>><?php echo htmlspecialchars($c); ?></option>
@@ -320,7 +320,7 @@ body { background: #060b18; color: #e2e8f0; }
                     <td class="py-2 px-2 text-white font-medium cell-q"><?php echo htmlspecialchars($p['question_hu']); ?></td>
                     <td class="py-2 px-2 cell-ah <?php echo $p['answer_hu'] ? 'text-green-400' : 'text-yellow-500/50 italic'; ?>"><?php echo $p['answer_hu'] ? htmlspecialchars($p['answer_hu']) : '(missing)'; ?></td>
                     <td class="py-2 px-2 text-slate-400 cell-ae"><?php echo htmlspecialchars($p['answer_en']); ?></td>
-                    <td class="py-2 px-2 text-slate-500 cell-cat"><?php echo htmlspecialchars($p['category']); ?></td>
+                    <td class="py-2 px-2 cell-cat"><a href="?cat=<?php echo urlencode($p['category']); ?>" class="text-slate-500 hover:text-indigo-400 underline decoration-dotted underline-offset-2 transition-colors"><?php echo htmlspecialchars($p['category']); ?></a></td>
                     <td class="py-2 px-2 space-x-1 whitespace-nowrap">
                         <button onclick="editRow(<?php echo $p['id']; ?>)" class="border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors text-xs font-semibold px-2 py-1 rounded">edit</button>
                         <button onclick="aiGenerate(<?php echo $p['id']; ?>,'ai_answer')" class="border border-violet-500/50 text-violet-400 hover:bg-violet-500/20 hover:text-violet-300 transition-colors text-xs px-2 py-1 rounded" title="AI Generate Hungarian Answer">AI ans</button>
