@@ -108,6 +108,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $stmt->close();
         $message = "Updated phrase #$id.";
     }
+
+    if ($_POST['action'] === 'migrate_hu') {
+        $ids = json_decode($_POST['migrate_ids'] ?? '[]', true);
+        if ($ids) {
+            $migrated = 0;
+            $stmt = $conn->prepare("UPDATE hungarian_prep SET answer_hu = answer_en, answer_en = '' WHERE id = ? AND (answer_hu IS NULL OR answer_hu = '')");
+            foreach ($ids as $mid) {
+                $mid = (int)$mid;
+                $stmt->bind_param('i', $mid);
+                $stmt->execute();
+                if ($stmt->affected_rows > 0) $migrated++;
+            }
+            $stmt->close();
+            $message = "Migrated $migrated rows: moved answer_en → answer_hu.";
+        }
+    }
 }
 
 // AJAX: AI generate answer or question via Gemini
@@ -180,6 +196,11 @@ $catList = [];
 if ($cats) { while ($c = $cats->fetch_assoc()) $catList[] = $c['category']; }
 
 $totalCount = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep")->fetch_assoc()['c'] ?? 0;
+
+// Find rows where answer_en looks Hungarian (has HU diacritics) and answer_hu is empty
+$migrateRows = [];
+$mRes = $conn->query("SELECT id, question_hu, answer_en, category FROM hungarian_prep WHERE (answer_hu IS NULL OR answer_hu = '') AND answer_en != '' AND (answer_en REGEXP '[áéíóöőúüű]' OR answer_en REGEXP '^(Igen|Nem|A |Az |Szeretek|Tudok|Kétszer)')");
+if ($mRes) { while ($mr = $mRes->fetch_assoc()) $migrateRows[] = $mr; }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -279,6 +300,42 @@ body { background: #060b18; color: #e2e8f0; }
         </div>
         <?php endif; ?>
     </div>
+
+    <!-- DATA FIX: Hungarian in wrong column -->
+    <?php if ($migrateRows): ?>
+    <div class="bg-[#1a1a0e] border border-yellow-500/20 rounded-2xl p-6">
+        <h2 class="text-sm font-bold text-yellow-400 uppercase tracking-wider mb-2">Data Fix: Hungarian Answers in English Column</h2>
+        <p class="text-xs text-slate-400 mb-4"><?php echo count($migrateRows); ?> rows have Hungarian text in the "English" column with no Hungarian answer. Review and migrate them.</p>
+        <div class="overflow-x-auto mb-4">
+            <table class="w-full text-xs">
+                <thead><tr class="text-slate-500 uppercase tracking-wider text-[10px]">
+                    <th class="text-left py-2 px-2 w-8"><input type="checkbox" id="migrateAll" checked onchange="document.querySelectorAll('.migrate-cb').forEach(c=>c.checked=this.checked)" class="accent-yellow-500"></th>
+                    <th class="text-left py-2 px-2">#</th>
+                    <th class="text-left py-2 px-2">Question (HU)</th>
+                    <th class="text-left py-2 px-2">Currently in "English" column</th>
+                    <th class="text-left py-2 px-2">Category</th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($migrateRows as $mr): ?>
+                <tr class="border-t border-white/5">
+                    <td class="py-2 px-2"><input type="checkbox" class="migrate-cb accent-yellow-500" value="<?php echo $mr['id']; ?>" checked></td>
+                    <td class="py-2 px-2 text-slate-600"><?php echo $mr['id']; ?></td>
+                    <td class="py-2 px-2 text-white"><?php echo htmlspecialchars($mr['question_hu']); ?></td>
+                    <td class="py-2 px-2 text-yellow-400"><?php echo htmlspecialchars($mr['answer_en']); ?></td>
+                    <td class="py-2 px-2 text-slate-500"><?php echo htmlspecialchars($mr['category']); ?></td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <form method="POST" onsubmit="return confirmMigrate(this)">
+            <input type="hidden" name="action" value="migrate_hu">
+            <input type="hidden" name="migrate_ids" id="migrateIds">
+            <button type="submit" class="bg-yellow-600 hover:bg-yellow-500 px-5 py-2 rounded-lg text-sm font-semibold text-black transition-all">Move selected to Answer (HU) column</button>
+            <span class="text-xs text-slate-500 ml-3">This moves text from answer_en → answer_hu and clears answer_en</span>
+        </form>
+    </div>
+    <?php endif; ?>
 
     <!-- MANAGE SECTION -->
     <div class="bg-[#111a2e] border border-white/5 rounded-2xl p-6">
@@ -450,6 +507,14 @@ function aiFromModal(action) {
             status.textContent = 'AI generated — review and save.';
         })
         .catch(function() { status.textContent = 'AI request failed'; });
+}
+
+function confirmMigrate(form) {
+    var ids = [];
+    document.querySelectorAll('.migrate-cb:checked').forEach(function(cb) { ids.push(parseInt(cb.value)); });
+    if (!ids.length) { alert('No rows selected'); return false; }
+    document.getElementById('migrateIds').value = JSON.stringify(ids);
+    return confirm('Move ' + ids.length + ' answers from English → Hungarian column?');
 }
 
 // Close modal on Escape
