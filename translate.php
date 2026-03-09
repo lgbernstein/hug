@@ -26,9 +26,15 @@ curl_setopt_array($ch, [
 ]);
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlErr  = curl_error($ch);
 curl_close($ch);
 
-if ($httpCode !== 200 || !$response) { echo json_encode(['translation' => 'API error']); exit; }
+if ($httpCode !== 200 || !$response) {
+    $err = $response ? json_decode($response, true) : null;
+    $msg = $err['error']['message'] ?? ($curlErr ?: "HTTP $httpCode");
+    echo json_encode(['translation' => 'API error: ' . $msg]);
+    exit;
+}
 
 $data = json_decode($response, true);
 $translation = $data['candidates'][0]['content']['parts'][0]['text'] ?? 'Error';
