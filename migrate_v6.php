@@ -76,7 +76,36 @@ $conn->query("CREATE TABLE IF NOT EXISTS grammar_patterns (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 $results[] = "grammar_patterns table ready";
 
-// 6. Add skill_tags column to study_history for per-attempt skill tracking
+// 6. Deduplicate hungarian_prep and add UNIQUE constraint on question_hu
+$dupeCheck = $conn->query("SELECT COUNT(*) as cnt FROM hungarian_prep GROUP BY question_hu HAVING cnt > 1 LIMIT 1");
+if ($dupeCheck && $dupeCheck->num_rows > 0) {
+    // Delete duplicate rows, keeping the one with the lowest id
+    $conn->query("DELETE hp FROM hungarian_prep hp
+        INNER JOIN (
+            SELECT MIN(id) as keep_id, question_hu
+            FROM hungarian_prep
+            GROUP BY question_hu
+            HAVING COUNT(*) > 1
+        ) dups ON hp.question_hu = dups.question_hu AND hp.id != dups.keep_id");
+    $results[] = "Removed " . $conn->affected_rows . " duplicate rows from hungarian_prep";
+} else {
+    $results[] = "No duplicates found in hungarian_prep";
+}
+
+// 6b. Add UNIQUE constraint on question_hu to prevent future duplicates
+$idx = $conn->query("SHOW INDEX FROM hungarian_prep WHERE Key_name = 'unique_question_hu'");
+if ($idx && $idx->num_rows === 0) {
+    $conn->query("ALTER TABLE hungarian_prep ADD UNIQUE KEY unique_question_hu (question_hu(255))");
+    if ($conn->error) {
+        $results[] = "Failed to add UNIQUE on question_hu: " . $conn->error;
+    } else {
+        $results[] = "Added UNIQUE constraint on hungarian_prep.question_hu";
+    }
+} else {
+    $results[] = "UNIQUE constraint on question_hu already exists";
+}
+
+// 7. Add skill_tags column to study_history for per-attempt skill tracking
 $col = $conn->query("SHOW COLUMNS FROM study_history LIKE 'skill_tags'");
 if ($col && $col->num_rows === 0) {
     $conn->query("ALTER TABLE study_history ADD COLUMN skill_tags TEXT DEFAULT NULL");
