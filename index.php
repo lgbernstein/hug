@@ -405,6 +405,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .drill-card:hover { border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05); transform: translateY(-1px); }
 .tag-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.15); }
 .tag-pill-active { background: rgba(99, 102, 241, 0.35); border-color: rgba(99, 102, 241, 0.5); color: #fff; }
+select option { background: #111a2e; color: #e2e8f0; }
 </style>
 </head>
 <body class="min-h-screen flex flex-col items-center pb-20 md:pb-6">
@@ -480,6 +481,78 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         </div>
         <div id="statsContent" class="flex-1 overflow-y-auto p-5 space-y-6">
             <p class="text-slate-500 text-sm text-center">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<!-- DRILL MODAL -->
+<div id="activeDrill" class="hidden fixed inset-0 modal-backdrop z-50 flex flex-col">
+    <div class="glass-strong max-w-2xl w-full mx-auto mt-4 md:mt-12 rounded-t-3xl md:rounded-3xl flex-1 md:flex-initial md:max-h-[85vh] flex flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <div>
+                <h2 id="drillTitle" class="text-lg font-bold text-white"></h2>
+                <p id="drillProgress" class="text-xs text-slate-500 mt-0.5"></p>
+            </div>
+            <button onclick="closeDrill()" class="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto">
+            <div class="px-5 pt-6 pb-4 text-center">
+                <h1 id="drillQuestionText" class="question-text text-white mb-3"></h1>
+                <div class="flex justify-center gap-4 mb-2">
+                    <button onclick="drillTranslate()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:text-blue-400 hover:border-blue-400/40 hover:bg-blue-400/5 transition-all">
+                        <i data-lucide="languages" class="w-4 h-4"></i>
+                        <span class="text-xs font-semibold">Translate</span>
+                    </button>
+                </div>
+                <p id="drillTranslation" class="hidden text-blue-300/80 text-sm mt-2 italic"></p>
+            </div>
+            <div class="px-5 pb-4">
+                <button onclick="drillSpeak()"
+                    class="w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-5 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98]">
+                    <i data-lucide="volume-2" class="w-7 h-7 text-accent-light group-hover:scale-110 transition-transform"></i>
+                    <span class="text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]">Listen</span>
+                </button>
+            </div>
+            <div class="px-5 pb-4">
+                <details id="drillReveal" class="group">
+                    <summary class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition-all cursor-pointer list-none border border-white/5">
+                        <i data-lucide="eye" class="w-4 h-4"></i>
+                        <span class="text-xs font-semibold uppercase tracking-wider">Reveal Answer</span>
+                    </summary>
+                    <div class="mt-3 p-5 bg-accent/5 rounded-xl border border-accent/10">
+                        <p id="drillAnswerText" class="text-lg text-slate-300 italic leading-relaxed"></p>
+                    </div>
+                </details>
+            </div>
+            <div class="px-5 pb-5">
+                <div class="flex items-center justify-center gap-3">
+                    <button onclick="drillMic()" title="Mic" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-green-600 hover:bg-green-500 text-white glow-green">
+                        <i data-lucide="mic" class="w-6 h-6"></i>
+                        <span class="text-[9px] font-semibold">Mic</span>
+                    </button>
+                    <button onclick="drillNext()" title="Next" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
+                        <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                        <span class="text-[9px] font-semibold">Next</span>
+                    </button>
+                    <button onclick="drillShuffle()" title="Shuffle" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
+                        <i data-lucide="shuffle" class="w-5 h-5"></i>
+                        <span class="text-[9px] font-semibold">Shuffle</span>
+                    </button>
+                </div>
+                <div class="flex items-center justify-center gap-5 mt-3 text-xs">
+                    <span class="flex items-center gap-1 text-green-500/70">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i> <span id="drillPass">0</span>
+                    </span>
+                    <span class="flex items-center gap-1 text-red-500/70">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i> <span id="drillFail">0</span>
+                    </span>
+                    <span class="text-slate-500">
+                        <span id="drillIndex">0</span> / <span id="drillTotal">0</span>
+                    </span>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -701,25 +774,18 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <span><span class="kbd">P</span> Phonetic</span>
     </div>
 
-    <!-- Quick Access: Drills + Grammar + Practice -->
-    <div class="grid grid-cols-2 gap-2">
-        <button onclick="showView('drills')" class="glass rounded-2xl p-4 flex items-center gap-3 hover:border-accent/20 transition-all text-left active:scale-[0.98]">
-            <div class="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
-                <i data-lucide="dumbbell" class="w-4 h-4 text-accent-light"></i>
-            </div>
-            <div>
-                <p class="text-xs font-bold text-white">Drills</p>
-                <p id="homeDrillCount" class="text-[10px] text-slate-500">Focused practice</p>
-            </div>
-        </button>
-        <button onclick="showView('grammar')" class="glass rounded-2xl p-4 flex items-center gap-3 hover:border-accent/20 transition-all text-left active:scale-[0.98]">
-            <div class="w-9 h-9 rounded-xl bg-yellow-400/10 flex items-center justify-center flex-shrink-0">
-                <i data-lucide="book-open" class="w-4 h-4 text-yellow-400"></i>
-            </div>
-            <div>
-                <p class="text-xs font-bold text-white">Grammar</p>
-                <p id="homeGrammarCount" class="text-[10px] text-slate-500">Patterns & AI lessons</p>
-            </div>
+    <!-- Focused Drill Picker + Grammar -->
+    <div class="flex items-center gap-2">
+        <div class="flex-1 relative">
+            <select id="drillPicker" onchange="onDrillPick(this.value)"
+                class="w-full bg-surface-100 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-semibold appearance-none cursor-pointer hover:border-accent/30 transition-all focus:outline-none focus:border-accent/40 pr-10">
+                <option value="">Focused Drill...</option>
+            </select>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+        </div>
+        <button onclick="showView('grammar')" class="bg-surface-100 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-semibold text-white hover:border-accent/30 transition-all flex-shrink-0">
+            <i data-lucide="book-open" class="w-4 h-4 text-yellow-400"></i>
+            <span class="hidden sm:inline">Grammar</span>
         </button>
     </div>
 
@@ -766,84 +832,6 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 
         <div id="drillGroupList" class="space-y-2">
             <p class="text-slate-500 text-sm text-center py-4">Loading drill groups...</p>
-        </div>
-
-        <!-- Active Drill (hidden until a group is selected) -->
-        <div id="activeDrill" class="hidden">
-            <div class="glass rounded-3xl overflow-hidden glow-accent">
-                <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                    <div>
-                        <h2 id="drillTitle" class="text-lg font-bold text-white"></h2>
-                        <p id="drillProgress" class="text-xs text-slate-500 mt-0.5"></p>
-                    </div>
-                    <button onclick="closeDrill()" class="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
-                </div>
-
-                <!-- Drill question display -->
-                <div class="px-5 pt-6 pb-4 text-center">
-                    <h1 id="drillQuestionText" class="question-text text-white mb-3"></h1>
-                    <div class="flex justify-center gap-4 mb-2">
-                        <button onclick="drillTranslate()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:text-blue-400 hover:border-blue-400/40 hover:bg-blue-400/5 transition-all">
-                            <i data-lucide="languages" class="w-4 h-4"></i>
-                            <span class="text-xs font-semibold">Translate</span>
-                        </button>
-                    </div>
-                    <p id="drillTranslation" class="hidden text-blue-300/80 text-sm mt-2 italic"></p>
-                </div>
-
-                <!-- Drill listen button -->
-                <div class="px-5 pb-4">
-                    <button onclick="drillSpeak()"
-                        class="w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-5 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98]">
-                        <i data-lucide="volume-2" class="w-7 h-7 text-accent-light group-hover:scale-110 transition-transform"></i>
-                        <span class="text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]">Listen</span>
-                    </button>
-                </div>
-
-                <!-- Drill answer reveal -->
-                <div class="px-5 pb-4">
-                    <details id="drillReveal" class="group">
-                        <summary class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition-all cursor-pointer list-none border border-white/5">
-                            <i data-lucide="eye" class="w-4 h-4"></i>
-                            <span class="text-xs font-semibold uppercase tracking-wider">Reveal Answer</span>
-                        </summary>
-                        <div class="mt-3 p-5 bg-accent/5 rounded-xl border border-accent/10">
-                            <p id="drillAnswerText" class="text-lg text-slate-300 italic leading-relaxed"></p>
-                        </div>
-                    </details>
-                </div>
-
-                <!-- Drill controls -->
-                <div class="px-5 pb-5">
-                    <div class="flex items-center justify-center gap-3">
-                        <button onclick="drillMic()" title="Mic [Space]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-green-600 hover:bg-green-500 text-white glow-green">
-                            <i data-lucide="mic" class="w-6 h-6"></i>
-                            <span class="text-[9px] font-semibold">Mic</span>
-                        </button>
-                        <button onclick="drillNext()" title="Next" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
-                            <i data-lucide="arrow-right" class="w-5 h-5"></i>
-                            <span class="text-[9px] font-semibold">Next</span>
-                        </button>
-                        <button onclick="drillShuffle()" title="Shuffle" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
-                            <i data-lucide="shuffle" class="w-5 h-5"></i>
-                            <span class="text-[9px] font-semibold">Shuffle</span>
-                        </button>
-                    </div>
-                    <div class="flex items-center justify-center gap-5 mt-3 text-xs">
-                        <span class="flex items-center gap-1 text-green-500/70">
-                            <i data-lucide="check" class="w-3.5 h-3.5"></i> <span id="drillPass">0</span>
-                        </span>
-                        <span class="flex items-center gap-1 text-red-500/70">
-                            <i data-lucide="x" class="w-3.5 h-3.5"></i> <span id="drillFail">0</span>
-                        </span>
-                        <span class="text-slate-500">
-                            <span id="drillIndex">0</span> / <span id="drillTotal">0</span>
-                        </span>
-                    </div>
-                </div>
-            </div>
         </div>
 
     </div><!-- end view-drills -->
@@ -1980,7 +1968,7 @@ function showView(view) {
     // Show quickbar only on home
     document.getElementById('quickbar-home').classList.toggle('hidden', view !== 'home');
     // Lazy load
-    if (view === 'home') loadHomeStats();
+    if (view === 'home') { loadHomeStats(); loadDrillGroups(); }
     if (view === 'drills') loadDrillGroups();
     if (view === 'grammar') { loadGrammarPatterns(); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2012,13 +2000,12 @@ function loadHomeStats() {
             }
 
             // Counts on drill/grammar buttons
-            if (data.grammar_count) {
-                document.getElementById('homeGrammarCount').textContent = data.grammar_count + ' patterns';
-            }
+            // These elements may exist depending on layout
+            var gc = document.getElementById('homeGrammarCount');
+            if (gc && data.grammar_count) gc.textContent = data.grammar_count + ' patterns';
+            var dc = document.getElementById('homeDrillCount');
             var drillCount = (data.groups || []).filter(function(g) { return g.phrase_count > 0; }).length;
-            if (drillCount) {
-                document.getElementById('homeDrillCount').textContent = drillCount + ' groups';
-            }
+            if (dc && drillCount) dc.textContent = drillCount + ' groups';
             lucide.createIcons();
         })
         .catch(function() {});
@@ -2037,51 +2024,60 @@ function loadDrillGroups() {
         .then(function(r) { return r.json(); })
         .then(function(groups) {
             drillGroupsLoaded = true;
-            var list = document.getElementById('drillGroupList');
-            list.textContent = '';
-            var countEl = document.getElementById('drillGroupCount');
-            if (countEl) countEl.textContent = groups.length + ' groups';
-            if (!groups.length) {
-                var empty = document.createElement('p');
-                empty.className = 'text-slate-500 text-sm text-center py-4';
-                empty.textContent = 'No drill groups yet. Run import_notion.php first.';
-                list.appendChild(empty);
-                return;
+            // Populate dropdown on home page
+            var picker = document.getElementById('drillPicker');
+            if (picker) {
+                picker.innerHTML = '<option value="">Focused Drill...</option>';
+                groups.forEach(function(g) {
+                    if (g.phrase_count < 1) return;
+                    var opt = document.createElement('option');
+                    opt.value = g.name;
+                    opt.textContent = g.name + ' (' + g.phrase_count + ')';
+                    picker.appendChild(opt);
+                });
             }
-            groups.forEach(function(g) {
-                if (g.phrase_count < 1) return;
-                var card = document.createElement('div');
-                card.className = 'drill-card';
-                card.onclick = function() { startDrill(g.name); };
-
-                var top = document.createElement('div');
-                top.className = 'flex items-center justify-between';
-                var left = document.createElement('div');
-                left.className = 'flex items-center gap-3';
-                var icon = document.createElement('div');
-                icon.className = 'w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0';
-                icon.innerHTML = '<i data-lucide="dumbbell" class="w-4 h-4 text-accent-light"></i>';
-                var info = document.createElement('div');
-                var name = document.createElement('p');
-                name.className = 'text-sm font-semibold text-white';
-                name.textContent = g.name;
-                var desc = document.createElement('p');
-                desc.className = 'text-[10px] text-slate-400 mt-0.5';
-                desc.textContent = g.description || '';
-                info.appendChild(name);
-                info.appendChild(desc);
-                left.appendChild(icon);
-                left.appendChild(info);
-                var count = document.createElement('span');
-                count.className = 'text-xs text-slate-500 flex-shrink-0';
-                count.textContent = g.phrase_count;
-                top.appendChild(left);
-                top.appendChild(count);
-                card.appendChild(top);
-                list.appendChild(card);
-            });
+            // Populate drills view list
+            var list = document.getElementById('drillGroupList');
+            if (list) {
+                list.textContent = '';
+                var countEl = document.getElementById('drillGroupCount');
+                if (countEl) countEl.textContent = groups.length + ' groups';
+                groups.forEach(function(g) {
+                    if (g.phrase_count < 1) return;
+                    var card = document.createElement('div');
+                    card.className = 'drill-card';
+                    card.onclick = function() { startDrill(g.name); };
+                    var top = document.createElement('div');
+                    top.className = 'flex items-center justify-between';
+                    var name = document.createElement('span');
+                    name.className = 'text-sm font-semibold text-white';
+                    name.textContent = g.name;
+                    var count = document.createElement('span');
+                    count.className = 'text-xs text-slate-500';
+                    count.textContent = g.phrase_count;
+                    top.appendChild(name);
+                    top.appendChild(count);
+                    if (g.description) {
+                        var desc = document.createElement('p');
+                        desc.className = 'text-[10px] text-slate-400 mt-0.5';
+                        desc.textContent = g.description;
+                        card.appendChild(top);
+                        card.appendChild(desc);
+                    } else {
+                        card.appendChild(top);
+                    }
+                    list.appendChild(card);
+                });
+            }
             lucide.createIcons();
         });
+}
+
+function onDrillPick(name) {
+    if (!name) return;
+    startDrill(name);
+    // Reset dropdown after selection
+    document.getElementById('drillPicker').value = '';
 }
 
 function startDrill(groupName) {
