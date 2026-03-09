@@ -134,8 +134,8 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .modal-backdrop { background: rgba(6, 11, 24, 0.9); backdrop-filter: blur(8px); }
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; transition: all 0.2s; cursor: pointer; user-select: none; }
 .pill-active { background: #6366f1; color: white; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2); }
-.pill-inactive { color: #cbd5e1; }
-.pill-inactive:hover { color: #f1f5f9; background: rgba(255,255,255,0.05); }
+.pill-inactive { color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); }
+.pill-inactive:hover { color: #f1f5f9; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.25); }
 .ctrl-btn { display: flex; align-items: center; justify-content: center; border-radius: 16px; transition: all 0.2s; }
 .ctrl-btn:active { transform: scale(0.95); }
 .result-pass { border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.05); }
@@ -315,13 +315,13 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <div class="px-5 pt-6 pb-4 text-center">
             <h1 id="questionText" class="question-text text-white mb-3"><?php echo htmlspecialchars($targetQ); ?></h1>
             <div class="flex justify-center gap-4 mb-2">
-                <button id="translateBtn" onclick="toggleTranslation()" class="inline-flex items-center gap-2 text-slate-200 hover:text-blue-400 transition-colors">
-                    <i data-lucide="languages" class="w-5 h-5"></i>
-                    <span class="text-sm font-semibold">Translate</span>
+                <button id="translateBtn" onclick="toggleTranslation()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:text-blue-400 hover:border-blue-400/40 hover:bg-blue-400/5 transition-all">
+                    <i data-lucide="languages" class="w-4 h-4"></i>
+                    <span class="text-xs font-semibold">Translate</span>
                 </button>
-                <button id="phoneticBtn" onclick="togglePhonetic()" class="inline-flex items-center gap-2 text-slate-200 hover:text-amber-400 transition-colors">
-                    <i data-lucide="spell-check" class="w-5 h-5"></i>
-                    <span class="text-sm font-semibold">Phonetic</span>
+                <button id="phoneticBtn" onclick="togglePhonetic()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:text-amber-400 hover:border-amber-400/40 hover:bg-amber-400/5 transition-all">
+                    <i data-lucide="spell-check" class="w-4 h-4"></i>
+                    <span class="text-xs font-semibold">Phonetic</span>
                 </button>
             </div>
             <p id="inlineTranslation" class="hidden text-blue-300/80 text-sm mt-2 italic"></p>
