@@ -101,6 +101,71 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'stats') {
     exit;
 }
 
+// AJAX: list drill groups
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'drill_groups') {
+    header('Content-Type: application/json');
+    $groups = [];
+    $r = $conn->query("SELECT id, name, description, source FROM drill_groups ORDER BY name");
+    if ($r) { while ($row = $r->fetch_assoc()) {
+        // Count phrases matching this drill group by tag
+        $tag = $conn->real_escape_string($row['name']);
+        $cnt = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep WHERE tags LIKE '%$tag%'")->fetch_assoc()['c'] ?? 0;
+        // Also count by drill_group column
+        if ((int)$cnt === 0) {
+            $cnt = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep WHERE drill_group = '$tag'")->fetch_assoc()['c'] ?? 0;
+        }
+        $row['phrase_count'] = (int)$cnt;
+        $groups[] = $row;
+    }}
+    echo json_encode($groups);
+    exit;
+}
+
+// AJAX: get phrases for a drill group (by tag match)
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'drill_phrases') {
+    header('Content-Type: application/json');
+    $tag = $conn->real_escape_string($_GET['tag'] ?? '');
+    if (!$tag) { echo json_encode([]); exit; }
+    $ahuCol = $hasAnswerHu ? "COALESCE(answer_hu,'')" : "''";
+    $whoFilter = ($who !== 'All') ? " AND (`who` = 'All' OR `who` = '$who_safe')" : "";
+    $sql = "SELECT question_hu AS q, answer_en AS a, $ahuCol AS a_hu, category, tags
+            FROM hungarian_prep
+            WHERE (tags LIKE '%$tag%' OR drill_group = '$tag')$whoFilter
+            ORDER BY RAND()";
+    $r = $conn->query($sql);
+    $rows = [];
+    if ($r) { while ($row = $r->fetch_assoc()) $rows[] = $row; }
+    echo json_encode($rows);
+    exit;
+}
+
+// AJAX: list grammar patterns
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'grammar_patterns') {
+    header('Content-Type: application/json');
+    $search = $conn->real_escape_string($_GET['search'] ?? '');
+    $tagFilter = $conn->real_escape_string($_GET['tag'] ?? '');
+    $sql = "SELECT id, pattern, suffix_words, explanation, part_of_speech, tags FROM grammar_patterns WHERE 1=1";
+    if ($search) $sql .= " AND (pattern LIKE '%$search%' OR explanation LIKE '%$search%' OR suffix_words LIKE '%$search%')";
+    if ($tagFilter) $sql .= " AND tags LIKE '%$tagFilter%'";
+    $sql .= " ORDER BY pattern";
+    $r = $conn->query($sql);
+    $rows = [];
+    if ($r) { while ($row = $r->fetch_assoc()) $rows[] = $row; }
+    echo json_encode($rows);
+    exit;
+}
+
+// AJAX: skill proficiency for current user
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'skill_proficiency') {
+    header('Content-Type: application/json');
+    $sql = "SELECT skill, pass_count, fail_count, level, last_seen FROM skill_proficiency WHERE who='$who_safe' ORDER BY fail_count DESC, skill";
+    $r = $conn->query($sql);
+    $rows = [];
+    if ($r) { while ($row = $r->fetch_assoc()) $rows[] = $row; }
+    echo json_encode($rows);
+    exit;
+}
+
 // Shuffle bypasses SRS, pure random
 $shuffle = isset($_GET['shuffle']) && $_GET['shuffle'] === '1';
 if ($shuffle) {
@@ -134,7 +199,7 @@ $conn->close();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>HUG COACH v5.0</title>
+<title>HUG COACH v6.0</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script>
@@ -192,6 +257,17 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .kbd { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-family: monospace; background: rgba(255,255,255,0.05); color: #64748b; border: 1px solid rgba(255,255,255,0.1); }
 .quick-bar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; align-items: center; padding: 8px 16px; background: rgba(17, 26, 46, 0.95); backdrop-filter: blur(30px); z-index: 40; border-top: 1px solid rgba(255,255,255,0.05); }
 @media (min-width: 768px) { .quick-bar { position: static; border: none; background: transparent; backdrop-filter: none; justify-content: center; gap: 8px; margin-top: 24px; } }
+.tab-bar { display: flex; gap: 2px; background: rgba(17, 26, 46, 0.6); border-radius: 16px; padding: 4px; border: 1px solid rgba(255,255,255,0.05); }
+.tab-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; color: #94a3b8; cursor: pointer; transition: all 0.2s; user-select: none; }
+.tab-btn:hover { color: #e2e8f0; background: rgba(255,255,255,0.03); }
+.tab-active { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1); }
+.tab-section { display: none; }
+.tab-section.active { display: block; }
+.grammar-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px; transition: all 0.2s; cursor: pointer; }
+.grammar-card:hover { border-color: rgba(99, 102, 241, 0.2); background: rgba(17, 26, 46, 0.8); }
+.drill-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px 20px; transition: all 0.2s; cursor: pointer; }
+.drill-card:hover { border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05); transform: translateY(-1px); }
+.tag-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.15); }
 </style>
 </head>
 <body class="min-h-screen flex flex-col items-center pb-20 md:pb-6">
@@ -276,7 +352,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
             </div>
             <div>
                 <span class="text-sm font-bold tracking-wide text-white">HUG COACH</span>
-                <span class="text-[10px] text-slate-500 ml-1.5">v5.0</span>
+                <span class="text-[10px] text-slate-500 ml-1.5">v6.0</span>
             </div>
         </div>
         <div class="flex items-center gap-2">
@@ -290,6 +366,24 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         </div>
         </div>
     </header>
+
+    <!-- TAB BAR -->
+    <div class="tab-bar">
+        <button onclick="switchTab('interview')" id="tab-interview" class="tab-btn tab-active">
+            <i data-lucide="mic" class="w-4 h-4"></i> Interview
+        </button>
+        <button onclick="switchTab('drills')" id="tab-drills" class="tab-btn">
+            <i data-lucide="dumbbell" class="w-4 h-4"></i> Drills
+        </button>
+        <button onclick="switchTab('learn')" id="tab-learn" class="tab-btn">
+            <i data-lucide="book-open" class="w-4 h-4"></i> Learn
+        </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 1: INTERVIEW PREP (existing UI) -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="section-interview" class="tab-section active space-y-4">
 
     <!-- SESSION PROGRESS -->
     <div class="flex items-center gap-3">
@@ -485,6 +579,149 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <span><span class="kbd">T</span> Translate</span>
         <span><span class="kbd">P</span> Phonetic</span>
     </div>
+
+    </div><!-- end section-interview -->
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 2: DRILLS -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="section-drills" class="tab-section space-y-4">
+
+        <!-- Drill Group Picker -->
+        <div class="glass rounded-3xl overflow-hidden glow-accent">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                <h2 class="text-lg font-bold flex items-center gap-2">
+                    <i data-lucide="dumbbell" class="w-5 h-5 text-accent-light"></i> Drill Groups
+                </h2>
+                <span id="drillGroupCount" class="text-xs text-slate-500"></span>
+            </div>
+            <div id="drillGroupList" class="p-4 space-y-2">
+                <p class="text-slate-500 text-sm text-center py-4">Loading drill groups...</p>
+            </div>
+        </div>
+
+        <!-- Active Drill (hidden until a group is selected) -->
+        <div id="activeDrill" class="hidden">
+            <div class="glass rounded-3xl overflow-hidden glow-accent">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                    <div>
+                        <h2 id="drillTitle" class="text-lg font-bold text-white"></h2>
+                        <p id="drillProgress" class="text-xs text-slate-500 mt-0.5"></p>
+                    </div>
+                    <button onclick="closeDrill()" class="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Drill question display -->
+                <div class="px-5 pt-6 pb-4 text-center">
+                    <h1 id="drillQuestionText" class="question-text text-white mb-3"></h1>
+                    <div class="flex justify-center gap-4 mb-2">
+                        <button onclick="drillTranslate()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:text-blue-400 hover:border-blue-400/40 hover:bg-blue-400/5 transition-all">
+                            <i data-lucide="languages" class="w-4 h-4"></i>
+                            <span class="text-xs font-semibold">Translate</span>
+                        </button>
+                    </div>
+                    <p id="drillTranslation" class="hidden text-blue-300/80 text-sm mt-2 italic"></p>
+                </div>
+
+                <!-- Drill listen button -->
+                <div class="px-5 pb-4">
+                    <button onclick="drillSpeak()"
+                        class="w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-5 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98]">
+                        <i data-lucide="volume-2" class="w-7 h-7 text-accent-light group-hover:scale-110 transition-transform"></i>
+                        <span class="text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]">Listen</span>
+                    </button>
+                </div>
+
+                <!-- Drill answer reveal -->
+                <div class="px-5 pb-4">
+                    <details id="drillReveal" class="group">
+                        <summary class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition-all cursor-pointer list-none border border-white/5">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                            <span class="text-xs font-semibold uppercase tracking-wider">Reveal Answer</span>
+                        </summary>
+                        <div class="mt-3 p-5 bg-accent/5 rounded-xl border border-accent/10">
+                            <p id="drillAnswerText" class="text-lg text-slate-300 italic leading-relaxed"></p>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- Drill controls -->
+                <div class="px-5 pb-5">
+                    <div class="flex items-center justify-center gap-3">
+                        <button onclick="drillMic()" title="Mic [Space]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-green-600 hover:bg-green-500 text-white glow-green">
+                            <i data-lucide="mic" class="w-6 h-6"></i>
+                            <span class="text-[9px] font-semibold">Mic</span>
+                        </button>
+                        <button onclick="drillNext()" title="Next" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
+                            <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                            <span class="text-[9px] font-semibold">Next</span>
+                        </button>
+                        <button onclick="drillShuffle()" title="Shuffle" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
+                            <i data-lucide="shuffle" class="w-5 h-5"></i>
+                            <span class="text-[9px] font-semibold">Shuffle</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-center gap-5 mt-3 text-xs">
+                        <span class="flex items-center gap-1 text-green-500/70">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i> <span id="drillPass">0</span>
+                        </span>
+                        <span class="flex items-center gap-1 text-red-500/70">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i> <span id="drillFail">0</span>
+                        </span>
+                        <span class="text-slate-500">
+                            <span id="drillIndex">0</span> / <span id="drillTotal">0</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- end section-drills -->
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- TAB 3: LEARN -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="section-learn" class="tab-section space-y-4">
+
+        <!-- Grammar Patterns Browser -->
+        <div class="glass rounded-3xl overflow-hidden glow-accent">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                <h2 class="text-lg font-bold flex items-center gap-2">
+                    <i data-lucide="book-open" class="w-5 h-5 text-accent-light"></i> Grammar Patterns
+                </h2>
+                <span id="grammarCount" class="text-xs text-slate-500"></span>
+            </div>
+            <div class="px-5 py-3 border-b border-white/5">
+                <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                    <input id="grammarSearch" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
+                        class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+                </div>
+            </div>
+            <!-- Tag filter row -->
+            <div id="grammarTagFilter" class="px-5 py-2 border-b border-white/5 flex flex-wrap gap-1.5 overflow-x-auto"></div>
+            <!-- Pattern list -->
+            <div id="grammarList" class="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
+                <p class="text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
+            </div>
+        </div>
+
+        <!-- Skill Proficiency -->
+        <div class="glass rounded-3xl overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                <h2 class="text-lg font-bold flex items-center gap-2">
+                    <i data-lucide="brain" class="w-5 h-5 text-accent-light"></i> Skill Proficiency
+                </h2>
+            </div>
+            <div id="skillList" class="p-4 space-y-2">
+                <p class="text-slate-500 text-sm text-center py-4">Start practicing to build your skill profile...</p>
+            </div>
+        </div>
+
+    </div><!-- end section-learn -->
+
 </div>
 
 <!-- BOTTOM QUICK BAR -->
@@ -1556,6 +1793,326 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+// ── Tab navigation ────────────────────────────────────────────────────
+var currentTab = localStorage.getItem('hugTab') || 'interview';
+
+function switchTab(tab) {
+    currentTab = tab;
+    localStorage.setItem('hugTab', tab);
+    ['interview', 'drills', 'learn'].forEach(function(t) {
+        document.getElementById('section-' + t).classList.toggle('active', t === tab);
+        var btn = document.getElementById('tab-' + t);
+        if (t === tab) { btn.classList.add('tab-active'); } else { btn.classList.remove('tab-active'); }
+    });
+    if (tab === 'drills') loadDrillGroups();
+    if (tab === 'learn') { loadGrammarPatterns(); loadSkillProficiency(); }
+    lucide.createIcons();
+}
+
+// ── Drill system ──────────────────────────────────────────────────────
+var drillPhrases = [];
+var drillIdx = 0;
+var drillPassCount = 0, drillFailCount = 0;
+var drillGroupsLoaded = false;
+
+function loadDrillGroups() {
+    if (drillGroupsLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=drill_groups')
+        .then(function(r) { return r.json(); })
+        .then(function(groups) {
+            drillGroupsLoaded = true;
+            var list = document.getElementById('drillGroupList');
+            list.textContent = '';
+            document.getElementById('drillGroupCount').textContent = groups.length + ' groups';
+            if (!groups.length) {
+                var empty = document.createElement('p');
+                empty.className = 'text-slate-500 text-sm text-center py-4';
+                empty.textContent = 'No drill groups yet. Run import_notion.php first.';
+                list.appendChild(empty);
+                return;
+            }
+            groups.forEach(function(g) {
+                var card = document.createElement('div');
+                card.className = 'drill-card';
+                card.onclick = function() { startDrill(g.name); };
+
+                var top = document.createElement('div');
+                top.className = 'flex items-center justify-between';
+                var name = document.createElement('span');
+                name.className = 'text-sm font-semibold text-white';
+                name.textContent = g.name;
+                var count = document.createElement('span');
+                count.className = 'text-xs text-slate-500';
+                count.textContent = g.phrase_count + ' phrases';
+                top.appendChild(name);
+                top.appendChild(count);
+
+                var desc = document.createElement('p');
+                desc.className = 'text-xs text-slate-400 mt-1';
+                desc.textContent = g.description || '';
+
+                card.appendChild(top);
+                card.appendChild(desc);
+                list.appendChild(card);
+            });
+            lucide.createIcons();
+        });
+}
+
+function startDrill(groupName) {
+    fetch('?who=' + who + '&ajax=1&action=drill_phrases&tag=' + encodeURIComponent(groupName))
+        .then(function(r) { return r.json(); })
+        .then(function(phrases) {
+            if (!phrases.length) { alert('No phrases found for "' + groupName + '"'); return; }
+            drillPhrases = phrases;
+            drillIdx = 0;
+            drillPassCount = 0;
+            drillFailCount = 0;
+            document.getElementById('drillTitle').textContent = groupName;
+            document.getElementById('drillTotal').textContent = phrases.length;
+            document.getElementById('drillPass').textContent = '0';
+            document.getElementById('drillFail').textContent = '0';
+            document.getElementById('activeDrill').classList.remove('hidden');
+            showDrillQuestion();
+            lucide.createIcons();
+        });
+}
+
+function showDrillQuestion() {
+    if (drillIdx >= drillPhrases.length) drillIdx = 0;
+    var p = drillPhrases[drillIdx];
+    document.getElementById('drillQuestionText').textContent = p.q;
+    document.getElementById('drillAnswerText').textContent = p.a_hu || p.a;
+    document.getElementById('drillIndex').textContent = drillIdx + 1;
+    document.getElementById('drillProgress').textContent = 'Question ' + (drillIdx + 1) + ' of ' + drillPhrases.length;
+    document.getElementById('drillReveal').removeAttribute('open');
+    document.getElementById('drillTranslation').classList.add('hidden');
+}
+
+function drillNext() {
+    drillIdx++;
+    if (drillIdx >= drillPhrases.length) drillIdx = 0;
+    showDrillQuestion();
+}
+
+function drillShuffle() {
+    for (var i = drillPhrases.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = drillPhrases[i];
+        drillPhrases[i] = drillPhrases[j];
+        drillPhrases[j] = tmp;
+    }
+    drillIdx = 0;
+    showDrillQuestion();
+}
+
+function drillSpeak() {
+    if (!drillPhrases.length) return;
+    window.speechSynthesis.cancel();
+    var msg = new SpeechSynthesisUtterance(drillPhrases[drillIdx].q);
+    msg.lang = 'hu-HU';
+    msg.rate = currentSpeed;
+    if (huVoice) msg.voice = huVoice;
+    window.speechSynthesis.speak(msg);
+}
+
+function drillMic() {
+    drillSpeak();
+}
+
+function drillTranslate() {
+    if (!drillPhrases.length) return;
+    var el = document.getElementById('drillTranslation');
+    el.textContent = 'Translating...';
+    el.classList.remove('hidden');
+    var fd = new FormData();
+    fd.append('text', drillPhrases[drillIdx].q);
+    fetch('translate.php', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) { el.textContent = data.translation || 'Error'; })
+        .catch(function() { el.textContent = 'Translation error'; });
+}
+
+function closeDrill() {
+    document.getElementById('activeDrill').classList.add('hidden');
+    drillPhrases = [];
+}
+
+// ── Grammar patterns browser ──────────────────────────────────────────
+var grammarLoaded = false;
+var allGrammarPatterns = [];
+var grammarActiveTag = '';
+
+function loadGrammarPatterns() {
+    if (grammarLoaded) return;
+    fetch('?ajax=1&action=grammar_patterns')
+        .then(function(r) { return r.json(); })
+        .then(function(patterns) {
+            grammarLoaded = true;
+            allGrammarPatterns = patterns;
+            document.getElementById('grammarCount').textContent = patterns.length + ' patterns';
+            renderGrammarPatterns(patterns);
+            buildGrammarTagFilter(patterns);
+            lucide.createIcons();
+        });
+}
+
+function renderGrammarPatterns(patterns) {
+    var list = document.getElementById('grammarList');
+    list.textContent = '';
+    if (!patterns.length) {
+        var empty = document.createElement('p');
+        empty.className = 'text-slate-500 text-sm text-center py-4';
+        empty.textContent = 'No patterns found.';
+        list.appendChild(empty);
+        return;
+    }
+    patterns.forEach(function(p) {
+        var card = document.createElement('div');
+        card.className = 'grammar-card';
+
+        var title = document.createElement('h3');
+        title.className = 'text-sm font-bold text-white mb-1';
+        title.textContent = p.pattern;
+        card.appendChild(title);
+
+        if (p.suffix_words) {
+            var suffix = document.createElement('p');
+            suffix.className = 'text-xs text-accent-light font-mono mb-1';
+            suffix.textContent = p.suffix_words;
+            card.appendChild(suffix);
+        }
+
+        if (p.explanation) {
+            var expl = document.createElement('p');
+            expl.className = 'text-xs text-slate-400 mb-2';
+            expl.textContent = p.explanation;
+            card.appendChild(expl);
+        }
+
+        var meta = document.createElement('div');
+        meta.className = 'flex items-center gap-2 flex-wrap';
+        if (p.part_of_speech) {
+            var pos = document.createElement('span');
+            pos.className = 'text-[10px] px-2 py-0.5 rounded bg-surface-50 text-slate-400 font-semibold';
+            pos.textContent = p.part_of_speech;
+            meta.appendChild(pos);
+        }
+        if (p.tags) {
+            p.tags.split(',').forEach(function(t) {
+                t = t.trim();
+                if (!t) return;
+                var tag = document.createElement('span');
+                tag.className = 'tag-pill cursor-pointer';
+                tag.textContent = t;
+                tag.onclick = function(e) { e.stopPropagation(); filterGrammarByTag(t); };
+                meta.appendChild(tag);
+            });
+        }
+        card.appendChild(meta);
+        list.appendChild(card);
+    });
+}
+
+function buildGrammarTagFilter(patterns) {
+    var tagSet = {};
+    patterns.forEach(function(p) {
+        if (!p.tags) return;
+        p.tags.split(',').forEach(function(t) {
+            t = t.trim();
+            if (t) tagSet[t] = (tagSet[t] || 0) + 1;
+        });
+    });
+    var container = document.getElementById('grammarTagFilter');
+    container.textContent = '';
+
+    var allPill = document.createElement('span');
+    allPill.className = 'tag-pill cursor-pointer' + (!grammarActiveTag ? ' !bg-accent/30 !border-accent/40' : '');
+    allPill.textContent = 'All';
+    allPill.onclick = function() { filterGrammarByTag(''); };
+    container.appendChild(allPill);
+
+    Object.keys(tagSet).sort().forEach(function(tag) {
+        var pill = document.createElement('span');
+        pill.className = 'tag-pill cursor-pointer' + (grammarActiveTag === tag ? ' !bg-accent/30 !border-accent/40' : '');
+        pill.textContent = tag + ' (' + tagSet[tag] + ')';
+        pill.onclick = function() { filterGrammarByTag(tag); };
+        container.appendChild(pill);
+    });
+}
+
+function filterGrammarByTag(tag) {
+    grammarActiveTag = (grammarActiveTag === tag) ? '' : tag;
+    var filtered = grammarActiveTag
+        ? allGrammarPatterns.filter(function(p) { return p.tags && p.tags.indexOf(grammarActiveTag) !== -1; })
+        : allGrammarPatterns;
+    renderGrammarPatterns(filtered);
+    buildGrammarTagFilter(allGrammarPatterns);
+    document.getElementById('grammarCount').textContent = filtered.length + ' patterns';
+}
+
+var grammarDebounce;
+function searchGrammar() {
+    clearTimeout(grammarDebounce);
+    grammarDebounce = setTimeout(function() {
+        var q = document.getElementById('grammarSearch').value.trim().toLowerCase();
+        var filtered = allGrammarPatterns.filter(function(p) {
+            if (!q) return true;
+            return (p.pattern || '').toLowerCase().indexOf(q) !== -1 ||
+                   (p.explanation || '').toLowerCase().indexOf(q) !== -1 ||
+                   (p.suffix_words || '').toLowerCase().indexOf(q) !== -1;
+        });
+        if (grammarActiveTag) {
+            filtered = filtered.filter(function(p) { return p.tags && p.tags.indexOf(grammarActiveTag) !== -1; });
+        }
+        renderGrammarPatterns(filtered);
+        document.getElementById('grammarCount').textContent = filtered.length + ' patterns';
+    }, 200);
+}
+
+// ── Skill proficiency display ─────────────────────────────────────────
+function loadSkillProficiency() {
+    fetch('?who=' + who + '&ajax=1&action=skill_proficiency')
+        .then(function(r) { return r.json(); })
+        .then(function(skills) {
+            var list = document.getElementById('skillList');
+            list.textContent = '';
+            if (!skills.length) {
+                var empty = document.createElement('p');
+                empty.className = 'text-slate-500 text-sm text-center py-4';
+                empty.textContent = 'Start practicing to build your skill profile.';
+                list.appendChild(empty);
+                return;
+            }
+            skills.forEach(function(s) {
+                var total = (parseInt(s.pass_count) || 0) + (parseInt(s.fail_count) || 0);
+                var pct = total > 0 ? Math.round((s.pass_count / total) * 100) : 0;
+                var row = document.createElement('div');
+                row.className = 'flex items-center gap-3 p-3 rounded-xl bg-surface-50';
+
+                var nameEl = document.createElement('span');
+                nameEl.className = 'text-sm text-white font-medium flex-1';
+                nameEl.textContent = s.skill;
+
+                var barWrap = document.createElement('div');
+                barWrap.className = 'w-20 h-2 bg-surface-300 rounded-full overflow-hidden';
+                var barFill = document.createElement('div');
+                barFill.className = 'h-full rounded-full ' + (pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500');
+                barFill.style.width = pct + '%';
+                barWrap.appendChild(barFill);
+
+                var pctEl = document.createElement('span');
+                pctEl.className = 'text-xs text-slate-400 w-10 text-right';
+                pctEl.textContent = pct + '%';
+
+                row.appendChild(nameEl);
+                row.appendChild(barWrap);
+                row.appendChild(pctEl);
+                list.appendChild(row);
+            });
+        });
+}
+
 // ── Init ──────────────────────────────────────────────────────────────
 setMode(currentMode);
 setCat(cat, true);
@@ -1567,6 +2124,7 @@ applyPhoneticState();
 if (translateOn) fetchTranslation();
 if (phoneticOn) fetchPhonetic();
 updateProgressBar();
+switchTab(currentTab);
 lucide.createIcons();
 </script>
 </body>
