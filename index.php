@@ -405,8 +405,8 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .view-section.active { animation: fadeIn 0.2s ease-out; }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.grammar-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px; transition: all 0.2s; cursor: pointer; }
-.grammar-card:hover { border-color: rgba(99, 102, 241, 0.2); background: rgba(17, 26, 46, 0.8); }
+.grammar-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 16px; transition: all 0.2s; }
+.grammar-card:hover { border-color: rgba(99, 102, 241, 0.15); background: rgba(17, 26, 46, 0.8); }
 .drill-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px 20px; transition: all 0.2s; cursor: pointer; }
 .drill-card:hover { border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05); transform: translateY(-1px); }
 .tag-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.15); }
@@ -791,37 +791,35 @@ select option { background: #111a2e; color: #e2e8f0; }
             <button onclick="goHome()" class="p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
                 <i data-lucide="arrow-left" class="w-5 h-5"></i>
             </button>
-            <h2 class="text-lg font-bold text-white">Grammar Patterns</h2>
+            <h2 class="text-lg font-bold text-white">Grammar Guide</h2>
             <span id="grammarCount" class="text-xs text-slate-500 ml-auto"></span>
         </div>
 
-        <!-- Search -->
+        <!-- Search + filter -->
         <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
             <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
             <input id="grammarSearch" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
                 class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
         </div>
-
-        <!-- Tag filter row -->
         <div id="grammarTagFilter" class="flex flex-wrap gap-1.5"></div>
 
-        <!-- Pattern list -->
-        <div id="grammarList" class="space-y-2">
+        <!-- Pattern cards -->
+        <div id="grammarList" class="space-y-3">
             <p class="text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
         </div>
 
-        <!-- AI Lesson Panel (hidden until Teach Me is clicked) -->
+        <!-- AI Lesson Panel (slides up over cards) -->
         <div id="lessonPanel" class="hidden">
-            <div class="glass rounded-3xl overflow-hidden glow-accent">
-                <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                    <h2 id="lessonTitle" class="text-lg font-bold flex items-center gap-2">
-                        <i data-lucide="sparkles" class="w-5 h-5 text-yellow-400"></i> <span></span>
+            <div class="glass rounded-2xl overflow-hidden border border-accent/20">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-accent/5">
+                    <h2 id="lessonTitle" class="text-base font-bold flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-yellow-400"></i> <span></span>
                     </h2>
-                    <button onclick="closeLesson()" class="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
-                        <i data-lucide="x" class="w-5 h-5"></i>
+                    <button onclick="closeLesson()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
                     </button>
                 </div>
-                <div id="lessonContent" class="p-5 space-y-5">
+                <div id="lessonContent" class="p-4 space-y-4">
                     <p class="text-slate-400 text-sm text-center py-8">Loading AI lesson...</p>
                 </div>
             </div>
@@ -2151,188 +2149,101 @@ function renderGrammarPatterns(patterns) {
         list.appendChild(empty);
         return;
     }
-
-    // Group patterns by their primary tag
-    var groups = {};
-    var ungrouped = [];
-    patterns.forEach(function(p) {
-        var primaryTag = (p.tags || '').split(',')[0].trim();
-        if (!primaryTag) { ungrouped.push(p); return; }
-        if (!groups[primaryTag]) groups[primaryTag] = [];
-        groups[primaryTag].push(p);
-    });
-
-    var sortedTags = Object.keys(groups).sort();
-
-    // If filtering by a single tag, show flat list (already scoped)
-    if (grammarActiveTag) {
-        renderGrammarFlat(list, patterns);
-        return;
-    }
-
-    // Render grouped sections
-    sortedTags.forEach(function(tag) {
-        var section = document.createElement('div');
-        section.className = 'glass rounded-2xl overflow-hidden';
-
-        // Section header (clickable to expand)
-        var sectionHeader = document.createElement('button');
-        sectionHeader.className = 'w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-all';
-        var headerLeft = document.createElement('div');
-        headerLeft.className = 'flex items-center gap-2.5';
-        var tagBadge = document.createElement('span');
-        tagBadge.className = 'tag-pill';
-        tagBadge.textContent = tag;
-        var countBadge = document.createElement('span');
-        countBadge.className = 'text-[10px] text-slate-500 font-medium';
-        countBadge.textContent = groups[tag].length + ' pattern' + (groups[tag].length !== 1 ? 's' : '');
-        headerLeft.appendChild(tagBadge);
-        headerLeft.appendChild(countBadge);
-        var chevron = document.createElement('i');
-        chevron.setAttribute('data-lucide', 'chevron-down');
-        chevron.className = 'w-4 h-4 text-slate-500 transition-transform';
-        sectionHeader.appendChild(headerLeft);
-        sectionHeader.appendChild(chevron);
-        section.appendChild(sectionHeader);
-
-        // Section body (hidden)
-        var body = document.createElement('div');
-        body.className = 'hidden border-t border-white/5';
-
-        groups[tag].forEach(function(p) {
-            body.appendChild(buildPatternRow(p));
-        });
-
-        section.appendChild(body);
-
-        // Toggle
-        sectionHeader.onclick = function() {
-            var isOpen = !body.classList.contains('hidden');
-            body.classList.toggle('hidden');
-            chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
-        };
-
-        list.appendChild(section);
-    });
-
-    // Ungrouped at bottom
-    if (ungrouped.length) {
-        var section = document.createElement('div');
-        section.className = 'glass rounded-2xl overflow-hidden';
-        var sectionHeader = document.createElement('button');
-        sectionHeader.className = 'w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-all';
-        var headerLeft = document.createElement('div');
-        headerLeft.className = 'flex items-center gap-2.5';
-        var tagBadge = document.createElement('span');
-        tagBadge.className = 'text-xs font-semibold text-slate-400';
-        tagBadge.textContent = 'Other';
-        var countBadge = document.createElement('span');
-        countBadge.className = 'text-[10px] text-slate-500 font-medium';
-        countBadge.textContent = ungrouped.length + ' pattern' + (ungrouped.length !== 1 ? 's' : '');
-        headerLeft.appendChild(tagBadge);
-        headerLeft.appendChild(countBadge);
-        var chevron = document.createElement('i');
-        chevron.setAttribute('data-lucide', 'chevron-down');
-        chevron.className = 'w-4 h-4 text-slate-500 transition-transform';
-        sectionHeader.appendChild(headerLeft);
-        sectionHeader.appendChild(chevron);
-        section.appendChild(sectionHeader);
-        var body = document.createElement('div');
-        body.className = 'hidden border-t border-white/5';
-        ungrouped.forEach(function(p) { body.appendChild(buildPatternRow(p)); });
-        section.appendChild(body);
-        sectionHeader.onclick = function() {
-            var isOpen = !body.classList.contains('hidden');
-            body.classList.toggle('hidden');
-            chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
-        };
-        list.appendChild(section);
-    }
-
+    patterns.forEach(function(p) { list.appendChild(buildPatternCard(p)); });
     lucide.createIcons();
 }
 
-// Flat list for filtered/search results
-function renderGrammarFlat(list, patterns) {
-    patterns.forEach(function(p) { list.appendChild(buildPatternRow(p)); });
-    lucide.createIcons();
-}
+function buildPatternCard(p) {
+    var card = document.createElement('div');
+    card.className = 'grammar-card';
 
-// Build a single pattern row (reusable)
-function buildPatternRow(p) {
-    var row = document.createElement('div');
-    row.className = 'px-4 py-3 border-b border-white/[0.03] last:border-0 cursor-pointer hover:bg-white/[0.02] transition-all';
+    // Header row: part of speech badge + pattern name
+    var header = document.createElement('div');
+    header.className = 'flex items-start gap-3 mb-2';
 
-    // Top line: title + chevron
-    var top = document.createElement('div');
-    top.className = 'flex items-start justify-between gap-2';
-    var titleWrap = document.createElement('div');
-    titleWrap.className = 'flex-1';
+    var titleCol = document.createElement('div');
+    titleCol.className = 'flex-1 min-w-0';
+
     var title = document.createElement('h3');
-    title.className = 'text-sm font-semibold text-white';
+    title.className = 'text-sm font-bold text-white leading-snug';
     title.textContent = p.pattern;
-    titleWrap.appendChild(title);
-    if (p.suffix_words) {
-        var suffix = document.createElement('span');
-        suffix.className = 'text-[10px] text-accent-light font-mono';
-        suffix.textContent = p.suffix_words;
-        titleWrap.appendChild(document.createTextNode(' '));
-        titleWrap.appendChild(suffix);
+    titleCol.appendChild(title);
+
+    // Suffix examples — formatted clearly
+    if (p.suffix_words && p.suffix_words !== '—') {
+        var suffixRow = document.createElement('div');
+        suffixRow.className = 'mt-1.5 flex flex-wrap gap-1';
+        p.suffix_words.split(/[;,]/).forEach(function(s) {
+            s = s.trim();
+            if (!s) return;
+            var chip = document.createElement('span');
+            chip.className = 'inline-block px-2 py-0.5 rounded bg-accent/10 text-[11px] font-mono text-accent-light border border-accent/15';
+            chip.textContent = s;
+            suffixRow.appendChild(chip);
+        });
+        titleCol.appendChild(suffixRow);
     }
-    var chevron = document.createElement('i');
-    chevron.setAttribute('data-lucide', 'chevron-down');
-    chevron.className = 'w-3.5 h-3.5 text-slate-600 flex-shrink-0 mt-1 transition-transform';
-    top.appendChild(titleWrap);
-    top.appendChild(chevron);
-    row.appendChild(top);
 
-    // Expandable detail
-    var detail = document.createElement('div');
-    detail.className = 'hidden mt-3 pt-3 border-t border-white/5 space-y-3';
+    header.appendChild(titleCol);
 
+    // Part of speech badge (top-right)
+    if (p.part_of_speech && p.part_of_speech !== 'Other') {
+        var posBadge = document.createElement('span');
+        posBadge.className = 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/5 text-slate-500 flex-shrink-0 mt-0.5';
+        posBadge.textContent = p.part_of_speech;
+        header.appendChild(posBadge);
+    }
+
+    card.appendChild(header);
+
+    // Explanation — always visible
     if (p.explanation) {
         var expl = document.createElement('p');
-        expl.className = 'text-xs text-slate-400';
+        expl.className = 'text-xs text-slate-400 leading-relaxed mb-3';
         expl.textContent = p.explanation;
-        detail.appendChild(expl);
+        card.appendChild(expl);
     }
 
-    // Action buttons
-    var actionRow = document.createElement('div');
-    actionRow.className = 'flex gap-2';
+    // Action buttons — always visible
+    var actions = document.createElement('div');
+    actions.className = 'flex items-center gap-2 flex-wrap';
+
+    // Listen button
     var listenBtn = document.createElement('button');
-    listenBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-50 text-xs font-semibold text-accent-light hover:bg-surface-200 transition-all';
+    listenBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-50 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-surface-200 transition-all';
     listenBtn.innerHTML = '<i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Listen';
     listenBtn.onclick = function(e) {
         e.stopPropagation();
-        window.speechSynthesis.cancel();
-        var msg = new SpeechSynthesisUtterance(p.suffix_words || p.pattern);
-        msg.lang = 'hu-HU'; msg.rate = 0.8;
-        if (huVoice) msg.voice = huVoice;
-        window.speechSynthesis.speak(msg);
+        speakHu(p.suffix_words || p.pattern);
     };
-    actionRow.appendChild(listenBtn);
+    actions.appendChild(listenBtn);
 
+    // Practice button — start a drill with matching tag
+    var primaryTag = (p.tags || '').split(',')[0].trim();
+    if (primaryTag) {
+        var practiceBtn = document.createElement('button');
+        practiceBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-green-500/10 text-[11px] font-semibold text-green-400 hover:bg-green-500/20 transition-all border border-green-500/15';
+        practiceBtn.innerHTML = '<i data-lucide="dumbbell" class="w-3.5 h-3.5"></i> Practice';
+        practiceBtn.onclick = function(e) {
+            e.stopPropagation();
+            goHome();
+            startDrill(primaryTag);
+        };
+        actions.appendChild(practiceBtn);
+    }
+
+    // Teach Me button — AI deep-dive
     var teachBtn = document.createElement('button');
-    teachBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 text-xs font-semibold text-yellow-300 hover:bg-accent/30 transition-all border border-yellow-400/20';
+    teachBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-yellow-400/10 text-[11px] font-semibold text-yellow-300 hover:bg-yellow-400/20 transition-all border border-yellow-400/15';
     teachBtn.innerHTML = '<i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Teach Me';
     teachBtn.onclick = function(e) {
         e.stopPropagation();
         teachMe(p);
     };
-    actionRow.appendChild(teachBtn);
-    detail.appendChild(actionRow);
+    actions.appendChild(teachBtn);
 
-    row.appendChild(detail);
-
-    // Toggle
-    row.onclick = function() {
-        var isOpen = !detail.classList.contains('hidden');
-        detail.classList.toggle('hidden');
-        chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
-    };
-
-    return row;
+    card.appendChild(actions);
+    return card;
 }
 
 function buildGrammarTagFilter(patterns) {
@@ -2387,14 +2298,7 @@ function searchGrammar() {
         if (grammarActiveTag) {
             filtered = filtered.filter(function(p) { return p.tags && p.tags.indexOf(grammarActiveTag) !== -1; });
         }
-        // Flat list when searching, grouped when browsing
-        if (grammarSearchQuery) {
-            var list = document.getElementById('grammarList');
-            list.textContent = '';
-            renderGrammarFlat(list, filtered);
-        } else {
-            renderGrammarPatterns(filtered);
-        }
+        renderGrammarPatterns(filtered);
         document.getElementById('grammarCount').textContent = filtered.length + ' patterns';
     }, 200);
 }
