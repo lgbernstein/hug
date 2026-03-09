@@ -9,6 +9,11 @@ $cat = in_array($cat, ['all','prep','bios']) ? $cat : 'all';
 // Ensure answer_hu column exists (safe for MySQL 5.7)
 $colCheck = $conn->query("SHOW COLUMNS FROM hungarian_prep LIKE 'answer_hu'");
 $hasAnswerHu = ($colCheck && $colCheck->num_rows > 0);
+// Ensure who column exists
+$whoCheck = $conn->query("SHOW COLUMNS FROM hungarian_prep LIKE 'who'");
+if ($whoCheck && $whoCheck->num_rows === 0) {
+    $conn->query("ALTER TABLE hungarian_prep ADD COLUMN `who` VARCHAR(10) DEFAULT 'All' AFTER category");
+}
 
 $who_safe   = $conn->real_escape_string($who);
 $bio_filter = ($who !== 'All')
@@ -22,9 +27,39 @@ if ($cat === 'bios') {
     $parts[] = "SELECT fact_label_hu AS q, fact_value_hu AS a, '' AS a_hu, category FROM user_bios $bio_filter";
 } else {
     $ahuCol = $hasAnswerHu ? "COALESCE(answer_hu,'')" : "''";
-    $parts[] = "SELECT question_hu AS q, answer_en AS a, $ahuCol AS a_hu, category FROM hungarian_prep";
+    // Filter by who: show All + user-specific questions
+    $whoFilter = ($who !== 'All') ? " WHERE (`who` = 'All' OR `who` = '$who_safe')" : "";
+    $parts[] = "SELECT question_hu AS q, answer_en AS a, $ahuCol AS a_hu, category FROM hungarian_prep$whoFilter";
 }
 $union = implode(' UNION ', $parts);
+
+// AJAX: save a phrase from practice
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'save_phrase') {
+    header('Content-Type: application/json');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['error'=>'POST only']); exit; }
+    $q  = trim($_POST['question_hu'] ?? '');
+    $ae = trim($_POST['answer_en'] ?? '');
+    $ah = trim($_POST['answer_hu'] ?? '') ?: null;
+    $pc = trim($_POST['category'] ?? 'Practice');
+    if ($q === '') { echo json_encode(['error'=>'No phrase provided']); exit; }
+    // Check for duplicate
+    $chk = $conn->prepare("SELECT id FROM hungarian_prep WHERE question_hu = ?");
+    $chk->bind_param('s', $q);
+    $chk->execute();
+    $chk->store_result();
+    if ($chk->num_rows > 0) {
+        $chk->close();
+        echo json_encode(['ok'=>true, 'msg'=>'Already in database']);
+        exit;
+    }
+    $chk->close();
+    $stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_hu, answer_en, category, `who`) VALUES (?, ?, ?, ?, 'All')");
+    $stmt->bind_param('ssss', $q, $ah, $ae, $pc);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['ok'=>true, 'msg'=>'Saved!']);
+    exit;
+}
 
 // AJAX: list all phrases for browser
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'phrases') {
@@ -66,15 +101,21 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'stats') {
     exit;
 }
 
-// SRS-weighted query
-$srs_sql = "SELECT phrases.q, phrases.a, phrases.a_hu, phrases.category
-            FROM ($union) AS phrases
-            LEFT JOIN study_history sh ON sh.phrase = phrases.q AND sh.who = '$who_safe'
-            ORDER BY CASE WHEN sh.next_review IS NULL OR sh.next_review <= NOW() THEN 0 ELSE 1 END ASC, RAND()
-            LIMIT 1";
-$result = $conn->query($srs_sql);
-if (!$result) {
+// Shuffle bypasses SRS, pure random
+$shuffle = isset($_GET['shuffle']) && $_GET['shuffle'] === '1';
+if ($shuffle) {
     $result = $conn->query("SELECT q, a, a_hu, category FROM ($union) AS phrases ORDER BY RAND() LIMIT 1");
+} else {
+    // SRS-weighted query
+    $srs_sql = "SELECT phrases.q, phrases.a, phrases.a_hu, phrases.category
+                FROM ($union) AS phrases
+                LEFT JOIN study_history sh ON sh.phrase = phrases.q AND sh.who = '$who_safe'
+                ORDER BY CASE WHEN sh.next_review IS NULL OR sh.next_review <= NOW() THEN 0 ELSE 1 END ASC, RAND()
+                LIMIT 1";
+    $result = $conn->query($srs_sql);
+    if (!$result) {
+        $result = $conn->query("SELECT q, a, a_hu, category FROM ($union) AS phrases ORDER BY RAND() LIMIT 1");
+    }
 }
 $row     = $result ? $result->fetch_assoc() : null;
 $targetQ  = $row['q'] ?? 'No Data Found';
@@ -120,6 +161,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .glass-strong { background: rgba(17, 26, 46, 0.95); backdrop-filter: blur(30px); border: 1px solid rgba(99, 102, 241, 0.15); }
 .glow-accent { box-shadow: 0 0 30px rgba(99, 102, 241, 0.15), 0 0 60px rgba(99, 102, 241, 0.05); }
 .glow-red { box-shadow: 0 0 25px rgba(239, 68, 68, 0.3); }
+.glow-green { box-shadow: 0 0 25px rgba(34, 197, 94, 0.3); }
 @keyframes mic-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); } }
 .mic-active { animation: mic-pulse 1.5s ease-in-out infinite; background: #dc2626 !important; }
 .progress-track { background: rgba(99, 102, 241, 0.1); }
@@ -279,10 +321,6 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                     class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold">
                     <i data-lucide="timer" class="w-3.5 h-3.5"></i> Auto-Next
                 </button>
-                <button id="micToggle" onclick="toggleMic()" title="Mic on/off"
-                    class="p-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all">
-                    <i id="micToggleIcon" data-lucide="mic" class="w-3.5 h-3.5"></i>
-                </button>
                 <div class="flex items-center gap-1.5">
                     <div id="readyIndicator" class="status-dot dot-off"></div>
                     <div class="vol-track"><div id="volFill" class="vol-fill"></div></div>
@@ -366,13 +404,17 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                     <i data-lucide="snail" class="w-5 h-5"></i>
                     <span class="text-[9px] font-semibold">Slow</span>
                 </button>
-                <button id="recordBtn" onclick="toggleMic()" title="Record [Space]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-red-600 hover:bg-red-500 text-white glow-red">
+                <button id="recordBtn" onclick="toggleMic()" title="Mic [Space]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-green-600 hover:bg-green-500 text-white glow-green">
                     <i id="recordIcon" data-lucide="mic" class="w-6 h-6"></i>
-                    <span id="recordLabel" class="text-[9px] font-semibold">Record</span>
+                    <span id="recordLabel" class="text-[9px] font-semibold">Mic</span>
                 </button>
                 <button onclick="nextQuestion()" title="Next [Enter]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
                     <i data-lucide="arrow-right" class="w-5 h-5"></i>
                     <span class="text-[9px] font-semibold">Next</span>
+                </button>
+                <button onclick="shuffleQuestion()" title="Random question" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
+                    <i data-lucide="shuffle" class="w-5 h-5"></i>
+                    <span class="text-[9px] font-semibold">Shuffle</span>
                 </button>
             </div>
             <div class="flex items-center justify-center gap-5 mt-3 text-xs">
@@ -422,6 +464,9 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                     <button onclick="translatePractice()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Translate">
                         <i data-lucide="languages" class="w-4 h-4"></i>
                     </button>
+                    <button id="savePhraseBtn" onclick="savePracticePhrase()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Save to phrase list">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                    </button>
                 </div>
             </div>
             <p id="practiceTranslation" class="hidden text-slate-300 text-sm mt-3 italic px-1"></p>
@@ -430,8 +475,11 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 
     <!-- Keyboard Shortcuts (desktop) -->
     <div class="hidden md:flex items-center justify-center gap-4 text-[10px] text-slate-300 mt-2">
-        <span><span class="kbd">Space</span> Record</span>
-        <span><span class="kbd">Enter</span> Next</span>
+        <span><span class="kbd">Space</span> Mic</span>
+        <span><span class="kbd">&larr;</span> Prev</span>
+        <span><span class="kbd">&rarr;</span> Next</span>
+        <span><span class="kbd">&uarr;</span> Hear</span>
+        <span><span class="kbd">&darr;</span> Reveal</span>
         <span><span class="kbd">Esc</span> Stop</span>
         <span><span class="kbd">S</span> Slow</span>
         <span><span class="kbd">T</span> Translate</span>
@@ -453,9 +501,9 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <i data-lucide="volume-2" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Listen</span>
     </button>
-    <button onclick="toggleMic()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-red-400 transition-all">
+    <button onclick="toggleMic()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-green-400 transition-all">
         <i data-lucide="mic" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Record</span>
+        <span class="text-[10px] font-semibold">Mic</span>
     </button>
     <button onclick="nextQuestion()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
         <i data-lucide="skip-forward" class="w-5 h-5"></i>
@@ -486,6 +534,10 @@ let translateOn    = localStorage.getItem('hugTranslate') === '1';
 let phoneticOn     = localStorage.getItem('hugPhonetic') === '1';
 let strictness     = parseInt(localStorage.getItem('hugStrict')) || 2;
 let repeatOnFail   = localStorage.getItem('hugRepeatFail') === '1';
+
+// Question history for prev/next navigation
+var questionHistory = [{ q: targetQ, a: targetA, a_hu: targetAH }];
+var historyIndex = 0;
 
 var strictLabels = { 1: 'Relaxed', 2: 'Meaning', 3: 'Balanced', 4: 'Strict', 5: 'Exam' };
 document.getElementById('strictSlider').value = strictness;
@@ -706,14 +758,14 @@ function setSpeed(speed) {
 }
 
 // ── Category filter ───────────────────────────────────────────────────
-function setCat(c) {
+function setCat(c, skipFetch) {
     cat = c;
     localStorage.setItem('hugCat', c);
     ['all','prep','bios'].forEach(function(id) {
         var el = document.getElementById('cat-' + id);
         el.className = 'pill ' + (cat === id ? 'pill-active' : 'pill-inactive');
     });
-    nextQuestion();
+    if (!skipFetch) nextQuestion();
 }
 
 // ── Listen mode ───────────────────────────────────────────────────────
@@ -731,13 +783,13 @@ function applyListenMode() {
         q.title = 'Click to reveal';
         q.onclick = revealQuestion;
         btn.classList.add('text-amber-400');
-        btn.classList.remove('text-slate-500');
+        btn.classList.remove('text-slate-500', 'text-slate-200');
     } else {
         q.classList.remove('listen-blur');
         q.title = '';
         q.onclick = null;
         btn.classList.remove('text-amber-400');
-        btn.classList.add('text-slate-500');
+        btn.classList.add('text-slate-200');
     }
 }
 
@@ -757,10 +809,10 @@ function applyAutoAdvance() {
     var btn = document.getElementById('autoAdvanceBtn');
     if (autoAdvance) {
         btn.classList.add('text-accent-light');
-        btn.classList.remove('text-slate-500');
+        btn.classList.remove('text-slate-500', 'text-slate-200');
     } else {
         btn.classList.remove('text-accent-light');
-        btn.classList.add('text-slate-500');
+        btn.classList.add('text-slate-200');
     }
 }
 
@@ -791,6 +843,10 @@ function nextQuestion() {
             targetQ  = data.q;
             targetA  = data.a;
             targetAH = data.a_hu || '';
+            // Track history — trim future if we navigated back
+            questionHistory = questionHistory.slice(0, historyIndex + 1);
+            questionHistory.push({ q: data.q, a: data.a, a_hu: data.a_hu || '', category: data.category || '' });
+            historyIndex = questionHistory.length - 1;
             document.getElementById('questionText').textContent = data.q;
             document.getElementById('answerText').textContent   = data.a_hu || data.a;
             document.getElementById('resultCard').classList.add('hidden');
@@ -808,9 +864,80 @@ function nextQuestion() {
         });
 }
 
+function prevQuestion() {
+    if (historyIndex <= 0) return;
+    historyIndex--;
+    var h = questionHistory[historyIndex];
+    targetQ  = h.q;
+    targetA  = h.a;
+    targetAH = h.a_hu || '';
+    isListening       = false;
+    questionAttempted = false;
+    showPlaybackWhenReady = false;
+    clearTimeout(recTimeout);
+    clearTimeout(advanceTimeout);
+    try { recognition.abort(); } catch(e) {}
+    document.getElementById('questionText').textContent = h.q;
+    document.getElementById('answerText').textContent   = h.a_hu || h.a;
+    document.getElementById('resultCard').classList.add('hidden');
+    document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
+    document.getElementById('matchScore').textContent   = '';
+    document.getElementById('transcript').textContent   = '';
+    document.getElementById('playbackBtn').classList.add('hidden');
+    document.getElementById('categoryTag').textContent  = h.category || '';
+    document.getElementById('revealDetails').removeAttribute('open');
+    document.getElementById('practiceTranslation').classList.add('hidden');
+    lastRecordingBlob = null;
+    if (listenMode) applyListenMode();
+    if (translateOn) fetchTranslation(); else { document.getElementById('inlineTranslation').classList.add('hidden'); document.getElementById('inlineTranslation').textContent = ''; }
+    if (phoneticOn) fetchPhonetic(); else { document.getElementById('phoneticHint').classList.add('hidden'); document.getElementById('phoneticHint').textContent = ''; }
+    speak(currentSpeed);
+}
+
+function shuffleQuestion() {
+    isListening       = false;
+    questionAttempted = false;
+    showPlaybackWhenReady = false;
+    clearTimeout(recTimeout);
+    clearTimeout(advanceTimeout);
+    try { recognition.abort(); } catch(e) {}
+
+    document.getElementById('practiceTranslation').classList.add('hidden');
+    document.getElementById('revealDetails').removeAttribute('open');
+
+    fetch('?who=' + who + '&cat=' + cat + '&ajax=1&shuffle=1')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            targetQ  = data.q;
+            targetA  = data.a;
+            targetAH = data.a_hu || '';
+            questionHistory = questionHistory.slice(0, historyIndex + 1);
+            questionHistory.push({ q: data.q, a: data.a, a_hu: data.a_hu || '', category: data.category || '' });
+            historyIndex = questionHistory.length - 1;
+            document.getElementById('questionText').textContent = data.q;
+            document.getElementById('answerText').textContent   = data.a_hu || data.a;
+            document.getElementById('resultCard').classList.add('hidden');
+            document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
+            document.getElementById('matchScore').textContent   = '';
+            document.getElementById('transcript').textContent   = '';
+            document.getElementById('playbackBtn').classList.add('hidden');
+            document.getElementById('categoryTag').textContent = data.category || '';
+            lastRecordingBlob = null;
+            if (listenMode) applyListenMode();
+            if (translateOn) fetchTranslation(); else { document.getElementById('inlineTranslation').classList.add('hidden'); document.getElementById('inlineTranslation').textContent = ''; }
+            if (phoneticOn) fetchPhonetic(); else { document.getElementById('phoneticHint').classList.add('hidden'); document.getElementById('phoneticHint').textContent = ''; }
+            speak(currentSpeed);
+        });
+}
+
 // ── Speech recognition ────────────────────────────────────────────────
 var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-var recognition = new SpeechRecognition();
+if (!SpeechRecognition) {
+    document.getElementById('recordBtn').disabled = true;
+    document.getElementById('recordBtn').title = 'Speech recognition not supported in this browser';
+    document.getElementById('recordLabel').textContent = 'N/A';
+}
+var recognition = SpeechRecognition ? new SpeechRecognition() : { start:function(){}, stop:function(){}, abort:function(){}, onstart:null, onresult:null, onend:null, onerror:null };
 recognition.lang            = 'hu-HU';
 recognition.interimResults  = false;
 recognition.continuous      = true;
@@ -821,23 +948,17 @@ function setRecordIcon(iconName) {
     icon.setAttribute('data-lucide', iconName);
     lucide.createIcons({ nodes: [icon] });
 }
-function setMicToggleIcon(iconName) {
-    var icon = document.getElementById('micToggleIcon');
-    icon.setAttribute('data-lucide', iconName);
-    lucide.createIcons({ nodes: [icon] });
-}
-
 recognition.onstart = function() {
     isListening     = true;
     listenStartTime = Date.now();
     indicator.className = 'status-dot dot-live';
-    document.getElementById('recordBtn').classList.add('mic-active');
+    var rb = document.getElementById('recordBtn');
+    rb.classList.add('mic-active');
+    rb.classList.remove('bg-green-600', 'hover:bg-green-500', 'glow-green');
+    rb.classList.add('bg-red-600', 'hover:bg-red-500', 'glow-red');
     document.getElementById('recordLabel').textContent = 'Recording';
 
     setRecordIcon('headphones');
-    setMicToggleIcon('mic-off');
-    document.getElementById('micToggle').classList.add('text-red-400');
-    document.getElementById('micToggle').classList.remove('text-slate-200');
     startVolume();
     recTimeout = setTimeout(function() {
         if (isListening) recognition.stop();
@@ -863,13 +984,12 @@ recognition.onresult = function(event) {
     }
     isListening = false;
     indicator.className = 'status-dot dot-off';
-    document.getElementById('recordBtn').classList.remove('mic-active');
-    document.getElementById('recordLabel').textContent = 'Record';
+    var rbReset = document.getElementById('recordBtn');
+    rbReset.classList.remove('mic-active', 'bg-red-600', 'hover:bg-red-500', 'glow-red');
+    rbReset.classList.add('bg-green-600', 'hover:bg-green-500', 'glow-green');
+    document.getElementById('recordLabel').textContent = 'Mic';
 
     setRecordIcon('mic');
-    setMicToggleIcon('mic');
-    document.getElementById('micToggle').classList.remove('text-red-400');
-    document.getElementById('micToggle').classList.add('text-slate-200');
 
     if (isPractice) {
         isPractice = false;
@@ -973,7 +1093,7 @@ recognition.onresult = function(event) {
                     countdown.textContent = 'Next in ' + secsLeft + 's...';
                     secsLeft--;
                 }, 1000);
-                advanceTimeout = setTimeout(function() { clearInterval(countdownInterval); nextQuestion(); }, 4000);
+                advanceTimeout = setTimeout(function() { clearInterval(countdownInterval); nextQuestion(); }, 3000);
             }
             if (!questionAttempted) {
                 questionAttempted = true;
@@ -997,13 +1117,12 @@ recognition.onend = function() {
     isPractice  = false;
     cleanupAudio();
     indicator.className = 'status-dot dot-off';
-    document.getElementById('recordBtn').classList.remove('mic-active');
-    document.getElementById('recordLabel').textContent = 'Record';
+    var rbReset = document.getElementById('recordBtn');
+    rbReset.classList.remove('mic-active', 'bg-red-600', 'hover:bg-red-500', 'glow-red');
+    rbReset.classList.add('bg-green-600', 'hover:bg-green-500', 'glow-green');
+    document.getElementById('recordLabel').textContent = 'Mic';
 
     setRecordIcon('mic');
-    setMicToggleIcon('mic');
-    document.getElementById('micToggle').classList.remove('text-red-400');
-    document.getElementById('micToggle').classList.add('text-slate-200');
 };
 
 function toggleMic() {
@@ -1030,10 +1149,10 @@ function applyTranslateState() {
     var el = document.getElementById('inlineTranslation');
     if (translateOn) {
         btn.classList.add('text-blue-400');
-        btn.classList.remove('text-slate-500');
+        btn.classList.remove('text-slate-500', 'text-slate-200');
     } else {
         btn.classList.remove('text-blue-400');
-        btn.classList.add('text-slate-500');
+        btn.classList.add('text-slate-200');
         el.classList.add('hidden');
     }
 }
@@ -1064,10 +1183,10 @@ function applyPhoneticState() {
     var el = document.getElementById('phoneticHint');
     if (phoneticOn) {
         btn.classList.add('text-amber-400');
-        btn.classList.remove('text-slate-500');
+        btn.classList.remove('text-slate-500', 'text-slate-200');
     } else {
         btn.classList.remove('text-amber-400');
-        btn.classList.add('text-slate-500');
+        btn.classList.add('text-slate-200');
         el.classList.add('hidden');
     }
 }
@@ -1138,6 +1257,40 @@ function translatePractice() {
             }
         })
         .catch(function() { el.textContent = 'Translation error'; });
+}
+
+function savePracticePhrase() {
+    var input = document.getElementById('practiceInput').value.trim();
+    var transEl = document.getElementById('practiceTranslation');
+    var transText = transEl.textContent.trim();
+    if (!input) return;
+
+    // Determine which is Hungarian and which is English
+    var hasHuChars = /[áéíóöőúüűÁÉÍÓÖŐÚÜŰ]/.test(input);
+    var questionHu = hasHuChars ? input : transText;
+    var answerEn = hasHuChars ? transText : input;
+    var answerHu = hasHuChars ? input : (transText || '');
+
+    if (!questionHu) { alert('Type a Hungarian phrase first (or translate to get one)'); return; }
+
+    var btn = document.getElementById('savePhraseBtn');
+    btn.classList.add('opacity-50');
+
+    var fd = new FormData();
+    fd.append('question_hu', questionHu);
+    fd.append('answer_en', answerEn.replace(/\s*🔊$/, ''));
+    fd.append('answer_hu', answerHu);
+    fd.append('category', 'Practice');
+
+    fetch('?ajax=1&action=save_phrase', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { alert(data.error); return; }
+            transEl.textContent = data.msg;
+            transEl.classList.remove('hidden');
+            btn.classList.remove('opacity-50');
+        })
+        .catch(function() { btn.classList.remove('opacity-50'); alert('Save failed'); });
 }
 
 // Live translation as you type (debounced)
@@ -1231,10 +1384,25 @@ function jumpToPhrase(q, a) {
     targetQ = q;
     targetA = a;
     targetAH = '';
+    questionAttempted = false;
+    showPlaybackWhenReady = false;
+    lastRecordingBlob = null;
+    clearTimeout(recTimeout);
+    clearTimeout(advanceTimeout);
+    try { recognition.abort(); } catch(e) {}
     document.getElementById('questionText').textContent = q;
     document.getElementById('answerText').textContent   = a;
     document.getElementById('resultCard').classList.add('hidden');
+    document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
+    document.getElementById('matchScore').textContent   = '';
+    document.getElementById('transcript').textContent   = '';
+    document.getElementById('playbackBtn').classList.add('hidden');
+    document.getElementById('revealDetails').removeAttribute('open');
+    document.getElementById('practiceTranslation').classList.add('hidden');
     closeBrowse();
+    if (listenMode) applyListenMode();
+    if (translateOn) fetchTranslation(); else { document.getElementById('inlineTranslation').classList.add('hidden'); }
+    if (phoneticOn) fetchPhonetic(); else { document.getElementById('phoneticHint').classList.add('hidden'); }
     speak(currentSpeed);
 }
 
@@ -1372,12 +1540,25 @@ document.addEventListener('keydown', function(e) {
         toggleTranslation();
     } else if (e.key === 'p' || e.key === 'P') {
         togglePhonetic();
+    } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        prevQuestion();
+    } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextQuestion();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        speak(currentSpeed, false);
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        var d = document.getElementById('revealDetails');
+        d.open = !d.open;
     }
 });
 
 // ── Init ──────────────────────────────────────────────────────────────
 setMode(currentMode);
-setCat(cat);
+setCat(cat, true);
 setSpeed(currentSpeed);
 applyListenMode();
 applyAutoAdvance();
