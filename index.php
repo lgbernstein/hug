@@ -279,8 +279,14 @@ Give exactly 3 examples and 3 quiz questions. Make them relevant to daily life a
     ]);
     $resp = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
     curl_close($ch);
-    if ($httpCode !== 200) { echo json_encode(['error' => 'Gemini API error', 'code' => $httpCode]); exit; }
+    if ($httpCode !== 200 || !$resp) {
+        $errBody = $resp ? json_decode($resp, true) : null;
+        $msg = $errBody['error']['message'] ?? ($curlErr ?: "HTTP $httpCode");
+        echo json_encode(['error' => 'Gemini API error: ' . $msg]);
+        exit;
+    }
     $data = json_decode($resp, true);
     $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
     $text = preg_replace('/^```json\s*/i', '', $text);
