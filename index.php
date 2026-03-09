@@ -1115,9 +1115,40 @@ function translatePractice() {
     fd.append('text', text);
     fetch('translate.php', { method: 'POST', body: fd })
         .then(function(r) { return r.json(); })
-        .then(function(data) { el.textContent = data.translation || 'Error'; })
+        .then(function(data) {
+            var result = data.translation || 'Error';
+            el.textContent = '';
+            el.appendChild(document.createTextNode(result + ' '));
+            if (result && result !== 'Error') {
+                var speakBtn = document.createElement('button');
+                speakBtn.className = 'inline-flex items-center ml-1 text-indigo-400 hover:text-white transition-colors align-middle';
+                speakBtn.title = 'Listen';
+                speakBtn.textContent = '\u{1F50A}';
+                speakBtn.onclick = function() {
+                    window.speechSynthesis.cancel();
+                    var msg = new SpeechSynthesisUtterance(result);
+                    msg.lang = 'hu-HU';
+                    msg.rate = 0.9;
+                    if (huVoice) msg.voice = huVoice;
+                    window.speechSynthesis.speak(msg);
+                };
+                el.appendChild(speakBtn);
+            }
+        })
         .catch(function() { el.textContent = 'Translation error'; });
 }
+
+// Live translation as you type (debounced)
+var practiceDebounce;
+document.getElementById('practiceInput').addEventListener('input', function() {
+    clearTimeout(practiceDebounce);
+    var text = this.value.trim();
+    if (!text) {
+        document.getElementById('practiceTranslation').classList.add('hidden');
+        return;
+    }
+    practiceDebounce = setTimeout(function() { translatePractice(); }, 600);
+});
 
 document.getElementById('practiceInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && (e.ctrlKey || e.shiftKey)) {
