@@ -485,78 +485,6 @@ select option { background: #111a2e; color: #e2e8f0; }
     </div>
 </div>
 
-<!-- DRILL MODAL -->
-<div id="activeDrill" class="hidden fixed inset-0 modal-backdrop z-50 flex flex-col">
-    <div class="glass-strong max-w-2xl w-full mx-auto mt-4 md:mt-12 rounded-t-3xl md:rounded-3xl flex-1 md:flex-initial md:max-h-[85vh] flex flex-col overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-            <div>
-                <h2 id="drillTitle" class="text-lg font-bold text-white"></h2>
-                <p id="drillProgress" class="text-xs text-slate-500 mt-0.5"></p>
-            </div>
-            <button onclick="closeDrill()" class="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-        </div>
-        <div class="flex-1 overflow-y-auto">
-            <div class="px-5 pt-6 pb-4 text-center">
-                <h1 id="drillQuestionText" class="question-text text-white mb-3"></h1>
-                <div class="flex justify-center gap-4 mb-2">
-                    <button onclick="drillTranslate()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:text-blue-400 hover:border-blue-400/40 hover:bg-blue-400/5 transition-all">
-                        <i data-lucide="languages" class="w-4 h-4"></i>
-                        <span class="text-xs font-semibold">Translate</span>
-                    </button>
-                </div>
-                <p id="drillTranslation" class="hidden text-blue-300/80 text-sm mt-2 italic"></p>
-            </div>
-            <div class="px-5 pb-4">
-                <button onclick="drillSpeak()"
-                    class="w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-5 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98]">
-                    <i data-lucide="volume-2" class="w-7 h-7 text-accent-light group-hover:scale-110 transition-transform"></i>
-                    <span class="text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]">Listen</span>
-                </button>
-            </div>
-            <div class="px-5 pb-4">
-                <details id="drillReveal" class="group">
-                    <summary class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition-all cursor-pointer list-none border border-white/5">
-                        <i data-lucide="eye" class="w-4 h-4"></i>
-                        <span class="text-xs font-semibold uppercase tracking-wider">Reveal Answer</span>
-                    </summary>
-                    <div class="mt-3 p-5 bg-accent/5 rounded-xl border border-accent/10">
-                        <p id="drillAnswerText" class="text-lg text-slate-300 italic leading-relaxed"></p>
-                    </div>
-                </details>
-            </div>
-            <div class="px-5 pb-5">
-                <div class="flex items-center justify-center gap-3">
-                    <button onclick="drillMic()" title="Mic" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-green-600 hover:bg-green-500 text-white glow-green">
-                        <i data-lucide="mic" class="w-6 h-6"></i>
-                        <span class="text-[9px] font-semibold">Mic</span>
-                    </button>
-                    <button onclick="drillNext()" title="Next" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
-                        <i data-lucide="arrow-right" class="w-5 h-5"></i>
-                        <span class="text-[9px] font-semibold">Next</span>
-                    </button>
-                    <button onclick="drillShuffle()" title="Shuffle" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
-                        <i data-lucide="shuffle" class="w-5 h-5"></i>
-                        <span class="text-[9px] font-semibold">Shuffle</span>
-                    </button>
-                </div>
-                <div class="flex items-center justify-center gap-5 mt-3 text-xs">
-                    <span class="flex items-center gap-1 text-green-500/70">
-                        <i data-lucide="check" class="w-3.5 h-3.5"></i> <span id="drillPass">0</span>
-                    </span>
-                    <span class="flex items-center gap-1 text-red-500/70">
-                        <i data-lucide="x" class="w-3.5 h-3.5"></i> <span id="drillFail">0</span>
-                    </span>
-                    <span class="text-slate-500">
-                        <span id="drillIndex">0</span> / <span id="drillTotal">0</span>
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- MAIN APP -->
 <div class="w-full max-w-2xl px-4 pt-4 md:pt-8 space-y-4">
 
@@ -602,6 +530,18 @@ select option { background: #111a2e; color: #e2e8f0; }
             <span><span id="homeStudied" class="text-blue-400 font-bold">—</span> studied</span>
             <span><span id="homeMastered" class="text-green-400 font-bold">—</span> mastered</span>
         </div>
+    </div>
+
+    <!-- DRILL MODE BANNER (hidden unless drill active) -->
+    <div id="drillBanner" class="hidden flex items-center justify-between bg-accent/10 border border-accent/20 rounded-xl px-4 py-2.5">
+        <div class="flex items-center gap-2">
+            <i data-lucide="dumbbell" class="w-4 h-4 text-accent-light"></i>
+            <span id="drillBannerName" class="text-sm font-bold text-white"></span>
+            <span id="drillBannerCount" class="text-[10px] text-slate-400"></span>
+        </div>
+        <button onclick="closeDrill()" class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i> Exit
+        </button>
     </div>
 
     <!-- SESSION PROGRESS -->
@@ -1159,6 +1099,8 @@ function setSpeed(speed) {
 function setCat(c, skipFetch) {
     cat = c;
     localStorage.setItem('hugCat', c);
+    // Exit drill mode when switching categories
+    if (drillPhrases.length > 0) closeDrill();
     ['all','prep','bios'].forEach(function(id) {
         var el = document.getElementById('cat-' + id);
         el.className = 'pill ' + (cat === id ? 'pill-active' : 'pill-inactive');
@@ -1236,6 +1178,14 @@ function nextQuestion() {
     document.getElementById('practiceTranslation').classList.add('hidden');
     document.getElementById('revealDetails').removeAttribute('open');
 
+    // If in drill mode, advance through drill array
+    if (drillPhrases.length > 0) {
+        drillIdx++;
+        if (drillIdx >= drillPhrases.length) drillIdx = 0;
+        loadDrillIntoPlayer();
+        return;
+    }
+
     fetch('?who=' + who + '&cat=' + cat + '&ajax=1')
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -1303,6 +1253,19 @@ function shuffleQuestion() {
 
     document.getElementById('practiceTranslation').classList.add('hidden');
     document.getElementById('revealDetails').removeAttribute('open');
+
+    // If in drill mode, shuffle the drill array
+    if (drillPhrases.length > 0) {
+        for (var i = drillPhrases.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var tmp = drillPhrases[i];
+            drillPhrases[i] = drillPhrases[j];
+            drillPhrases[j] = tmp;
+        }
+        drillIdx = 0;
+        loadDrillIntoPlayer();
+        return;
+    }
 
     fetch('?who=' + who + '&cat=' + cat + '&ajax=1&shuffle=1')
         .then(function(r) { return r.json(); })
@@ -2075,10 +2038,15 @@ function loadDrillGroups() {
 
 function onDrillPick(name) {
     if (!name) return;
+    // Go to home view if not already there
+    if (currentView !== 'home') showView('home');
     startDrill(name);
-    // Reset dropdown after selection
     document.getElementById('drillPicker').value = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// Drill mode: loads phrases into the main player
+var activeDrillName = '';
 
 function startDrill(groupName) {
     fetch('?who=' + who + '&ajax=1&action=drill_phrases&tag=' + encodeURIComponent(groupName))
@@ -2087,79 +2055,65 @@ function startDrill(groupName) {
             if (!phrases.length) { alert('No phrases found for "' + groupName + '". Try re-running import_notion.php.'); return; }
             drillPhrases = phrases;
             drillIdx = 0;
-            drillPassCount = 0;
-            drillFailCount = 0;
-            document.getElementById('drillTitle').textContent = groupName;
-            document.getElementById('drillTotal').textContent = phrases.length;
-            document.getElementById('drillPass').textContent = '0';
-            document.getElementById('drillFail').textContent = '0';
-            var panel = document.getElementById('activeDrill');
-            panel.classList.remove('hidden');
-            showDrillQuestion();
-            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            lucide.createIcons();
+            activeDrillName = groupName;
+            // Reset session counters for this drill
+            sessionPass = sessionFail = sessionStreak = sessionBestStreak = sessionCount = 0;
+            document.getElementById('sesPass').textContent = '0';
+            document.getElementById('sesFail').textContent = '0';
+            document.getElementById('sesStreak').textContent = '0';
+            // Show drill banner
+            showDrillBanner(groupName, phrases.length);
+            // Load first phrase into main player
+            loadDrillIntoPlayer();
         })
         .catch(function(err) { alert('Error loading drill: ' + err.message); });
 }
 
-function showDrillQuestion() {
-    if (drillIdx >= drillPhrases.length) drillIdx = 0;
-    var p = drillPhrases[drillIdx];
-    document.getElementById('drillQuestionText').textContent = p.q;
-    document.getElementById('drillAnswerText').textContent = p.a_hu || p.a;
-    document.getElementById('drillIndex').textContent = drillIdx + 1;
-    document.getElementById('drillProgress').textContent = 'Question ' + (drillIdx + 1) + ' of ' + drillPhrases.length;
-    document.getElementById('drillReveal').removeAttribute('open');
-    document.getElementById('drillTranslation').classList.add('hidden');
-}
-
-function drillNext() {
-    drillIdx++;
-    if (drillIdx >= drillPhrases.length) drillIdx = 0;
-    showDrillQuestion();
-}
-
-function drillShuffle() {
-    for (var i = drillPhrases.length - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
-        var tmp = drillPhrases[i];
-        drillPhrases[i] = drillPhrases[j];
-        drillPhrases[j] = tmp;
-    }
-    drillIdx = 0;
-    showDrillQuestion();
-}
-
-function drillSpeak() {
-    if (!drillPhrases.length) return;
-    window.speechSynthesis.cancel();
-    var msg = new SpeechSynthesisUtterance(drillPhrases[drillIdx].q);
-    msg.lang = 'hu-HU';
-    msg.rate = currentSpeed;
-    if (huVoice) msg.voice = huVoice;
-    window.speechSynthesis.speak(msg);
-}
-
-function drillMic() {
-    drillSpeak();
-}
-
-function drillTranslate() {
-    if (!drillPhrases.length) return;
-    var el = document.getElementById('drillTranslation');
-    el.textContent = 'Translating...';
-    el.classList.remove('hidden');
-    var fd = new FormData();
-    fd.append('text', drillPhrases[drillIdx].q);
-    fetch('translate.php', { method: 'POST', body: fd })
-        .then(function(r) { return r.json(); })
-        .then(function(data) { el.textContent = data.translation || 'Error'; })
-        .catch(function() { el.textContent = 'Translation error'; });
+function showDrillBanner(name, total) {
+    var banner = document.getElementById('drillBanner');
+    if (!banner) return;
+    document.getElementById('drillBannerName').textContent = name;
+    document.getElementById('drillBannerCount').textContent = total + ' phrases';
+    banner.classList.remove('hidden');
 }
 
 function closeDrill() {
-    document.getElementById('activeDrill').classList.add('hidden');
     drillPhrases = [];
+    activeDrillName = '';
+    drillIdx = 0;
+    var banner = document.getElementById('drillBanner');
+    if (banner) banner.classList.add('hidden');
+    // Reset progress bar to session mode
+    updateProgressBar();
+}
+
+function loadDrillIntoPlayer() {
+    if (!drillPhrases.length) return;
+    if (drillIdx >= drillPhrases.length) drillIdx = 0;
+    var p = drillPhrases[drillIdx];
+    targetQ = p.q;
+    targetA = p.a;
+    targetAH = p.a_hu || '';
+    // Update the main player UI
+    document.getElementById('questionText').textContent = p.q;
+    document.getElementById('answerText').textContent = p.a_hu || p.a;
+    document.getElementById('resultCard').classList.add('hidden');
+    document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
+    document.getElementById('matchScore').textContent = '';
+    document.getElementById('transcript').textContent = '';
+    document.getElementById('playbackBtn').classList.add('hidden');
+    document.getElementById('categoryTag').textContent = activeDrillName;
+    document.getElementById('revealDetails').removeAttribute('open');
+    lastRecordingBlob = null;
+    questionAttempted = false;
+    // Update progress for drill
+    var pct = drillPhrases.length > 0 ? Math.min(100, ((drillIdx) / drillPhrases.length) * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = (drillIdx + 1) + ' / ' + drillPhrases.length;
+    if (listenMode) applyListenMode();
+    if (translateOn) fetchTranslation(); else { document.getElementById('inlineTranslation').classList.add('hidden'); }
+    if (phoneticOn) fetchPhonetic(); else { document.getElementById('phoneticHint').classList.add('hidden'); }
+    speak(currentSpeed);
 }
 
 // ── Grammar patterns browser ──────────────────────────────────────────
