@@ -67,14 +67,14 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'stats') {
 }
 
 // SRS-weighted query
-$srs_sql = "SELECT phrases.q, phrases.a, phrases.category
+$srs_sql = "SELECT phrases.q, phrases.a, phrases.a_hu, phrases.category
             FROM ($union) AS phrases
             LEFT JOIN study_history sh ON sh.phrase = phrases.q AND sh.who = '$who_safe'
             ORDER BY CASE WHEN sh.next_review IS NULL OR sh.next_review <= NOW() THEN 0 ELSE 1 END ASC, RAND()
             LIMIT 1";
 $result = $conn->query($srs_sql);
 if (!$result) {
-    $result = $conn->query("SELECT q, a, category FROM ($union) AS phrases ORDER BY RAND() LIMIT 1");
+    $result = $conn->query("SELECT q, a, a_hu, category FROM ($union) AS phrases ORDER BY RAND() LIMIT 1");
 }
 $row     = $result ? $result->fetch_assoc() : null;
 $targetQ  = $row['q'] ?? 'No Data Found';
@@ -449,7 +449,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Stats</span>
     </button>
-    <button onclick="speak(currentSpeed)" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
+    <button onclick="speak(currentSpeed, false)" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
         <i data-lucide="volume-2" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Listen</span>
     </button>
@@ -646,7 +646,8 @@ function loadVoices() {
 window.speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
 
-function speak(rate) {
+function speak(rate, autoRecord) {
+    if (autoRecord === undefined) autoRecord = true;
     window.speechSynthesis.cancel();
     isListening = false;
     clearTimeout(recTimeout);
@@ -663,7 +664,7 @@ function speak(rate) {
         msg.lang = 'hu-HU';
         msg.rate = rate;
         if (huVoice) msg.voice = huVoice;
-        msg.onend = function() { setTimeout(toggleMic, 350); };
+        if (autoRecord) { msg.onend = function() { setTimeout(toggleMic, 350); }; }
         window.speechSynthesis.speak(msg);
     }, 50);
 }
@@ -712,6 +713,7 @@ function setCat(c) {
         var el = document.getElementById('cat-' + id);
         el.className = 'pill ' + (cat === id ? 'pill-active' : 'pill-inactive');
     });
+    nextQuestion();
 }
 
 // ── Listen mode ───────────────────────────────────────────────────────
@@ -953,7 +955,7 @@ recognition.onresult = function(event) {
                 pauseRow.className = 'flex items-center justify-center gap-2 mt-2';
                 var countdown = document.createElement('span');
                 countdown.className = 'text-[10px] text-slate-400';
-                countdown.textContent = 'Next in 4s...';
+                countdown.textContent = 'Next in 3s...';
                 var pauseBtn = document.createElement('button');
                 pauseBtn.className = 'text-[10px] px-2 py-0.5 rounded border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 font-semibold';
                 pauseBtn.textContent = 'Pause';
@@ -965,9 +967,9 @@ recognition.onresult = function(event) {
                 pauseRow.appendChild(countdown);
                 pauseRow.appendChild(pauseBtn);
                 scoreDisplay.appendChild(pauseRow);
-                var secsLeft = 3;
+                var secsLeft = 2;
                 var countdownInterval = setInterval(function() {
-                    if (secsLeft <= 0) { clearInterval(countdownInterval); return; }
+                    if (secsLeft <= 0) { clearInterval(countdownInterval); countdown.textContent = 'Moving on...'; return; }
                     countdown.textContent = 'Next in ' + secsLeft + 's...';
                     secsLeft--;
                 }, 1000);
@@ -1228,6 +1230,7 @@ function renderPhrases(data) {
 function jumpToPhrase(q, a) {
     targetQ = q;
     targetA = a;
+    targetAH = '';
     document.getElementById('questionText').textContent = q;
     document.getElementById('answerText').textContent   = a;
     document.getElementById('resultCard').classList.add('hidden');
@@ -1368,7 +1371,7 @@ document.addEventListener('keydown', function(e) {
     } else if (e.key === 't' || e.key === 'T') {
         toggleTranslation();
     } else if (e.key === 'p' || e.key === 'P') {
-        showPhonetic();
+        togglePhonetic();
     }
 });
 

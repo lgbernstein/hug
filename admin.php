@@ -104,8 +104,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'update_answer' && isset($_POST['id'])) {
         $id = (int)$_POST['id'];
-        $answer_hu = $conn->real_escape_string(trim($_POST['answer_hu'] ?? ''));
-        $conn->query("UPDATE hungarian_prep SET answer_hu = " . ($answer_hu ? "'$answer_hu'" : "NULL") . " WHERE id = $id");
+        $ah = trim($_POST['answer_hu'] ?? '') ?: null;
+        $stmt = $conn->prepare("UPDATE hungarian_prep SET answer_hu=? WHERE id=?");
+        $stmt->bind_param('si', $ah, $id);
+        $stmt->execute();
+        $stmt->close();
         $message = "Updated Hungarian answer for phrase #$id.";
     }
 
@@ -401,13 +404,13 @@ body { background: #060b18; color: #e2e8f0; }
                     data-id="<?php echo $p['id']; ?>"
                     data-q="<?php echo htmlspecialchars($p['question_hu'], ENT_QUOTES); ?>"
                     data-ah="<?php echo htmlspecialchars($p['answer_hu'] ?? '', ENT_QUOTES); ?>"
-                    data-ae="<?php echo htmlspecialchars($p['answer_en'], ENT_QUOTES); ?>"
+                    data-ae="<?php echo htmlspecialchars($p['answer_en'] ?? '', ENT_QUOTES); ?>"
                     data-cat="<?php echo htmlspecialchars($p['category'], ENT_QUOTES); ?>">
                     <td class="py-2 px-2"><input type="checkbox" class="row-cb accent-red-500 cursor-pointer" value="<?php echo $p['id']; ?>" onchange="updateBulkBar()"></td>
                     <td class="py-2 px-2 text-slate-600"><?php echo $p['id']; ?></td>
                     <td class="py-2 px-2 text-white font-medium cell-q"><?php echo htmlspecialchars($p['question_hu']); ?></td>
                     <td class="py-2 px-2 cell-ah <?php echo $p['answer_hu'] ? 'text-green-400' : 'text-yellow-500/50 italic'; ?>"><?php echo $p['answer_hu'] ? htmlspecialchars($p['answer_hu']) : '(missing)'; ?></td>
-                    <td class="py-2 px-2 text-slate-400 cell-ae"><?php echo htmlspecialchars($p['answer_en']); ?></td>
+                    <td class="py-2 px-2 text-slate-400 cell-ae"><?php echo htmlspecialchars($p['answer_en'] ?? ''); ?></td>
                     <td class="py-2 px-2 cell-cat"><a href="?cat=<?php echo urlencode($p['category']); ?>" class="text-slate-500 hover:text-indigo-400 underline decoration-dotted underline-offset-2 transition-colors"><?php echo htmlspecialchars($p['category']); ?></a></td>
                     <td class="py-2 px-2 space-x-1 whitespace-nowrap">
                         <button onclick="editRow(<?php echo $p['id']; ?>)" class="border border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors text-xs font-semibold px-2 py-1 rounded">Edit</button>

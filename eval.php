@@ -34,13 +34,17 @@ if ($apiKey === '') {
 $bio_context = '';
 if ($mode === 'interview' && $who !== 'All') {
     $conn = new mysqli($env['DB_HOST'], $env['DB_USER'], $env['DB_PASS'], $env['DB_NAME']);
-    $who_safe = $conn->real_escape_string($who);
-    $res = $conn->query("SELECT fact_label_hu, fact_value_hu FROM user_bios WHERE subject_name = '$who_safe'");
     $facts = [];
-    while ($r = $res->fetch_assoc()) {
-        $facts[] = $r['fact_label_hu'] . ': ' . $r['fact_value_hu'];
+    if (!$conn->connect_error) {
+        $who_safe = $conn->real_escape_string($who);
+        $res = $conn->query("SELECT fact_label_hu, fact_value_hu FROM user_bios WHERE subject_name = '$who_safe'");
+        if ($res) {
+            while ($r = $res->fetch_assoc()) {
+                $facts[] = $r['fact_label_hu'] . ': ' . $r['fact_value_hu'];
+            }
+        }
+        $conn->close();
     }
-    $conn->close();
     if ($facts) $bio_context = 'Known facts about ' . $who . ': ' . implode('; ', $facts) . '. ';
 }
 
