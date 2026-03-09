@@ -302,6 +302,16 @@ if ($col && $col->num_rows === 0) {
     $conn->query("ALTER TABLE drill_groups ADD COLUMN tag_match VARCHAR(500) DEFAULT NULL AFTER description");
 }
 
+// Add unique index on name if missing, then clear duplicates
+$idx = $conn->query("SHOW INDEX FROM drill_groups WHERE Key_name = 'unique_name'");
+if ($idx && $idx->num_rows === 0) {
+    // Remove duplicates first (keep lowest id per name)
+    $conn->query("DELETE d FROM drill_groups d INNER JOIN (
+        SELECT name, MIN(id) AS keep_id FROM drill_groups GROUP BY name HAVING COUNT(*) > 1
+    ) dups ON d.name = dups.name AND d.id != dups.keep_id");
+    $conn->query("ALTER TABLE drill_groups ADD UNIQUE KEY unique_name (name)");
+}
+
 // [name, description, tag_match (comma-separated patterns to match in phrase tags), source]
 $drill_groups = [
     ['Question Words', 'mi/kit/kinek question word forms and cases', 'question-words', 'notion'],

@@ -33,7 +33,8 @@ $conn->query("CREATE TABLE IF NOT EXISTS drill_groups (
     description TEXT,
     source VARCHAR(50) DEFAULT 'manual',
     notion_url TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 $results[] = "drill_groups table ready";
 
