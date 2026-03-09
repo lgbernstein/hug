@@ -101,19 +101,31 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'stats') {
     exit;
 }
 
+// Helper: build SQL WHERE clause from comma-separated tag patterns
+function buildTagWhere($tagMatch, $conn) {
+    $tags = array_map('trim', explode(',', $tagMatch));
+    $clauses = [];
+    foreach ($tags as $t) {
+        if ($t === '') continue;
+        $t = $conn->real_escape_string($t);
+        $clauses[] = "tags LIKE '%$t%'";
+    }
+    return $clauses ? '(' . implode(' OR ', $clauses) . ')' : '0';
+}
+
 // AJAX: list drill groups
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'drill_groups') {
     header('Content-Type: application/json');
     $groups = [];
-    $r = $conn->query("SELECT id, name, description, source FROM drill_groups ORDER BY name");
+    // Check if tag_match column exists
+    $tmCheck = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
+    $hasTM = ($tmCheck && $tmCheck->num_rows > 0);
+    $cols = $hasTM ? "id, name, description, tag_match, source" : "id, name, description, '' AS tag_match, source";
+    $r = $conn->query("SELECT $cols FROM drill_groups ORDER BY name");
     if ($r) { while ($row = $r->fetch_assoc()) {
-        // Count phrases matching this drill group by tag
-        $tag = $conn->real_escape_string($row['name']);
-        $cnt = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep WHERE tags LIKE '%$tag%'")->fetch_assoc()['c'] ?? 0;
-        // Also count by drill_group column
-        if ((int)$cnt === 0) {
-            $cnt = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep WHERE drill_group = '$tag'")->fetch_assoc()['c'] ?? 0;
-        }
+        $tagMatch = $row['tag_match'] ?: $row['name'];
+        $where = buildTagWhere($tagMatch, $conn);
+        $cnt = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep WHERE $where")->fetch_assoc()['c'] ?? 0;
         $row['phrase_count'] = (int)$cnt;
         $groups[] = $row;
     }}
@@ -121,16 +133,27 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'drill_groups') {
     exit;
 }
 
-// AJAX: get phrases for a drill group (by tag match)
+// AJAX: get phrases for a drill group (by tag_match)
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'drill_phrases') {
     header('Content-Type: application/json');
-    $tag = $conn->real_escape_string($_GET['tag'] ?? '');
-    if (!$tag) { echo json_encode([]); exit; }
+    $groupName = $conn->real_escape_string($_GET['tag'] ?? '');
+    if (!$groupName) { echo json_encode([]); exit; }
+    // Look up tag_match from drill_groups
+    $tmCheck = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
+    $hasTM = ($tmCheck && $tmCheck->num_rows > 0);
+    $tagMatch = $groupName;
+    if ($hasTM) {
+        $lookup = $conn->query("SELECT tag_match FROM drill_groups WHERE name = '$groupName' LIMIT 1");
+        if ($lookup && $row = $lookup->fetch_assoc()) {
+            $tagMatch = $row['tag_match'] ?: $groupName;
+        }
+    }
+    $where = buildTagWhere($tagMatch, $conn);
     $ahuCol = $hasAnswerHu ? "COALESCE(answer_hu,'')" : "''";
     $whoFilter = ($who !== 'All') ? " AND (`who` = 'All' OR `who` = '$who_safe')" : "";
     $sql = "SELECT question_hu AS q, answer_en AS a, $ahuCol AS a_hu, category, tags
             FROM hungarian_prep
-            WHERE (tags LIKE '%$tag%' OR drill_group = '$tag')$whoFilter
+            WHERE ($where OR drill_group = '$groupName')$whoFilter
             ORDER BY RAND()";
     $r = $conn->query($sql);
     $rows = [];

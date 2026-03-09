@@ -37,6 +37,15 @@ $conn->query("CREATE TABLE IF NOT EXISTS drill_groups (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 $results[] = "drill_groups table ready";
 
+// 3b. Add tag_match column to drill_groups
+$col = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
+if ($col && $col->num_rows === 0) {
+    $conn->query("ALTER TABLE drill_groups ADD COLUMN tag_match VARCHAR(500) DEFAULT NULL AFTER description");
+    $results[] = "Added 'tag_match' column to drill_groups";
+} else {
+    $results[] = "'tag_match' column already exists in drill_groups";
+}
+
 // 4. Create skill_proficiency table
 $conn->query("CREATE TABLE IF NOT EXISTS skill_proficiency (
     id INT AUTO_INCREMENT PRIMARY KEY,

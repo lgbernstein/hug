@@ -296,28 +296,39 @@ $results[] = "Common expressions: {$counts['expressions']} processed";
 // ============================================================
 // 4. DRILL GROUPS
 // ============================================================
+// Ensure tag_match column exists
+$col = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
+if ($col && $col->num_rows === 0) {
+    $conn->query("ALTER TABLE drill_groups ADD COLUMN tag_match VARCHAR(500) DEFAULT NULL AFTER description");
+}
+
+// [name, description, tag_match (comma-separated patterns to match in phrase tags), source]
 $drill_groups = [
-    ['Question Words (mi-forms)', 'mi/kit/kinek question word forms and cases', 'notion'],
-    ['Possessive Endings', 'All person/number possessive suffixes', 'notion'],
-    ['Numbers and Dates', 'Cardinal numbers, ordinals, months, dates', 'notion'],
-    ['Vowel Harmony Cases', 'Case suffixes with vowel harmony variants', 'notion'],
-    ['Weather and Adjectives', 'Weather adjectives with -s/-os/-es/-ös', 'notion'],
-    ['Demonstratives', 'ez/az/ezek/azok with articles', 'notion'],
-    ['Verb Prefixes', 'be- ki- fel- le- el- meg- oda- rá-', 'notion'],
-    ['Interview - Basic Info', 'Name, age, birthplace, documents', 'notion'],
-    ['Interview - Family', 'Parents, siblings, marital status, children', 'notion'],
-    ['Interview - Occupation', 'Work, job, retirement', 'notion'],
-    ['Interview - Origins', 'Hungarian heritage, motivation for citizenship', 'notion'],
-    ['Common Greetings', 'Jó reggelt, Szia, Viszontlátásra, etc.', 'notion'],
-    ['Shopping & Restaurant', 'Ordering, paying, asking prices', 'notion'],
-    ['Hungarian History', 'Key dates and events (895-1956)', 'notion'],
-    ['Daily Activities', 'Verb prefixes in context: felkelek, bemegyek, etc.', 'notion'],
-    ['val/-vel Assimilation', 'Instrumental case with consonant assimilation', 'notion'],
+    ['Question Words', 'mi/kit/kinek question word forms and cases', 'question-words', 'notion'],
+    ['Possessive Endings', 'All person/number possessive suffixes', 'possessive', 'notion'],
+    ['Numbers and Dates', 'Cardinal numbers, ordinals, months, dates', 'dates,numbers,ordinals', 'notion'],
+    ['Vowel Harmony Cases', 'Case suffixes with vowel harmony variants', 'instrumental-val-vel,inessive-ban-ben', 'notion'],
+    ['Weather and Adjectives', 'Weather adjectives with -s/-os/-es/-ös', 'weather-adjectives,adjectives', 'notion'],
+    ['Demonstratives', 'ez/az/ezek/azok with articles', 'demonstratives', 'notion'],
+    ['Verb Prefixes', 'be- ki- fel- le- el- meg- oda- rá-', 'verb-prefix', 'notion'],
+    ['Interview - Basic Info', 'Name, age, birthplace, documents', 'interview,basic-info,greeting,documents', 'notion'],
+    ['Interview - Family', 'Parents, siblings, marital status, children', 'interview,family', 'notion'],
+    ['Interview - Occupation', 'Work, job, retirement', 'interview,occupation', 'notion'],
+    ['Interview - Origins', 'Hungarian heritage, motivation for citizenship', 'interview,origins', 'notion'],
+    ['Common Greetings & Expressions', 'Jó reggelt, Szia, Viszontlátásra, etc.', 'common-expressions', 'notion'],
+    ['Shopping & Restaurant', 'Ordering, paying, asking prices', 'shopping,restaurant', 'notion'],
+    ['Hungarian History', 'Key dates and events (895-1956)', 'history', 'notion'],
+    ['Daily Activities', 'Verb prefixes in context: felkelek, bemegyek, etc.', 'daily,verb-prefix', 'notion'],
+    ['val/-vel Assimilation', 'Instrumental case with consonant assimilation', 'instrumental-val-vel,assimilation', 'notion'],
+    ['Past Tense', 'Sentences using past tense forms', 'past-tense', 'notion'],
+    ['Formal Register', 'Formal/polite speech (Ön forms)', 'formal-register', 'notion'],
+    ['Time Expressions', 'Telling time, durations, since when', 'time-expressions', 'notion'],
+    ['Places & Location', 'Inessive, allative, direction suffixes', 'inessive-ban-ben,places', 'notion'],
 ];
 
-$stmt = $conn->prepare("INSERT INTO drill_groups (name, description, source) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE description=VALUES(description)");
+$stmt = $conn->prepare("INSERT INTO drill_groups (name, description, tag_match, source) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE description=VALUES(description), tag_match=VALUES(tag_match)");
 foreach ($drill_groups as $dg) {
-    $stmt->bind_param('sss', $dg[0], $dg[1], $dg[2]);
+    $stmt->bind_param('ssss', $dg[0], $dg[1], $dg[2], $dg[3]);
     $stmt->execute();
 }
 $stmt->close();
