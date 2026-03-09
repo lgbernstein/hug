@@ -178,6 +178,59 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'grammar_patterns') {
     exit;
 }
 
+// AJAX: home screen stats (due count, streak, drill groups preview)
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'home_stats') {
+    header('Content-Type: application/json');
+    $due = 0;
+    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND next_review <= NOW()");
+    if ($r) $due = (int)($r->fetch_assoc()['c'] ?? 0);
+    $total = 0;
+    $r = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep");
+    if ($r) $total = (int)($r->fetch_assoc()['c'] ?? 0);
+    $studied = 0;
+    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe'");
+    if ($r) $studied = (int)($r->fetch_assoc()['c'] ?? 0);
+    $mastered = 0;
+    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND pass_count >= 3");
+    if ($r) $mastered = (int)($r->fetch_assoc()['c'] ?? 0);
+    // Streak: consecutive days with at least one study_history entry
+    $streak = 0;
+    $r = $conn->query("SELECT DISTINCT DATE(last_seen) AS d FROM study_history WHERE who='$who_safe' ORDER BY d DESC LIMIT 60");
+    if ($r) {
+        $today = new DateTime('today');
+        $checkDate = clone $today;
+        while ($row = $r->fetch_assoc()) {
+            $d = new DateTime($row['d']);
+            if ($d->format('Y-m-d') === $checkDate->format('Y-m-d')) {
+                $streak++;
+                $checkDate->modify('-1 day');
+            } else { break; }
+        }
+    }
+    // Top 5 drill groups
+    $groups = [];
+    $tmCheck = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
+    $hasTM = ($tmCheck && $tmCheck->num_rows > 0);
+    $cols = $hasTM ? "id, name, description, tag_match" : "id, name, description, '' AS tag_match";
+    $gq = $conn->query("SELECT $cols FROM drill_groups ORDER BY name LIMIT 6");
+    if ($gq) { while ($row = $gq->fetch_assoc()) {
+        $tagMatch = $row['tag_match'] ?: $row['name'];
+        $where = buildTagWhere($tagMatch, $conn);
+        $cnt = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep WHERE $where")->fetch_assoc()['c'] ?? 0;
+        $row['phrase_count'] = (int)$cnt;
+        $groups[] = $row;
+    }}
+    // Grammar pattern count
+    $grammarCount = 0;
+    $r = $conn->query("SELECT COUNT(*) AS c FROM grammar_patterns");
+    if ($r) $grammarCount = (int)($r->fetch_assoc()['c'] ?? 0);
+    echo json_encode([
+        'due' => $due, 'total' => $total, 'studied' => $studied, 'mastered' => $mastered,
+        'streak' => $streak, 'groups' => $groups, 'grammar_count' => $grammarCount
+    ]);
+    exit;
+}
+
 // AJAX: AI teach me — generate a mini-lesson for a grammar pattern
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'teach_me') {
     header('Content-Type: application/json');
@@ -340,12 +393,12 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .kbd { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-family: monospace; background: rgba(255,255,255,0.05); color: #64748b; border: 1px solid rgba(255,255,255,0.1); }
 .quick-bar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; align-items: center; padding: 8px 16px; background: rgba(17, 26, 46, 0.95); backdrop-filter: blur(30px); z-index: 40; border-top: 1px solid rgba(255,255,255,0.05); }
 @media (min-width: 768px) { .quick-bar { position: static; border: none; background: transparent; backdrop-filter: none; justify-content: center; gap: 8px; margin-top: 24px; } }
-.tab-bar { display: flex; gap: 2px; background: rgba(17, 26, 46, 0.6); border-radius: 16px; padding: 4px; border: 1px solid rgba(255,255,255,0.05); }
-.tab-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; color: #94a3b8; cursor: pointer; transition: all 0.2s; user-select: none; }
-.tab-btn:hover { color: #e2e8f0; background: rgba(255,255,255,0.03); }
-.tab-active { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1); }
-.tab-section { display: none; }
-.tab-section.active { display: block; }
+.view-section { display: none; }
+.view-section.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.view-section.active { animation: fadeIn 0.2s ease-out; }
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 .grammar-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px; transition: all 0.2s; cursor: pointer; }
 .grammar-card:hover { border-color: rgba(99, 102, 241, 0.2); background: rgba(17, 26, 46, 0.8); }
 .drill-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px 20px; transition: all 0.2s; cursor: pointer; }
@@ -380,10 +433,16 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                 <div class="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Best Streak</div>
             </div>
         </div>
-        <button onclick="closeSummary()"
-            class="w-full bg-accent hover:bg-accent-dark py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2">
-            Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
-        </button>
+        <div class="flex gap-2">
+            <button onclick="closeSummary(true)"
+                class="flex-1 bg-surface-300 hover:bg-surface-400 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 text-slate-300">
+                <i data-lucide="home" class="w-4 h-4"></i> Home
+            </button>
+            <button onclick="closeSummary(false)"
+                class="flex-1 bg-accent hover:bg-accent-dark py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 text-white">
+                Continue <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -451,27 +510,135 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         </div>
     </header>
 
-    <!-- TAB BAR -->
-    <div class="tab-bar">
-        <button onclick="switchTab('interview')" id="tab-interview" class="tab-btn tab-active">
-            <i data-lucide="mic" class="w-4 h-4"></i> Interview
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- VIEW: HOME SCREEN -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-home" class="view-section active space-y-4">
+
+        <!-- Streak + Due Banner -->
+        <div class="glass rounded-2xl p-4 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-1.5">
+                    <i data-lucide="flame" class="w-5 h-5 text-amber-400"></i>
+                    <span id="homeStreak" class="text-xl font-black text-amber-400">0</span>
+                    <span class="text-[10px] text-slate-500 font-semibold uppercase">day streak</span>
+                </div>
+            </div>
+            <div id="homeDueBadge" class="hidden flex items-center gap-1.5 bg-red-500/15 border border-red-500/20 rounded-full px-3 py-1">
+                <div class="w-2 h-2 rounded-full bg-red-400 animate-pulse"></div>
+                <span id="homeDueCount" class="text-xs font-bold text-red-300">0 due</span>
+            </div>
+        </div>
+
+        <!-- Start Session CTA -->
+        <button onclick="startSession()" id="startSessionBtn"
+            class="w-full glass rounded-3xl p-6 flex flex-col items-center gap-3 group hover:border-accent/30 transition-all active:scale-[0.98] glow-accent">
+            <div class="w-14 h-14 rounded-2xl bg-accent/20 flex items-center justify-center group-hover:bg-accent/30 transition-all">
+                <i data-lucide="play" class="w-7 h-7 text-accent-light"></i>
+            </div>
+            <div class="text-center">
+                <p class="text-lg font-bold text-white">Start Session</p>
+                <p id="startSessionSub" class="text-xs text-slate-400 mt-0.5">10 questions — review + new phrases</p>
+            </div>
         </button>
-        <button onclick="switchTab('drills')" id="tab-drills" class="tab-btn">
-            <i data-lucide="dumbbell" class="w-4 h-4"></i> Drills
-        </button>
-        <button onclick="switchTab('learn')" id="tab-learn" class="tab-btn">
-            <i data-lucide="book-open" class="w-4 h-4"></i> Learn
-        </button>
-    </div>
+
+        <!-- Quick Stats Row -->
+        <div class="grid grid-cols-3 gap-2">
+            <div class="glass rounded-xl p-3 text-center">
+                <div id="homeTotal" class="text-lg font-bold text-white">—</div>
+                <div class="text-[10px] text-slate-500 font-semibold uppercase">Phrases</div>
+            </div>
+            <div class="glass rounded-xl p-3 text-center">
+                <div id="homeStudied" class="text-lg font-bold text-blue-400">—</div>
+                <div class="text-[10px] text-slate-500 font-semibold uppercase">Studied</div>
+            </div>
+            <div class="glass rounded-xl p-3 text-center">
+                <div id="homeMastered" class="text-lg font-bold text-green-400">—</div>
+                <div class="text-[10px] text-slate-500 font-semibold uppercase">Mastered</div>
+            </div>
+        </div>
+
+        <!-- Mode Selector -->
+        <div class="flex items-center gap-2 px-1">
+            <span class="text-[10px] text-slate-500 font-semibold uppercase">Mode</span>
+            <div class="flex gap-1 flex-1">
+                <button onclick="setMode('pronunciation')" id="homeBtnPron" class="pill pill-active flex-1 justify-center">
+                    <i data-lucide="mic" class="w-3.5 h-3.5"></i> Pronounce
+                </button>
+                <button onclick="setMode('interview')" id="homeBtnInterview" class="pill pill-inactive flex-1 justify-center">
+                    <i data-lucide="message-square" class="w-3.5 h-3.5"></i> Interview
+                </button>
+            </div>
+        </div>
+
+        <!-- Drill Groups -->
+        <div class="glass rounded-3xl overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                <h2 class="text-sm font-bold flex items-center gap-2 text-white">
+                    <i data-lucide="dumbbell" class="w-4 h-4 text-accent-light"></i> Focused Drills
+                </h2>
+                <button onclick="showAllDrills()" class="text-[10px] text-accent-light font-semibold hover:text-white transition-all">See All</button>
+            </div>
+            <div id="homeDrillList" class="p-3 space-y-1.5">
+                <p class="text-slate-500 text-xs text-center py-3">Loading...</p>
+            </div>
+        </div>
+
+        <!-- Grammar Quick Access -->
+        <div class="glass rounded-3xl overflow-hidden">
+            <button onclick="showView('grammar')" class="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-all">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-yellow-400/10 flex items-center justify-center">
+                        <i data-lucide="book-open" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <div class="text-left">
+                        <p class="text-sm font-bold text-white">Grammar Patterns</p>
+                        <p id="homeGrammarCount" class="text-xs text-slate-400">Browse & learn with AI</p>
+                    </div>
+                </div>
+                <i data-lucide="chevron-right" class="w-5 h-5 text-slate-500"></i>
+            </button>
+        </div>
+
+        <!-- Practice Textarea (moved from interview) -->
+        <div class="glass rounded-3xl overflow-hidden px-5 py-4">
+            <div class="flex items-center gap-2 mb-3">
+                <i data-lucide="pen-line" class="w-4 h-4 text-slate-500"></i>
+                <span class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Practice Any Phrase</span>
+                <span class="kbd ml-auto hidden md:inline-flex">Ctrl+Enter</span>
+            </div>
+            <div class="flex gap-2">
+                <textarea id="practiceInput" rows="2" placeholder="Type Hungarian or English here..."
+                    oninput="this.rows = Math.max(2, this.value.split('\n').length)"
+                    class="flex-1 bg-surface-50 rounded-xl px-4 py-2.5 text-white text-sm border border-white/5 focus:outline-none focus:border-accent/40 resize-none transition-colors"></textarea>
+                <div class="flex flex-col gap-1.5">
+                    <button onclick="speakPractice()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Speak &amp; record">
+                        <i data-lucide="volume-2" class="w-4 h-4"></i>
+                    </button>
+                    <button onclick="translatePractice()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Translate">
+                        <i data-lucide="languages" class="w-4 h-4"></i>
+                    </button>
+                    <button id="savePhraseBtn" onclick="savePracticePhrase()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Save to phrase list">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+            <p id="practiceTranslation" class="hidden text-slate-300 text-sm mt-3 italic px-1"></p>
+        </div>
+
+    </div><!-- end view-home -->
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- TAB 1: INTERVIEW PREP (existing UI) -->
+    <!-- VIEW: ACTIVE SESSION (practice/interview) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="section-interview" class="tab-section active space-y-4">
+    <div id="view-session" class="view-section hidden space-y-4">
 
-    <!-- SESSION PROGRESS -->
+    <!-- SESSION HEADER -->
     <div class="flex items-center gap-3">
-        <div class="flex-1 h-1.5 progress-track rounded-full overflow-hidden">
+        <button onclick="goHome()" class="p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all" title="Back to home">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        </button>
+        <div class="flex-1 h-2 progress-track rounded-full overflow-hidden">
             <div id="progressFill" class="h-full progress-fill rounded-full" style="width: 0%"></div>
         </div>
         <span id="progressLabel" class="text-[11px] text-slate-500 font-medium tabular-nums min-w-[3rem] text-right">0 / 10</span>
@@ -624,31 +791,6 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
             </details>
         </div>
 
-        <!-- Practice Section -->
-        <div class="px-5 pb-5 border-t border-white/5 pt-4">
-            <div class="flex items-center gap-2 mb-3">
-                <i data-lucide="pen-line" class="w-4 h-4 text-slate-500"></i>
-                <span class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Practice Any Phrase</span>
-                <span class="kbd ml-auto hidden md:inline-flex">Ctrl+Enter</span>
-            </div>
-            <div class="flex gap-2">
-                <textarea id="practiceInput" rows="2" placeholder="Type Hungarian or English here..."
-                    oninput="this.rows = Math.max(2, this.value.split('\n').length)"
-                    class="flex-1 bg-surface-50 rounded-xl px-4 py-2.5 text-white text-sm border border-white/5 focus:outline-none focus:border-accent/40 resize-none transition-colors"></textarea>
-                <div class="flex flex-col gap-1.5">
-                    <button onclick="speakPractice()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Speak &amp; record">
-                        <i data-lucide="volume-2" class="w-4 h-4"></i>
-                    </button>
-                    <button onclick="translatePractice()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Translate">
-                        <i data-lucide="languages" class="w-4 h-4"></i>
-                    </button>
-                    <button id="savePhraseBtn" onclick="savePracticePhrase()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Save to phrase list">
-                        <i data-lucide="plus" class="w-4 h-4"></i>
-                    </button>
-                </div>
-            </div>
-            <p id="practiceTranslation" class="hidden text-slate-300 text-sm mt-3 italic px-1"></p>
-        </div>
     </main>
 
     <!-- Keyboard Shortcuts (desktop) -->
@@ -664,24 +806,23 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <span><span class="kbd">P</span> Phonetic</span>
     </div>
 
-    </div><!-- end section-interview -->
+    </div><!-- end view-session -->
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- TAB 2: DRILLS -->
+    <!-- VIEW: ALL DRILLS -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="section-drills" class="tab-section space-y-4">
+    <div id="view-drills" class="view-section hidden space-y-4">
 
-        <!-- Drill Group Picker -->
-        <div class="glass rounded-3xl overflow-hidden glow-accent">
-            <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                <h2 class="text-lg font-bold flex items-center gap-2">
-                    <i data-lucide="dumbbell" class="w-5 h-5 text-accent-light"></i> Drill Groups
-                </h2>
-                <span id="drillGroupCount" class="text-xs text-slate-500"></span>
-            </div>
-            <div id="drillGroupList" class="p-4 space-y-2">
-                <p class="text-slate-500 text-sm text-center py-4">Loading drill groups...</p>
-            </div>
+        <div class="flex items-center gap-3">
+            <button onclick="goHome()" class="p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            </button>
+            <h2 class="text-lg font-bold text-white">All Drill Groups</h2>
+            <span id="drillGroupCount" class="text-xs text-slate-500 ml-auto"></span>
+        </div>
+
+        <div id="drillGroupList" class="space-y-2">
+            <p class="text-slate-500 text-sm text-center py-4">Loading drill groups...</p>
         </div>
 
         <!-- Active Drill (hidden until a group is selected) -->
@@ -762,34 +903,34 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
             </div>
         </div>
 
-    </div><!-- end section-drills -->
+    </div><!-- end view-drills -->
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- TAB 3: LEARN -->
+    <!-- VIEW: GRAMMAR / LEARN -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="section-learn" class="tab-section space-y-4">
+    <div id="view-grammar" class="view-section hidden space-y-4">
 
-        <!-- Grammar Patterns Browser -->
-        <div class="glass rounded-3xl overflow-hidden glow-accent">
-            <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                <h2 class="text-lg font-bold flex items-center gap-2">
-                    <i data-lucide="book-open" class="w-5 h-5 text-accent-light"></i> Grammar Patterns
-                </h2>
-                <span id="grammarCount" class="text-xs text-slate-500"></span>
-            </div>
-            <div class="px-5 py-3 border-b border-white/5">
-                <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2">
-                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
-                    <input id="grammarSearch" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
-                        class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
-                </div>
-            </div>
-            <!-- Tag filter row -->
-            <div id="grammarTagFilter" class="px-5 py-2 border-b border-white/5 flex flex-wrap gap-1.5 overflow-x-auto"></div>
-            <!-- Pattern list -->
-            <div id="grammarList" class="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
-                <p class="text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
-            </div>
+        <div class="flex items-center gap-3">
+            <button onclick="goHome()" class="p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+            </button>
+            <h2 class="text-lg font-bold text-white">Grammar Patterns</h2>
+            <span id="grammarCount" class="text-xs text-slate-500 ml-auto"></span>
+        </div>
+
+        <!-- Search -->
+        <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+            <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+            <input id="grammarSearch" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
+                class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+        </div>
+
+        <!-- Tag filter row -->
+        <div id="grammarTagFilter" class="flex flex-wrap gap-1.5"></div>
+
+        <!-- Pattern list -->
+        <div id="grammarList" class="space-y-2">
+            <p class="text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
         </div>
 
         <!-- AI Lesson Panel (hidden until Teach Me is clicked) -->
@@ -803,32 +944,18 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
                         <i data-lucide="x" class="w-5 h-5"></i>
                     </button>
                 </div>
-
-                <!-- Lesson content -->
                 <div id="lessonContent" class="p-5 space-y-5">
                     <p class="text-slate-400 text-sm text-center py-8">Loading AI lesson...</p>
                 </div>
             </div>
         </div>
 
-        <!-- Skill Proficiency -->
-        <div class="glass rounded-3xl overflow-hidden">
-            <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                <h2 class="text-lg font-bold flex items-center gap-2">
-                    <i data-lucide="brain" class="w-5 h-5 text-accent-light"></i> Skill Proficiency
-                </h2>
-            </div>
-            <div id="skillList" class="p-4 space-y-2">
-                <p class="text-slate-500 text-sm text-center py-4">Start practicing to build your skill profile...</p>
-            </div>
-        </div>
-
-    </div><!-- end section-learn -->
+    </div><!-- end view-grammar -->
 
 </div>
 
-<!-- BOTTOM QUICK BAR -->
-<nav class="quick-bar">
+<!-- BOTTOM QUICK BAR (home) -->
+<nav id="quickbar-home" class="quick-bar">
     <button onclick="openBrowse()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
         <i data-lucide="book-open" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Browse</span>
@@ -837,6 +964,22 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
         <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Stats</span>
     </button>
+    <button onclick="startSession()" class="flex flex-col items-center gap-1 p-2 text-green-400 hover:text-green-300 transition-all">
+        <i data-lucide="play" class="w-6 h-6"></i>
+        <span class="text-[10px] font-semibold">Start</span>
+    </button>
+    <button onclick="showView('grammar')" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-yellow-400 transition-all">
+        <i data-lucide="book-open" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Learn</span>
+    </button>
+    <button onclick="showAllDrills()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
+        <i data-lucide="dumbbell" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Drills</span>
+    </button>
+</nav>
+
+<!-- BOTTOM QUICK BAR (session) -->
+<nav id="quickbar-session" class="quick-bar hidden">
     <button onclick="speak(currentSpeed, false)" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
         <i data-lucide="volume-2" class="w-5 h-5"></i>
         <span class="text-[10px] font-semibold">Listen</span>
@@ -952,9 +1095,13 @@ function showSummary() {
     updateProgressBar();
 }
 
-function closeSummary() {
+function closeSummary(goToHome) {
     document.getElementById('summaryModal').classList.add('hidden');
-    nextQuestion();
+    if (goToHome) {
+        goHome();
+    } else {
+        nextQuestion();
+    }
 }
 
 // ── Audio ─────────────────────────────────────────────────────────────
@@ -1160,9 +1307,15 @@ function applyAutoAdvance() {
 function setMode(mode) {
     currentMode = mode;
     localStorage.setItem('hugMode', mode);
+    // Session toolbar buttons
     document.getElementById('btnPron').className = 'pill ' + (mode === 'pronunciation' ? 'pill-active' : 'pill-inactive');
     document.getElementById('btnInterview').className = 'pill ' + (mode === 'interview' ? 'pill-active' : 'pill-inactive');
     document.getElementById('listenBtnLabel').textContent = mode === 'pronunciation' ? 'Listen & Repeat' : 'Hear Question';
+    // Home screen buttons
+    var hp = document.getElementById('homeBtnPron');
+    var hi = document.getElementById('homeBtnInterview');
+    if (hp) hp.className = 'pill ' + (mode === 'pronunciation' ? 'pill-active' : 'pill-inactive') + ' flex-1 justify-center';
+    if (hi) hi.className = 'pill ' + (mode === 'interview' ? 'pill-active' : 'pill-inactive') + ' flex-1 justify-center';
 }
 
 // ── Next question ─────────────────────────────────────────────────────
@@ -1897,19 +2050,117 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ── Tab navigation ────────────────────────────────────────────────────
-var currentTab = localStorage.getItem('hugTab') || 'interview';
+var currentView = 'home';
 
-function switchTab(tab) {
-    currentTab = tab;
-    localStorage.setItem('hugTab', tab);
-    ['interview', 'drills', 'learn'].forEach(function(t) {
-        document.getElementById('section-' + t).classList.toggle('active', t === tab);
-        var btn = document.getElementById('tab-' + t);
-        if (t === tab) { btn.classList.add('tab-active'); } else { btn.classList.remove('tab-active'); }
+function showView(view) {
+    currentView = view;
+    var views = ['home', 'session', 'drills', 'grammar'];
+    views.forEach(function(v) {
+        var el = document.getElementById('view-' + v);
+        if (el) el.classList.toggle('active', v === view);
     });
-    if (tab === 'drills') loadDrillGroups();
-    if (tab === 'learn') { loadGrammarPatterns(); loadSkillProficiency(); }
+    // Toggle quickbars
+    document.getElementById('quickbar-home').classList.toggle('hidden', view !== 'home');
+    document.getElementById('quickbar-session').classList.toggle('hidden', view === 'home' || view === 'grammar');
+    // Lazy load
+    if (view === 'home') loadHomeStats();
+    if (view === 'drills') loadDrillGroups();
+    if (view === 'grammar') { loadGrammarPatterns(); }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     lucide.createIcons();
+}
+
+function goHome() {
+    showView('home');
+}
+
+function startSession() {
+    sessionPass = sessionFail = sessionStreak = sessionBestStreak = sessionCount = 0;
+    document.getElementById('sesPass').textContent = '0';
+    document.getElementById('sesFail').textContent = '0';
+    document.getElementById('sesStreak').textContent = '0';
+    updateProgressBar();
+    showView('session');
+    speak(currentSpeed);
+}
+
+function showAllDrills() {
+    showView('drills');
+}
+
+// Home screen data
+var homeLoaded = false;
+function loadHomeStats() {
+    fetch('?who=' + who + '&ajax=1&action=home_stats')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            homeLoaded = true;
+            document.getElementById('homeStreak').textContent = data.streak || 0;
+            document.getElementById('homeTotal').textContent = data.total || 0;
+            document.getElementById('homeStudied').textContent = data.studied || 0;
+            document.getElementById('homeMastered').textContent = data.mastered || 0;
+
+            // Due badge
+            var badge = document.getElementById('homeDueBadge');
+            if (data.due > 0) {
+                badge.classList.remove('hidden');
+                document.getElementById('homeDueCount').textContent = data.due + ' due';
+                document.getElementById('startSessionSub').textContent = data.due + ' items due for review';
+            } else {
+                badge.classList.add('hidden');
+                document.getElementById('startSessionSub').textContent = '10 questions — review + new phrases';
+            }
+
+            // Grammar count
+            if (data.grammar_count) {
+                document.getElementById('homeGrammarCount').textContent = data.grammar_count + ' patterns — browse & learn with AI';
+            }
+
+            // Drill groups preview
+            renderHomeDrills(data.groups || []);
+            lucide.createIcons();
+        })
+        .catch(function() {});
+}
+
+function renderHomeDrills(groups) {
+    var list = document.getElementById('homeDrillList');
+    list.textContent = '';
+    if (!groups.length) {
+        var empty = document.createElement('p');
+        empty.className = 'text-slate-500 text-xs text-center py-3';
+        empty.textContent = 'No drill groups yet.';
+        list.appendChild(empty);
+        return;
+    }
+    groups.forEach(function(g) {
+        if (g.phrase_count < 1) return;
+        var row = document.createElement('div');
+        row.className = 'flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-white/[0.03] cursor-pointer transition-all';
+        row.onclick = function() { showView('drills'); setTimeout(function(){ startDrill(g.name); }, 100); };
+        var left = document.createElement('div');
+        left.className = 'flex items-center gap-3';
+        var icon = document.createElement('div');
+        icon.className = 'w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center';
+        icon.innerHTML = '<i data-lucide="dumbbell" class="w-4 h-4 text-accent-light"></i>';
+        var info = document.createElement('div');
+        var name = document.createElement('p');
+        name.className = 'text-sm font-semibold text-white';
+        name.textContent = g.name;
+        var count = document.createElement('p');
+        count.className = 'text-[10px] text-slate-500';
+        count.textContent = g.phrase_count + ' phrases';
+        info.appendChild(name);
+        info.appendChild(count);
+        left.appendChild(icon);
+        left.appendChild(info);
+        var chevron = document.createElement('i');
+        chevron.setAttribute('data-lucide', 'chevron-right');
+        chevron.className = 'w-4 h-4 text-slate-600';
+        row.appendChild(left);
+        row.appendChild(chevron);
+        list.appendChild(row);
+    });
 }
 
 // ── Drill system ──────────────────────────────────────────────────────
@@ -1926,7 +2177,8 @@ function loadDrillGroups() {
             drillGroupsLoaded = true;
             var list = document.getElementById('drillGroupList');
             list.textContent = '';
-            document.getElementById('drillGroupCount').textContent = groups.length + ' groups';
+            var countEl = document.getElementById('drillGroupCount');
+            if (countEl) countEl.textContent = groups.length + ' groups';
             if (!groups.length) {
                 var empty = document.createElement('p');
                 empty.className = 'text-slate-500 text-sm text-center py-4';
@@ -1935,27 +2187,35 @@ function loadDrillGroups() {
                 return;
             }
             groups.forEach(function(g) {
+                if (g.phrase_count < 1) return;
                 var card = document.createElement('div');
                 card.className = 'drill-card';
                 card.onclick = function() { startDrill(g.name); };
 
                 var top = document.createElement('div');
                 top.className = 'flex items-center justify-between';
-                var name = document.createElement('span');
+                var left = document.createElement('div');
+                left.className = 'flex items-center gap-3';
+                var icon = document.createElement('div');
+                icon.className = 'w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0';
+                icon.innerHTML = '<i data-lucide="dumbbell" class="w-4 h-4 text-accent-light"></i>';
+                var info = document.createElement('div');
+                var name = document.createElement('p');
                 name.className = 'text-sm font-semibold text-white';
                 name.textContent = g.name;
-                var count = document.createElement('span');
-                count.className = 'text-xs text-slate-500';
-                count.textContent = g.phrase_count + ' phrases';
-                top.appendChild(name);
-                top.appendChild(count);
-
                 var desc = document.createElement('p');
-                desc.className = 'text-xs text-slate-400 mt-1';
+                desc.className = 'text-[10px] text-slate-400 mt-0.5';
                 desc.textContent = g.description || '';
-
+                info.appendChild(name);
+                info.appendChild(desc);
+                left.appendChild(icon);
+                left.appendChild(info);
+                var count = document.createElement('span');
+                count.className = 'text-xs text-slate-500 flex-shrink-0';
+                count.textContent = g.phrase_count;
+                top.appendChild(left);
+                top.appendChild(count);
                 card.appendChild(top);
-                card.appendChild(desc);
                 list.appendChild(card);
             });
             lucide.createIcons();
@@ -2400,10 +2660,8 @@ applyListenMode();
 applyAutoAdvance();
 applyTranslateState();
 applyPhoneticState();
-if (translateOn) fetchTranslation();
-if (phoneticOn) fetchPhonetic();
 updateProgressBar();
-switchTab(currentTab);
+showView('home');
 lucide.createIcons();
 </script>
 </body>
