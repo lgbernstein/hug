@@ -376,6 +376,13 @@ body { background: #060b18; color: #e2e8f0; }
             <button onclick="toggleMissing('')" id="btn-all" class="border border-slate-500/30 text-slate-400 hover:bg-slate-500/10 text-xs px-3 py-1 rounded transition-all">Show All</button>
         </div>
 
+        <!-- Bulk action bar -->
+        <div id="bulkBar" class="hidden mb-4 flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <span id="bulkCount" class="text-xs text-red-400 font-semibold"></span>
+            <button onclick="bulkDelete()" class="bg-red-600 hover:bg-red-500 px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-all">Delete Selected</button>
+            <button onclick="clearSelection()" class="text-xs text-slate-400 hover:text-white transition-colors">Clear</button>
+        </div>
+
         <!-- Phrases Table -->
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
@@ -418,12 +425,6 @@ body { background: #060b18; color: #e2e8f0; }
             </table>
         </div>
 
-        <!-- Bulk action bar -->
-        <div id="bulkBar" class="hidden mt-4 flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-            <span id="bulkCount" class="text-xs text-red-400 font-semibold"></span>
-            <button onclick="bulkDelete()" class="bg-red-600 hover:bg-red-500 px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-all">Delete Selected</button>
-            <button onclick="clearSelection()" class="text-xs text-slate-400 hover:text-white transition-colors">Clear</button>
-        </div>
     </div>
 
 </div>
