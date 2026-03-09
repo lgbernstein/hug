@@ -291,6 +291,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .drill-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px 20px; transition: all 0.2s; cursor: pointer; }
 .drill-card:hover { border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05); transform: translateY(-1px); }
 .tag-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.15); }
+.tag-pill-active { background: rgba(99, 102, 241, 0.35); border-color: rgba(99, 102, 241, 0.5); color: #fff; }
 </style>
 </head>
 <body class="min-h-screen flex flex-col items-center pb-20 md:pb-6">
@@ -1994,27 +1995,41 @@ function renderGrammarPatterns(patterns) {
         var card = document.createElement('div');
         card.className = 'grammar-card';
 
+        // Header row: title + suffix (always visible)
+        var header = document.createElement('div');
+        header.className = 'flex items-start justify-between gap-2';
+        var titleWrap = document.createElement('div');
         var title = document.createElement('h3');
-        title.className = 'text-sm font-bold text-white mb-1';
+        title.className = 'text-sm font-bold text-white';
         title.textContent = p.pattern;
-        card.appendChild(title);
-
+        titleWrap.appendChild(title);
         if (p.suffix_words) {
             var suffix = document.createElement('p');
-            suffix.className = 'text-xs text-accent-light font-mono mb-1';
+            suffix.className = 'text-xs text-accent-light font-mono mt-0.5';
             suffix.textContent = p.suffix_words;
-            card.appendChild(suffix);
+            titleWrap.appendChild(suffix);
         }
+        var chevron = document.createElement('i');
+        chevron.setAttribute('data-lucide', 'chevron-down');
+        chevron.className = 'w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5 transition-transform';
+        header.appendChild(titleWrap);
+        header.appendChild(chevron);
+        card.appendChild(header);
+
+        // Expandable detail (hidden by default)
+        var detail = document.createElement('div');
+        detail.className = 'hidden mt-3 pt-3 border-t border-white/5';
 
         if (p.explanation) {
             var expl = document.createElement('p');
-            expl.className = 'text-xs text-slate-400 mb-2';
+            expl.className = 'text-xs text-slate-400 mb-3';
             expl.textContent = p.explanation;
-            card.appendChild(expl);
+            detail.appendChild(expl);
         }
 
+        // Tags
         var meta = document.createElement('div');
-        meta.className = 'flex items-center gap-2 flex-wrap';
+        meta.className = 'flex items-center gap-2 flex-wrap mb-3';
         if (p.part_of_speech) {
             var pos = document.createElement('span');
             pos.className = 'text-[10px] px-2 py-0.5 rounded bg-surface-50 text-slate-400 font-semibold';
@@ -2032,9 +2047,37 @@ function renderGrammarPatterns(patterns) {
                 meta.appendChild(tag);
             });
         }
-        card.appendChild(meta);
+        detail.appendChild(meta);
+
+        // Listen button for pattern name
+        var listenRow = document.createElement('div');
+        listenRow.className = 'flex gap-2';
+        var listenBtn = document.createElement('button');
+        listenBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-50 text-xs font-semibold text-accent-light hover:bg-surface-200 transition-all';
+        listenBtn.textContent = '🔊 Listen';
+        listenBtn.onclick = function(e) {
+            e.stopPropagation();
+            window.speechSynthesis.cancel();
+            var msg = new SpeechSynthesisUtterance(p.suffix_words || p.pattern);
+            msg.lang = 'hu-HU'; msg.rate = 0.8;
+            if (huVoice) msg.voice = huVoice;
+            window.speechSynthesis.speak(msg);
+        };
+        listenRow.appendChild(listenBtn);
+        detail.appendChild(listenRow);
+
+        card.appendChild(detail);
+
+        // Toggle expand on click
+        card.onclick = function() {
+            var isOpen = !detail.classList.contains('hidden');
+            detail.classList.toggle('hidden');
+            chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+        };
+
         list.appendChild(card);
     });
+    lucide.createIcons();
 }
 
 function buildGrammarTagFilter(patterns) {
@@ -2050,14 +2093,14 @@ function buildGrammarTagFilter(patterns) {
     container.textContent = '';
 
     var allPill = document.createElement('span');
-    allPill.className = 'tag-pill cursor-pointer' + (!grammarActiveTag ? ' !bg-accent/30 !border-accent/40' : '');
+    allPill.className = 'tag-pill cursor-pointer' + (!grammarActiveTag ? ' tag-pill-active' : '');
     allPill.textContent = 'All';
     allPill.onclick = function() { filterGrammarByTag(''); };
     container.appendChild(allPill);
 
     Object.keys(tagSet).sort().forEach(function(tag) {
         var pill = document.createElement('span');
-        pill.className = 'tag-pill cursor-pointer' + (grammarActiveTag === tag ? ' !bg-accent/30 !border-accent/40' : '');
+        pill.className = 'tag-pill cursor-pointer' + (grammarActiveTag === tag ? ' tag-pill-active' : '');
         pill.textContent = tag + ' (' + tagSet[tag] + ')';
         pill.onclick = function() { filterGrammarByTag(tag); };
         container.appendChild(pill);
