@@ -91,6 +91,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $message = "Deleted phrase #$id.";
     }
 
+    if ($_POST['action'] === 'delete_bulk') {
+        $ids = json_decode($_POST['delete_ids'] ?? '[]', true);
+        if ($ids) {
+            $safe = array_map('intval', $ids);
+            $inList = implode(',', $safe);
+            $conn->query("DELETE FROM hungarian_prep WHERE id IN ($inList)");
+            $deleted = $conn->affected_rows;
+            $message = "Deleted $deleted phrases.";
+        }
+    }
+
     if ($_POST['action'] === 'update_answer' && isset($_POST['id'])) {
         $id = (int)$_POST['id'];
         $answer_hu = $conn->real_escape_string(trim($_POST['answer_hu'] ?? ''));
@@ -369,6 +380,7 @@ body { background: #060b18; color: #e2e8f0; }
         <div class="overflow-x-auto">
             <table class="w-full text-xs">
                 <thead><tr class="text-slate-500 tracking-wider text-[10px]">
+                    <th class="py-2 px-2 w-6"><input type="checkbox" id="selectAll" onchange="document.querySelectorAll('.row-cb').forEach(function(c){c.checked=this.checked}.bind(this));updateBulkBar()" class="accent-red-500 cursor-pointer"></th>
                     <th class="text-left py-2 px-2 w-8">#</th>
                     <th class="text-left py-2 px-2">Question (HU)</th>
                     <th class="text-left py-2 px-2">Answer (HU)</th>
@@ -384,6 +396,7 @@ body { background: #060b18; color: #e2e8f0; }
                     data-ah="<?php echo htmlspecialchars($p['answer_hu'] ?? '', ENT_QUOTES); ?>"
                     data-ae="<?php echo htmlspecialchars($p['answer_en'], ENT_QUOTES); ?>"
                     data-cat="<?php echo htmlspecialchars($p['category'], ENT_QUOTES); ?>">
+                    <td class="py-2 px-2"><input type="checkbox" class="row-cb accent-red-500 cursor-pointer" value="<?php echo $p['id']; ?>" onchange="updateBulkBar()"></td>
                     <td class="py-2 px-2 text-slate-600"><?php echo $p['id']; ?></td>
                     <td class="py-2 px-2 text-white font-medium cell-q"><?php echo htmlspecialchars($p['question_hu']); ?></td>
                     <td class="py-2 px-2 cell-ah <?php echo $p['answer_hu'] ? 'text-green-400' : 'text-yellow-500/50 italic'; ?>"><?php echo $p['answer_hu'] ? htmlspecialchars($p['answer_hu']) : '(missing)'; ?></td>
@@ -403,6 +416,13 @@ body { background: #060b18; color: #e2e8f0; }
                 <?php endwhile; endif; ?>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Bulk action bar -->
+        <div id="bulkBar" class="hidden mt-4 flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+            <span id="bulkCount" class="text-xs text-red-400 font-semibold"></span>
+            <button onclick="bulkDelete()" class="bg-red-600 hover:bg-red-500 px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-all">Delete Selected</button>
+            <button onclick="clearSelection()" class="text-xs text-slate-400 hover:text-white transition-colors">Clear</button>
         </div>
     </div>
 
@@ -518,6 +538,36 @@ function aiFromModal(action) {
             status.textContent = 'AI generated — review and save.';
         })
         .catch(function() { status.textContent = 'AI request failed'; });
+}
+
+function updateBulkBar() {
+    var checked = document.querySelectorAll('.row-cb:checked');
+    var bar = document.getElementById('bulkBar');
+    if (checked.length > 0) {
+        bar.classList.remove('hidden');
+        document.getElementById('bulkCount').textContent = checked.length + ' selected';
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearSelection() {
+    document.querySelectorAll('.row-cb').forEach(function(c) { c.checked = false; });
+    document.getElementById('selectAll').checked = false;
+    updateBulkBar();
+}
+
+function bulkDelete() {
+    var ids = [];
+    document.querySelectorAll('.row-cb:checked').forEach(function(c) { ids.push(parseInt(c.value)); });
+    if (!ids.length) return;
+    if (!confirm('Delete ' + ids.length + ' phrases? This cannot be undone.')) return;
+    var form = document.createElement('form');
+    form.method = 'POST';
+    var a = document.createElement('input'); a.type = 'hidden'; a.name = 'action'; a.value = 'delete_bulk'; form.appendChild(a);
+    var d = document.createElement('input'); d.type = 'hidden'; d.name = 'delete_ids'; d.value = JSON.stringify(ids); form.appendChild(d);
+    document.body.appendChild(form);
+    form.submit();
 }
 
 function confirmMigrate(form) {
