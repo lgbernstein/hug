@@ -2333,102 +2333,188 @@ function renderGrammarPatterns(patterns) {
         list.appendChild(empty);
         return;
     }
-    patterns.forEach(function(p) {
-        var card = document.createElement('div');
-        card.className = 'grammar-card';
 
-        // Header row: title + suffix (always visible)
-        var header = document.createElement('div');
-        header.className = 'flex items-start justify-between gap-2';
-        var titleWrap = document.createElement('div');
-        var title = document.createElement('h3');
-        title.className = 'text-sm font-bold text-white';
-        title.textContent = p.pattern;
-        titleWrap.appendChild(title);
-        if (p.suffix_words) {
-            var suffix = document.createElement('p');
-            suffix.className = 'text-xs text-accent-light font-mono mt-0.5';
-            suffix.textContent = p.suffix_words;
-            titleWrap.appendChild(suffix);
-        }
+    // Group patterns by their primary tag
+    var groups = {};
+    var ungrouped = [];
+    patterns.forEach(function(p) {
+        var primaryTag = (p.tags || '').split(',')[0].trim();
+        if (!primaryTag) { ungrouped.push(p); return; }
+        if (!groups[primaryTag]) groups[primaryTag] = [];
+        groups[primaryTag].push(p);
+    });
+
+    var sortedTags = Object.keys(groups).sort();
+
+    // If filtering by a single tag, show flat list (already scoped)
+    if (grammarActiveTag) {
+        renderGrammarFlat(list, patterns);
+        return;
+    }
+
+    // Render grouped sections
+    sortedTags.forEach(function(tag) {
+        var section = document.createElement('div');
+        section.className = 'glass rounded-2xl overflow-hidden';
+
+        // Section header (clickable to expand)
+        var sectionHeader = document.createElement('button');
+        sectionHeader.className = 'w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-all';
+        var headerLeft = document.createElement('div');
+        headerLeft.className = 'flex items-center gap-2.5';
+        var tagBadge = document.createElement('span');
+        tagBadge.className = 'tag-pill';
+        tagBadge.textContent = tag;
+        var countBadge = document.createElement('span');
+        countBadge.className = 'text-[10px] text-slate-500 font-medium';
+        countBadge.textContent = groups[tag].length + ' pattern' + (groups[tag].length !== 1 ? 's' : '');
+        headerLeft.appendChild(tagBadge);
+        headerLeft.appendChild(countBadge);
         var chevron = document.createElement('i');
         chevron.setAttribute('data-lucide', 'chevron-down');
-        chevron.className = 'w-4 h-4 text-slate-500 flex-shrink-0 mt-0.5 transition-transform';
-        header.appendChild(titleWrap);
-        header.appendChild(chevron);
-        card.appendChild(header);
+        chevron.className = 'w-4 h-4 text-slate-500 transition-transform';
+        sectionHeader.appendChild(headerLeft);
+        sectionHeader.appendChild(chevron);
+        section.appendChild(sectionHeader);
 
-        // Expandable detail (hidden by default)
-        var detail = document.createElement('div');
-        detail.className = 'hidden mt-3 pt-3 border-t border-white/5';
+        // Section body (hidden)
+        var body = document.createElement('div');
+        body.className = 'hidden border-t border-white/5';
 
-        if (p.explanation) {
-            var expl = document.createElement('p');
-            expl.className = 'text-xs text-slate-400 mb-3';
-            expl.textContent = p.explanation;
-            detail.appendChild(expl);
-        }
+        groups[tag].forEach(function(p) {
+            body.appendChild(buildPatternRow(p));
+        });
 
-        // Tags
-        var meta = document.createElement('div');
-        meta.className = 'flex items-center gap-2 flex-wrap mb-3';
-        if (p.part_of_speech) {
-            var pos = document.createElement('span');
-            pos.className = 'text-[10px] px-2 py-0.5 rounded bg-surface-50 text-slate-400 font-semibold';
-            pos.textContent = p.part_of_speech;
-            meta.appendChild(pos);
-        }
-        if (p.tags) {
-            p.tags.split(',').forEach(function(t) {
-                t = t.trim();
-                if (!t) return;
-                var tag = document.createElement('span');
-                tag.className = 'tag-pill cursor-pointer';
-                tag.textContent = t;
-                tag.onclick = function(e) { e.stopPropagation(); filterGrammarByTag(t); };
-                meta.appendChild(tag);
-            });
-        }
-        detail.appendChild(meta);
+        section.appendChild(body);
 
-        // Action buttons row
-        var actionRow = document.createElement('div');
-        actionRow.className = 'flex gap-2';
-        var listenBtn = document.createElement('button');
-        listenBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-50 text-xs font-semibold text-accent-light hover:bg-surface-200 transition-all';
-        listenBtn.innerHTML = '<i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Listen';
-        listenBtn.onclick = function(e) {
-            e.stopPropagation();
-            window.speechSynthesis.cancel();
-            var msg = new SpeechSynthesisUtterance(p.suffix_words || p.pattern);
-            msg.lang = 'hu-HU'; msg.rate = 0.8;
-            if (huVoice) msg.voice = huVoice;
-            window.speechSynthesis.speak(msg);
-        };
-        actionRow.appendChild(listenBtn);
-
-        var teachBtn = document.createElement('button');
-        teachBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 text-xs font-semibold text-yellow-300 hover:bg-accent/30 transition-all border border-yellow-400/20';
-        teachBtn.innerHTML = '<i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Teach Me';
-        teachBtn.onclick = function(e) {
-            e.stopPropagation();
-            teachMe(p);
-        };
-        actionRow.appendChild(teachBtn);
-        detail.appendChild(actionRow);
-
-        card.appendChild(detail);
-
-        // Toggle expand on click
-        card.onclick = function() {
-            var isOpen = !detail.classList.contains('hidden');
-            detail.classList.toggle('hidden');
+        // Toggle
+        sectionHeader.onclick = function() {
+            var isOpen = !body.classList.contains('hidden');
+            body.classList.toggle('hidden');
             chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
         };
 
-        list.appendChild(card);
+        list.appendChild(section);
     });
+
+    // Ungrouped at bottom
+    if (ungrouped.length) {
+        var section = document.createElement('div');
+        section.className = 'glass rounded-2xl overflow-hidden';
+        var sectionHeader = document.createElement('button');
+        sectionHeader.className = 'w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-all';
+        var headerLeft = document.createElement('div');
+        headerLeft.className = 'flex items-center gap-2.5';
+        var tagBadge = document.createElement('span');
+        tagBadge.className = 'text-xs font-semibold text-slate-400';
+        tagBadge.textContent = 'Other';
+        var countBadge = document.createElement('span');
+        countBadge.className = 'text-[10px] text-slate-500 font-medium';
+        countBadge.textContent = ungrouped.length + ' pattern' + (ungrouped.length !== 1 ? 's' : '');
+        headerLeft.appendChild(tagBadge);
+        headerLeft.appendChild(countBadge);
+        var chevron = document.createElement('i');
+        chevron.setAttribute('data-lucide', 'chevron-down');
+        chevron.className = 'w-4 h-4 text-slate-500 transition-transform';
+        sectionHeader.appendChild(headerLeft);
+        sectionHeader.appendChild(chevron);
+        section.appendChild(sectionHeader);
+        var body = document.createElement('div');
+        body.className = 'hidden border-t border-white/5';
+        ungrouped.forEach(function(p) { body.appendChild(buildPatternRow(p)); });
+        section.appendChild(body);
+        sectionHeader.onclick = function() {
+            var isOpen = !body.classList.contains('hidden');
+            body.classList.toggle('hidden');
+            chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+        };
+        list.appendChild(section);
+    }
+
     lucide.createIcons();
+}
+
+// Flat list for filtered/search results
+function renderGrammarFlat(list, patterns) {
+    patterns.forEach(function(p) { list.appendChild(buildPatternRow(p)); });
+    lucide.createIcons();
+}
+
+// Build a single pattern row (reusable)
+function buildPatternRow(p) {
+    var row = document.createElement('div');
+    row.className = 'px-4 py-3 border-b border-white/[0.03] last:border-0 cursor-pointer hover:bg-white/[0.02] transition-all';
+
+    // Top line: title + chevron
+    var top = document.createElement('div');
+    top.className = 'flex items-start justify-between gap-2';
+    var titleWrap = document.createElement('div');
+    titleWrap.className = 'flex-1';
+    var title = document.createElement('h3');
+    title.className = 'text-sm font-semibold text-white';
+    title.textContent = p.pattern;
+    titleWrap.appendChild(title);
+    if (p.suffix_words) {
+        var suffix = document.createElement('span');
+        suffix.className = 'text-[10px] text-accent-light font-mono';
+        suffix.textContent = p.suffix_words;
+        titleWrap.appendChild(document.createTextNode(' '));
+        titleWrap.appendChild(suffix);
+    }
+    var chevron = document.createElement('i');
+    chevron.setAttribute('data-lucide', 'chevron-down');
+    chevron.className = 'w-3.5 h-3.5 text-slate-600 flex-shrink-0 mt-1 transition-transform';
+    top.appendChild(titleWrap);
+    top.appendChild(chevron);
+    row.appendChild(top);
+
+    // Expandable detail
+    var detail = document.createElement('div');
+    detail.className = 'hidden mt-3 pt-3 border-t border-white/5 space-y-3';
+
+    if (p.explanation) {
+        var expl = document.createElement('p');
+        expl.className = 'text-xs text-slate-400';
+        expl.textContent = p.explanation;
+        detail.appendChild(expl);
+    }
+
+    // Action buttons
+    var actionRow = document.createElement('div');
+    actionRow.className = 'flex gap-2';
+    var listenBtn = document.createElement('button');
+    listenBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-50 text-xs font-semibold text-accent-light hover:bg-surface-200 transition-all';
+    listenBtn.innerHTML = '<i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Listen';
+    listenBtn.onclick = function(e) {
+        e.stopPropagation();
+        window.speechSynthesis.cancel();
+        var msg = new SpeechSynthesisUtterance(p.suffix_words || p.pattern);
+        msg.lang = 'hu-HU'; msg.rate = 0.8;
+        if (huVoice) msg.voice = huVoice;
+        window.speechSynthesis.speak(msg);
+    };
+    actionRow.appendChild(listenBtn);
+
+    var teachBtn = document.createElement('button');
+    teachBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 text-xs font-semibold text-yellow-300 hover:bg-accent/30 transition-all border border-yellow-400/20';
+    teachBtn.innerHTML = '<i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Teach Me';
+    teachBtn.onclick = function(e) {
+        e.stopPropagation();
+        teachMe(p);
+    };
+    actionRow.appendChild(teachBtn);
+    detail.appendChild(actionRow);
+
+    row.appendChild(detail);
+
+    // Toggle
+    row.onclick = function() {
+        var isOpen = !detail.classList.contains('hidden');
+        detail.classList.toggle('hidden');
+        chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+    };
+
+    return row;
 }
 
 function buildGrammarTagFilter(patterns) {
@@ -2469,20 +2555,28 @@ function filterGrammarByTag(tag) {
 }
 
 var grammarDebounce;
+var grammarSearchQuery = '';
 function searchGrammar() {
     clearTimeout(grammarDebounce);
     grammarDebounce = setTimeout(function() {
-        var q = document.getElementById('grammarSearch').value.trim().toLowerCase();
+        grammarSearchQuery = document.getElementById('grammarSearch').value.trim().toLowerCase();
         var filtered = allGrammarPatterns.filter(function(p) {
-            if (!q) return true;
-            return (p.pattern || '').toLowerCase().indexOf(q) !== -1 ||
-                   (p.explanation || '').toLowerCase().indexOf(q) !== -1 ||
-                   (p.suffix_words || '').toLowerCase().indexOf(q) !== -1;
+            if (!grammarSearchQuery) return true;
+            return (p.pattern || '').toLowerCase().indexOf(grammarSearchQuery) !== -1 ||
+                   (p.explanation || '').toLowerCase().indexOf(grammarSearchQuery) !== -1 ||
+                   (p.suffix_words || '').toLowerCase().indexOf(grammarSearchQuery) !== -1;
         });
         if (grammarActiveTag) {
             filtered = filtered.filter(function(p) { return p.tags && p.tags.indexOf(grammarActiveTag) !== -1; });
         }
-        renderGrammarPatterns(filtered);
+        // Flat list when searching, grouped when browsing
+        if (grammarSearchQuery) {
+            var list = document.getElementById('grammarList');
+            list.textContent = '';
+            renderGrammarFlat(list, filtered);
+        } else {
+            renderGrammarPatterns(filtered);
+        }
         document.getElementById('grammarCount').textContent = filtered.length + ' patterns';
     }, 200);
 }
