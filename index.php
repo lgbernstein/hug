@@ -178,6 +178,66 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'grammar_patterns') {
     exit;
 }
 
+// AJAX: AI teach me — generate a mini-lesson for a grammar pattern
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'teach_me') {
+    header('Content-Type: application/json');
+    $pattern = trim($_POST['pattern'] ?? '');
+    $suffix = trim($_POST['suffix_words'] ?? '');
+    $explanation = trim($_POST['explanation'] ?? '');
+    if (!$pattern) { echo json_encode(['error' => 'No pattern']); exit; }
+
+    $prompt = "You are a Hungarian language tutor helping an English speaker prepare for the simplified naturalization interview (egyszerűsített honosítás).
+
+Teach this grammar pattern: **$pattern**
+" . ($suffix ? "Example words/suffixes: $suffix\n" : "") . ($explanation ? "Brief explanation: $explanation\n" : "") . "
+
+Respond in JSON with this exact structure:
+{
+  \"lesson\": \"A clear, concise explanation (2-3 sentences) of what this pattern means and when to use it. Use simple English.\",
+  \"examples\": [
+    {\"hu\": \"Hungarian example sentence\", \"en\": \"English translation\", \"highlight\": \"the word(s) showing the pattern\"},
+    {\"hu\": \"...\", \"en\": \"...\", \"highlight\": \"...\"},
+    {\"hu\": \"...\", \"en\": \"...\", \"highlight\": \"...\"}
+  ],
+  \"quiz\": [
+    {\"prompt\": \"Fill in: Budapesten ___. (I live)\", \"answer\": \"lakom\", \"hint\": \"Use the -k ending for 'I'\"},
+    {\"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\"},
+    {\"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}
+  ],
+  \"tip\": \"One practical tip or mnemonic to remember this pattern.\"
+}
+
+Give exactly 3 examples and 3 quiz questions. Make them relevant to daily life and interview topics (family, work, where you live, why you want citizenship). Keep quiz prompts as fill-in-the-blank.";
+
+    $apiKey = $env['GEMINI_KEY'];
+    $url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=$apiKey";
+    $payload = json_encode([
+        'contents' => [['parts' => [['text' => $prompt]]]],
+        'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048, 'responseMimeType' => 'application/json']
+    ]);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($httpCode !== 200) { echo json_encode(['error' => 'Gemini API error', 'code' => $httpCode]); exit; }
+    $data = json_decode($resp, true);
+    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $text = preg_replace('/^```json\s*/i', '', $text);
+    $text = preg_replace('/\s*```$/', '', $text);
+    $lesson = json_decode($text, true);
+    if (!$lesson) { echo json_encode(['error' => 'Failed to parse AI response', 'raw' => $text]); exit; }
+    echo json_encode($lesson);
+    exit;
+}
+
 // AJAX: skill proficiency for current user
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'skill_proficiency') {
     header('Content-Type: application/json');
@@ -729,6 +789,25 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
             <!-- Pattern list -->
             <div id="grammarList" class="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
                 <p class="text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
+            </div>
+        </div>
+
+        <!-- AI Lesson Panel (hidden until Teach Me is clicked) -->
+        <div id="lessonPanel" class="hidden">
+            <div class="glass rounded-3xl overflow-hidden glow-accent">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                    <h2 id="lessonTitle" class="text-lg font-bold flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-yellow-400"></i> <span></span>
+                    </h2>
+                    <button onclick="closeLesson()" class="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Lesson content -->
+                <div id="lessonContent" class="p-5 space-y-5">
+                    <p class="text-slate-400 text-sm text-center py-8">Loading AI lesson...</p>
+                </div>
             </div>
         </div>
 
@@ -1887,7 +1966,7 @@ function startDrill(groupName) {
     fetch('?who=' + who + '&ajax=1&action=drill_phrases&tag=' + encodeURIComponent(groupName))
         .then(function(r) { return r.json(); })
         .then(function(phrases) {
-            if (!phrases.length) { alert('No phrases found for "' + groupName + '"'); return; }
+            if (!phrases.length) { alert('No phrases found for "' + groupName + '". Try re-running import_notion.php.'); return; }
             drillPhrases = phrases;
             drillIdx = 0;
             drillPassCount = 0;
@@ -1896,10 +1975,13 @@ function startDrill(groupName) {
             document.getElementById('drillTotal').textContent = phrases.length;
             document.getElementById('drillPass').textContent = '0';
             document.getElementById('drillFail').textContent = '0';
-            document.getElementById('activeDrill').classList.remove('hidden');
+            var panel = document.getElementById('activeDrill');
+            panel.classList.remove('hidden');
             showDrillQuestion();
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
             lucide.createIcons();
-        });
+        })
+        .catch(function(err) { alert('Error loading drill: ' + err.message); });
 }
 
 function showDrillQuestion() {
@@ -2049,12 +2131,12 @@ function renderGrammarPatterns(patterns) {
         }
         detail.appendChild(meta);
 
-        // Listen button for pattern name
-        var listenRow = document.createElement('div');
-        listenRow.className = 'flex gap-2';
+        // Action buttons row
+        var actionRow = document.createElement('div');
+        actionRow.className = 'flex gap-2';
         var listenBtn = document.createElement('button');
         listenBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-50 text-xs font-semibold text-accent-light hover:bg-surface-200 transition-all';
-        listenBtn.textContent = '🔊 Listen';
+        listenBtn.innerHTML = '<i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Listen';
         listenBtn.onclick = function(e) {
             e.stopPropagation();
             window.speechSynthesis.cancel();
@@ -2063,8 +2145,17 @@ function renderGrammarPatterns(patterns) {
             if (huVoice) msg.voice = huVoice;
             window.speechSynthesis.speak(msg);
         };
-        listenRow.appendChild(listenBtn);
-        detail.appendChild(listenRow);
+        actionRow.appendChild(listenBtn);
+
+        var teachBtn = document.createElement('button');
+        teachBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/20 text-xs font-semibold text-yellow-300 hover:bg-accent/30 transition-all border border-yellow-400/20';
+        teachBtn.innerHTML = '<i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Teach Me';
+        teachBtn.onclick = function(e) {
+            e.stopPropagation();
+            teachMe(p);
+        };
+        actionRow.appendChild(teachBtn);
+        detail.appendChild(actionRow);
 
         card.appendChild(detail);
 
@@ -2135,6 +2226,128 @@ function searchGrammar() {
         document.getElementById('grammarCount').textContent = filtered.length + ' patterns';
     }, 200);
 }
+
+// ── AI Teach Me ───────────────────────────────────────────────────────
+function teachMe(pattern) {
+    var panel = document.getElementById('lessonPanel');
+    var content = document.getElementById('lessonContent');
+    var titleSpan = document.getElementById('lessonTitle').querySelector('span');
+    titleSpan.textContent = pattern.pattern;
+    content.innerHTML = '<div class="flex flex-col items-center py-8 gap-3"><div class="w-8 h-8 border-2 border-accent-light border-t-transparent rounded-full animate-spin"></div><p class="text-slate-400 text-sm">Generating lesson...</p></div>';
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    lucide.createIcons();
+
+    var fd = new FormData();
+    fd.append('pattern', pattern.pattern);
+    fd.append('suffix_words', pattern.suffix_words || '');
+    fd.append('explanation', pattern.explanation || '');
+
+    fetch('?ajax=1&action=teach_me', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { content.innerHTML = '<p class="text-red-400 text-sm text-center py-4">' + data.error + '</p>'; return; }
+            renderLesson(data, pattern);
+        })
+        .catch(function(err) {
+            content.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Failed to load lesson: ' + err.message + '</p>';
+        });
+}
+
+function renderLesson(data, pattern) {
+    var content = document.getElementById('lessonContent');
+    var html = '';
+
+    // Lesson explanation
+    html += '<div class="bg-surface-50 rounded-xl p-4 border border-white/5">';
+    html += '<p class="text-sm text-slate-200 leading-relaxed">' + escHtml(data.lesson) + '</p>';
+    html += '</div>';
+
+    // Tip
+    if (data.tip) {
+        html += '<div class="bg-yellow-400/5 rounded-xl p-4 border border-yellow-400/15 flex items-start gap-3">';
+        html += '<i data-lucide="lightbulb" class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5"></i>';
+        html += '<p class="text-sm text-yellow-200">' + escHtml(data.tip) + '</p>';
+        html += '</div>';
+    }
+
+    // Examples
+    if (data.examples && data.examples.length) {
+        html += '<div>';
+        html += '<h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Examples</h3>';
+        html += '<div class="space-y-2">';
+        data.examples.forEach(function(ex, i) {
+            var huText = ex.highlight ? ex.hu.replace(ex.highlight, '<span class="text-accent-light font-bold">' + escHtml(ex.highlight) + '</span>') : escHtml(ex.hu);
+            html += '<div class="bg-surface-50 rounded-lg p-3 border border-white/5">';
+            html += '<div class="flex items-center justify-between">';
+            html += '<p class="text-sm text-white font-medium">' + huText + '</p>';
+            html += '<button onclick="speakHu(\'' + escAttr(ex.hu) + '\')" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-accent-light transition-all flex-shrink-0"><i data-lucide="volume-2" class="w-4 h-4"></i></button>';
+            html += '</div>';
+            html += '<p class="text-xs text-slate-400 mt-1">' + escHtml(ex.en) + '</p>';
+            html += '</div>';
+        });
+        html += '</div></div>';
+    }
+
+    // Quiz
+    if (data.quiz && data.quiz.length) {
+        html += '<div>';
+        html += '<h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Quick Quiz</h3>';
+        html += '<div class="space-y-3">';
+        data.quiz.forEach(function(q, i) {
+            html += '<div class="bg-surface-50 rounded-lg p-4 border border-white/5" id="quiz-' + i + '">';
+            html += '<p class="text-sm text-white mb-2">' + escHtml(q.prompt) + '</p>';
+            html += '<div class="flex items-center gap-2">';
+            html += '<input type="text" class="flex-1 bg-surface-300 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 outline-none border border-white/5 focus:border-accent/40" placeholder="Your answer..." id="quiz-input-' + i + '" data-answer="' + escAttr(q.answer) + '" onkeydown="if(event.key===\'Enter\')checkQuiz(' + i + ')">';
+            html += '<button onclick="checkQuiz(' + i + ')" class="px-3 py-2 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-dark transition-all">Check</button>';
+            html += '</div>';
+            html += '<p class="text-xs text-slate-500 mt-1.5 hidden" id="quiz-hint-' + i + '">' + escHtml(q.hint) + '</p>';
+            html += '<p class="text-xs mt-1.5 hidden" id="quiz-result-' + i + '"></p>';
+            html += '</div>';
+        });
+        html += '</div></div>';
+    }
+
+    content.innerHTML = html;
+    lucide.createIcons();
+}
+
+function checkQuiz(idx) {
+    var input = document.getElementById('quiz-input-' + idx);
+    var result = document.getElementById('quiz-result-' + idx);
+    var hint = document.getElementById('quiz-hint-' + idx);
+    var answer = input.dataset.answer.toLowerCase().trim();
+    var userAnswer = input.value.toLowerCase().trim();
+
+    result.classList.remove('hidden');
+    if (userAnswer === answer) {
+        result.className = 'text-xs mt-1.5 text-green-400 font-semibold';
+        result.textContent = 'Correct!';
+        input.classList.add('border-green-500/40');
+        input.classList.remove('border-white/5', 'border-red-500/40');
+    } else {
+        result.className = 'text-xs mt-1.5 text-red-400';
+        result.textContent = 'Answer: ' + input.dataset.answer;
+        input.classList.add('border-red-500/40');
+        input.classList.remove('border-white/5', 'border-green-500/40');
+        hint.classList.remove('hidden');
+    }
+}
+
+function closeLesson() {
+    document.getElementById('lessonPanel').classList.add('hidden');
+}
+
+function speakHu(text) {
+    window.speechSynthesis.cancel();
+    var msg = new SpeechSynthesisUtterance(text);
+    msg.lang = 'hu-HU'; msg.rate = 0.8;
+    if (huVoice) msg.voice = huVoice;
+    window.speechSynthesis.speak(msg);
+}
+
+function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function escAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
 // ── Skill proficiency display ─────────────────────────────────────────
 function loadSkillProficiency() {
