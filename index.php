@@ -1180,7 +1180,7 @@ function toggleRepeatFail() {
 // Init repeat button state
 if (repeatOnFail) toggleRepeatFail();
 
-const indicator = document.getElementById('readyIndicator');
+var indicator = document.getElementById('readyIndicator') || document.createElement('div');
 let isListening       = false;
 let recTimeout        = null;
 let advanceTimeout    = null;
@@ -1577,9 +1577,10 @@ function shuffleQuestion() {
 // ── Speech recognition ────────────────────────────────────────────────
 var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (!SpeechRecognition) {
-    document.getElementById('recordBtn').disabled = true;
-    document.getElementById('recordBtn').title = 'Speech recognition not supported in this browser';
-    document.getElementById('recordLabel').textContent = 'N/A';
+    var rb = document.getElementById('recordBtn');
+    if (rb) { rb.disabled = true; rb.title = 'Speech recognition not supported'; }
+    var rl = document.getElementById('recordLabel');
+    if (rl) rl.textContent = 'N/A';
 }
 var recognition = SpeechRecognition ? new SpeechRecognition() : { start:function(){}, stop:function(){}, abort:function(){}, onstart:null, onresult:null, onend:null, onerror:null };
 recognition.lang            = 'hu-HU';
@@ -1589,6 +1590,7 @@ recognition.maxAlternatives = 5;
 
 function setRecordIcon(iconName) {
     var icon = document.getElementById('recordIcon');
+    if (!icon) return;
     icon.setAttribute('data-lucide', iconName);
     lucide.createIcons({ nodes: [icon] });
 }
@@ -1597,12 +1599,15 @@ recognition.onstart = function() {
     listenStartTime = Date.now();
     indicator.className = 'status-dot dot-live';
     var rb = document.getElementById('recordBtn');
-    rb.classList.add('mic-active');
-    rb.classList.remove('bg-green-600', 'hover:bg-green-500', 'glow-green');
-    rb.classList.add('bg-red-600', 'hover:bg-red-500', 'glow-red');
-    document.getElementById('recordLabel').textContent = 'Recording';
+    if (rb) {
+        rb.classList.add('mic-active');
+        rb.classList.remove('bg-green-600', 'hover:bg-green-500', 'glow-green');
+        rb.classList.add('bg-red-600', 'hover:bg-red-500', 'glow-red');
+    }
+    var rl = document.getElementById('recordLabel');
+    if (rl) rl.textContent = 'Recording';
 
-    setRecordIcon('headphones');
+    try { setRecordIcon('headphones'); } catch(e) {}
     startVolume();
     recTimeout = setTimeout(function() {
         if (isListening) recognition.stop();
@@ -1790,11 +1795,13 @@ recognition.onend = function() {
     cleanupAudio();
     indicator.className = 'status-dot dot-off';
     var rbReset = document.getElementById('recordBtn');
-    rbReset.classList.remove('mic-active', 'bg-red-600', 'hover:bg-red-500', 'glow-red');
-    rbReset.classList.add('bg-green-600', 'hover:bg-green-500', 'glow-green');
-    document.getElementById('recordLabel').textContent = 'Mic';
-
-    setRecordIcon('mic');
+    if (rbReset) {
+        rbReset.classList.remove('mic-active', 'bg-red-600', 'hover:bg-red-500', 'glow-red');
+        rbReset.classList.add('bg-green-600', 'hover:bg-green-500', 'glow-green');
+    }
+    var rl = document.getElementById('recordLabel');
+    if (rl) rl.textContent = 'Mic';
+    try { setRecordIcon('mic'); } catch(e) {}
 };
 
 function toggleMic() {
@@ -1967,23 +1974,25 @@ function savePracticePhrase() {
 
 // Live translation as you type (debounced)
 var practiceDebounce;
-document.getElementById('practiceInput').addEventListener('input', function() {
-    clearTimeout(practiceDebounce);
-    var text = this.value.trim();
-    if (!text) {
-        document.getElementById('practiceTranslation').classList.add('hidden');
-        return;
-    }
-    practiceDebounce = setTimeout(function() { translatePractice(); }, 600);
-});
-
-document.getElementById('practiceInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && (e.ctrlKey || e.shiftKey)) {
-        e.preventDefault();
-        speakPractice();
-        translatePractice();
-    }
-});
+var practiceInputEl = document.getElementById('practiceInput');
+if (practiceInputEl) {
+    practiceInputEl.addEventListener('input', function() {
+        clearTimeout(practiceDebounce);
+        var text = this.value.trim();
+        if (!text) {
+            document.getElementById('practiceTranslation').classList.add('hidden');
+            return;
+        }
+        practiceDebounce = setTimeout(function() { translatePractice(); }, 600);
+    });
+    practiceInputEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.shiftKey)) {
+            e.preventDefault();
+            speakPractice();
+            translatePractice();
+        }
+    });
+}
 
 // ── Phrase browser ────────────────────────────────────────────────────
 function openBrowse() {
