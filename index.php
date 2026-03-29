@@ -444,7 +444,7 @@ $conn->close();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>HUG COACH v6.0</title>
+<title>HUG COACH v7.0</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script>
@@ -605,7 +605,7 @@ select option { background: #111a2e; color: #e2e8f0; }
             </div>
             <div>
                 <span class="text-sm font-bold tracking-wide text-white">HUG COACH</span>
-                <span class="text-[10px] text-slate-500 ml-1.5">v6.0</span>
+                <span class="text-[10px] text-slate-500 ml-1.5">v7.0</span>
             </div>
         </div>
         <div class="flex items-center gap-2">
