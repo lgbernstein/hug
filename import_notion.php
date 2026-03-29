@@ -1,7 +1,8 @@
 <?php
 // Notion → Hug MySQL Import Script
-// Imports grammar patterns, sentences, vocabulary, interview Q&A, common expressions, and history dates
+// Imports grammar patterns, sentences, vocabulary, interview Q&A, citizenship words, common expressions, and history dates
 // Safe to re-run: uses INSERT IGNORE / ON DUPLICATE KEY UPDATE
+// Data sourced from Larry's Notion workspace on 2026-03-29
 
 session_start();
 $env = parse_ini_file('.env');
@@ -10,12 +11,14 @@ if ($conn->connect_error) { die('DB connection failed: ' . $conn->connect_error)
 $conn->set_charset('utf8mb4');
 
 $results = [];
-$counts = ['grammar' => 0, 'sentences' => 0, 'vocab' => 0, 'interview' => 0, 'expressions' => 0, 'history' => 0];
+$counts = ['grammar' => 0, 'sentences' => 0, 'vocab' => 0, 'interview' => 0, 'citizenship_words' => 0, 'expressions' => 0, 'history' => 0, 'knowledge' => 0];
 
 // ============================================================
 // 1. GRAMMAR PATTERNS → grammar_patterns table
+//    Source: Notion collection a108ddfa-9490-45d3-9de2-5a56d84dc413
 // ============================================================
 $patterns = [
+    // [pattern, suffix_words, explanation, part_of_speech, tags]
     ['Question Words', 'ki/kit/kinek…; mi/mit/minek…; melyik/melyiket…; hány, mennyi, hol/hova/honnan', 'Core Hungarian question words and their key case forms.', 'Other', 'Determiners'],
     ['Time expressions — quarter/half system', '—', 'Hungarian expresses time relative to the upcoming hour using negyed (quarter), fél (half), and háromnegyed (three-quarter).', 'Other', 'Possessive,Vowel harmony,Numbers and dates,Word order'],
     ['Afternoon time — use délután + regular time', '—', 'After 12:00, the quarter/half/three-quarter system is not used; use regular clock times with délután, reggel, este, etc.', 'Other', 'Possessive,Vowel harmony,Numbers and dates'],
@@ -56,6 +59,7 @@ $patterns = [
     ['Alphabet – Compact Pronunciation Table', '', 'Hungarian alphabet with pronunciation guide', 'Other', ''],
     ['Definite vs. Indefinite — Example Table', '', 'Examples of definite vs indefinite conjugation', 'Verb', 'Verbs'],
     ['Hungarian History - basic dates and names', '', 'Key dates and figures in Hungarian history', 'Other', 'Numbers and dates'],
+    ['Questions words (reference)', '', 'Quick-reference question word list', 'Other', 'Determiners'],
 ];
 
 $stmt = $conn->prepare("INSERT INTO grammar_patterns (pattern, suffix_words, explanation, part_of_speech, tags) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE suffix_words=VALUES(suffix_words), explanation=VALUES(explanation), part_of_speech=VALUES(part_of_speech), tags=VALUES(tags)");
@@ -68,114 +72,238 @@ $stmt->close();
 $results[] = "Grammar patterns: {$counts['grammar']} processed";
 
 // ============================================================
-// 2. SENTENCES TO PRACTICE → hungarian_prep
+// 2. INTERVIEW Q&A → hungarian_prep
+//    Source: Notion collection d1cd452f-1c5f-4d23-b5a3-2c4c34f7834e
+//    32 rows from "All Q&A" view
 // ============================================================
-$sentences = [
-    ['Korábban orvos voltam, most nyugdíjas vagyok.', 'I used to be a doctor, now I am retired.', 'prep', 'All', 'past-tense,occupation'],
-    ['Március tizenötödikén ünneplünk.', 'We celebrate on March 15th.', 'prep', 'All', 'dates,ordinals'],
-    ['Január elsején születtem.', 'I was born on January 1st.', 'prep', 'All', 'dates,ordinals,past-tense'],
-    ['Annával beszélek.', 'I am speaking with Anna.', 'prep', 'All', 'instrumental-val-vel'],
-    ['Ez a ház nagy.', 'This house is big.', 'prep', 'All', 'demonstratives,adjectives'],
-    ['Hány könyv van az asztalon?', 'How many books are on the table?', 'prep', 'All', 'question-words,quantifiers'],
-    ['Ez a negyedik feladat.', 'This is the fourth task.', 'prep', 'All', 'ordinals,demonstratives'],
-    ['Mennyi pénz kell?', 'How much money is needed?', 'prep', 'All', 'question-words,quantifiers'],
-    ['Busszal megyek.', 'I am going by bus.', 'prep', 'All', 'instrumental-val-vel,assimilation'],
-    ['Napos az idő.', 'The weather is sunny.', 'prep', 'All', 'weather-adjectives'],
-    ['Ő a hatodik.', 'They are sixth.', 'prep', 'All', 'ordinals'],
-    ['Esős idő van.', 'It is rainy weather.', 'prep', 'All', 'weather-adjectives,van-vannak'],
-    ['Az a könyv érdekes.', 'That book is interesting.', 'prep', 'All', 'demonstratives,adjectives'],
-];
 
-// Also add vocabulary items as practice phrases
-$vocab_phrases = [
-    ['A családom', 'My family', 'prep', 'All', 'possessive,family'],
-    ['Budapest megyében.', 'In Budapest county.', 'prep', 'All', 'inessive-ban-ben,places'],
-    ['Mivel foglalkozik az édesapja?', 'What does your father do for a living?', 'prep', 'All', 'question-words,occupation,possessive'],
-    ['Kérem, mondja a dátumot.', 'Please say the date.', 'prep', 'All', 'dates,formal-register'],
-    ['Az Ön családja melyik részről származik?', 'Which part does your family come from?', 'prep', 'All', 'question-words,family,formal-register'],
-    ['Los Angelesben lakom 2015 óta.', 'I have lived in Los Angeles since 2015.', 'prep', 'All', 'inessive-ban-ben,time-expressions'],
-    ['Mióta él ott?', 'Since when have you lived there?', 'prep', 'All', 'question-words,time-expressions'],
-    ['1990. 05. 14-én születtem Budapesten.', 'I was born on May 14, 1990 in Budapest.', 'prep', 'All', 'dates,past-tense,inessive-ban-ben'],
-];
-
-// Interview Q&A — complete pairs only (skip [TK-confirm] placeholders for now)
-$interview_phrases = [
-    // Basic info
-    ['Miben segíthetek?', 'How can I help you?', 'prep', 'All', 'interview,formal-register,greeting'],
-    ['Állampolgársági interjúra jöttem.', 'I came for a citizenship interview.', 'prep', 'All', 'interview,formal-register'],
-    ['Igen, elhoztam az útlevelemet.', 'Yes, I brought my passport.', 'prep', 'All', 'interview,documents,possessive'],
-    ['A nevem Marlene Angelos.', 'My name is Marlene Angelos.', 'prep', 'Maria', 'interview,basic-info'],
-    ['Ezerkilencszázharmincnégyben születtem.', 'I was born in 1934.', 'prep', 'Maria', 'interview,dates,past-tense'],
-    ['Medellínben, Kolumbiában születtem.', 'I was born in Medellín, Colombia.', 'prep', 'Maria', 'interview,birthplace,inessive-ban-ben'],
-    ['Kilencvenegy éves vagyok.', 'I am ninety-one years old.', 'prep', 'Maria', 'interview,numbers'],
-    // Family
-    ['Az édesanyám neve Maria Angelos volt.', "My mother's name was Maria Angelos.", 'prep', 'Maria', 'interview,family,possessive,past-tense'],
-    ['Az édesapám neve George Angelos volt.', "My father's name was George Angelos.", 'prep', 'Maria', 'interview,family,possessive,past-tense'],
-    ['Igen, van két öcsém.', 'Yes, I have two younger brothers.', 'prep', 'Maria', 'interview,family,numbers'],
-    ['Az öcséim neve John és Peter.', "My brothers' names are John and Peter.", 'prep', 'Maria', 'interview,family,possessive'],
-    // Occupation & daily life (from Polite Q&A page)
-    ['Nyugdíjas vagyok.', 'I am retired.', 'prep', 'Maria', 'interview,occupation'],
-    ['Az egyik orvos, a másik mérnök.', 'One is a doctor, the other an engineer.', 'prep', 'Maria', 'interview,occupation,family'],
-    ['Los Angelesben élek.', 'I live in Los Angeles.', 'prep', 'All', 'interview,residence,inessive-ban-ben'],
-    // Hobbies
-    ['Szeretek olvasni és zenét hallgatni.', 'I like reading and listening to music.', 'prep', 'Maria', 'interview,hobbies,infinitive'],
-    ['Ő szeretett kertészkedni.', 'She liked gardening.', 'prep', 'Maria', 'interview,hobbies,past-tense'],
-    ['Ő szeretett sakkozni.', 'He liked playing chess.', 'prep', 'Maria', 'interview,hobbies,past-tense'],
-    // More family from Polite Q&A
-    ['A szüleim mindketten ezerkilencszázharmincnégyben születtek.', 'My parents were both born in 1934.', 'prep', 'Maria', 'interview,family,dates,past-tense'],
-    ['Ők Onnokon születtek.', 'They were born in Onnok.', 'prep', 'Maria', 'interview,family,birthplace,past-tense'],
-    ['Ők már nem élnek.', 'They are no longer alive.', 'prep', 'Maria', 'interview,family'],
-    ['Az egyik testvérem New Yorkban él, a másik Floridában.', 'One of my brothers lives in New York, the other in Florida.', 'prep', 'Maria', 'interview,family,residence'],
-    // Longer interview answers
-    ['Magyar állampolgár szeretnék lenni, mert magyar származású vagyok, és szeretném megőrizni a családi kötődést és a nyelvet.', 'I would like to become a Hungarian citizen because I am of Hungarian origin, and I would like to preserve the family connection and the language.', 'prep', 'All', 'interview,origins,formal-register'],
-    ['Jelenleg Los Angelesben lakom, Kaliforniában, 2015 óta.', 'I currently live in Los Angeles, California, since 2015.', 'prep', 'All', 'interview,residence,time-expressions'],
-    // Standalone Hungarian sentences from the Q&A db (no English question needed)
-    ['Nyugdijas orvos vagyok.', 'I am a retired doctor.', 'prep', 'All', 'interview,occupation'],
-    ['Az édesanyám nővér volt, az édesapám pedig mérnök volt.', 'My mother was a nurse, and my father was an engineer.', 'prep', 'All', 'interview,family,occupation,past-tense'],
-    ['Hol van a személyi igazolványa?', 'Where is your ID card?', 'prep', 'All', 'interview,documents,question-words,possessive'],
-];
-
-// History dates as practice phrases
-$history_phrases = [
-    ['Nyolcszázkilencvenötben volt a Honfoglalás.', 'The Hungarian Conquest was in 895.', 'prep', 'All', 'history,dates,numbers'],
-    ['Ezerben volt az Államalapítás.', 'The founding of the Hungarian State was in 1000.', 'prep', 'All', 'history,dates'],
-    ['Augusztus huszadikán ünnepeljük Szent István napját.', 'We celebrate Saint Stephen\'s Day on August 20th.', 'prep', 'All', 'history,dates,ordinals'],
-    ['Ezerkétszáznegyvenegyedikben volt a Muhi csata.', 'The Battle of Muhi was in 1241.', 'prep', 'All', 'history,dates,numbers'],
-    ['Ezerötszázhuszonhatban volt a Mohácsi csata.', 'The Battle of Mohács was in 1526.', 'prep', 'All', 'history,dates,numbers'],
-    ['Március tizenötödikén ünnepeljük a Forradalmat.', 'We celebrate the Revolution on March 15th.', 'prep', 'All', 'history,dates,ordinals'],
-    ['Ezerkilencszázhúszban írták alá a Trianoni békeszerződést.', 'The Treaty of Trianon was signed in 1920.', 'prep', 'All', 'history,dates,numbers,past-tense'],
-    ['Ezerkilencszázötvenhatban volt a Forradalom.', 'The Hungarian Revolution was in 1956.', 'prep', 'All', 'history,dates,numbers'],
-];
-
-$all_phrases = array_merge($sentences, $vocab_phrases, $interview_phrases, $history_phrases);
-
-// Ensure question_hu column exists (should already from index.php auto-migration)
+// Ensure tags column exists
 $col = $conn->query("SHOW COLUMNS FROM hungarian_prep LIKE 'tags'");
 if ($col && $col->num_rows === 0) {
     $conn->query("ALTER TABLE hungarian_prep ADD COLUMN tags TEXT DEFAULT NULL AFTER `who`");
 }
 
-$stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, category, `who`, tags) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en), tags=VALUES(tags)");
-foreach ($all_phrases as $p) {
-    $stmt->bind_param('sssss', $p[0], $p[1], $p[2], $p[3], $p[4]);
+// [question_hu, answer_en, answer_hu, category, who, tags]
+$interview_qa = [
+    // Formal questions with answers
+    ['Kérem, mondja el, mi a foglalkozása.', 'Please tell me what your occupation is.', '[TK-confirm] a foglalkozásom.', 'interview', 'All', 'interview,formal-register,occupation'],
+    ['Kérem, mondja el, mi az édesanyja leánykori neve.', "Please tell me your mother's maiden name.", 'Az édesanyám leánykori neve [TK-confirm].', 'interview', 'All', 'interview,formal-register,family'],
+    ['Kérem, mondja el, miért szeretne magyar állampolgár lenni.', 'Please tell me why you would like to become a Hungarian citizen.', 'Magyar állampolgár szeretnék lenni, mert magyar származású vagyok, és szeretném megőrizni a családi kötődést és a nyelvet.', 'interview', 'All', 'interview,formal-register,origins'],
+    ['Kérem, mondja el, milyen gyakran beszél magyarul.', 'Please tell me how often you speak Hungarian.', '[TK-confirm] (Naponta beszélek magyarul. / Hetente többször beszélek magyarul.)', 'interview', 'All', 'interview,formal-register'],
+    ['Kérem, mondja el, mi a teljes neve.', 'Please tell me your full name.', 'A teljes nevem [TK-confirm teljes név].', 'interview', 'All', 'interview,formal-register,basic-info'],
+    ['Kérem, mondja el, mi az édesapja neve.', "Please tell me your father's name.", 'Az édesapám neve [TK-confirm].', 'interview', 'All', 'interview,formal-register,family'],
+    ['Kérem, mondja el, mióta lakik ezen a címen.', 'Please tell me since when you have been living at this address.', '[TK-confirm év] óta lakom ezen a címen.', 'interview', 'All', 'interview,formal-register,residence,time-expressions'],
+    ['Kérem, mutassa be az okmányait. Van útlevele vagy személyi igazolványa?', 'Please show me your documents. Do you have a passport or an ID card?', 'Igen. Itt van az útlevelem, és [TK-confirm] (személyi igazolványom is van / személyi igazolványom nincs).', 'interview', 'All', 'interview,formal-register,documents'],
+    ['Kérem, mondja el, járt-e már Magyarországon. Mikor és meddig volt ott?', 'Please tell me whether you have been to Hungary before. When and for how long were you there?', '[TK-confirm] (Igen, jártam Magyarországon. [TK-confirm év]-ben voltam ott [TK-confirm napok száma] napig.)', 'interview', 'All', 'interview,formal-register,travel'],
+    ['Kérem, mondja el, honnan származik a családja Magyarországon.', 'Please tell me where your family comes from in Hungary.', 'A családom [TK-confirm település]-ról/-ből származik, [TK-confirm megye] megyéből.', 'interview', 'All', 'interview,formal-register,origins,family'],
+    ['Kérem, mondja el, hol dolgozik.', 'Please tell me where you work.', '[TK-confirm cég]-nél dolgozom, [TK-confirm város]-ban/ben.', 'interview', 'All', 'interview,formal-register,occupation'],
+    ['Kérem, mondja el, mikor és hol született.', 'Please tell me when and where you were born.', '[TK-confirm dátum]-én születtem [TK-confirm város]-ban/ben, [TK-confirm megye] megyében.', 'interview', 'All', 'interview,formal-register,birthplace,dates'],
+    ['Kérem, mondja el, van-e gyermeke, és hány.', 'Please tell me whether you have any children, and how many.', '[TK-confirm] (Igen, [TK-confirm szám] gyermekem van. / Nem, nincs gyermekem.)', 'interview', 'All', 'interview,formal-register,family'],
+    ['Kérem, mondja el, hol lakik jelenleg.', 'Please tell me where you currently live.', 'Jelenleg [TK-confirm város]-ban/ben lakom, a [TK-confirm utca] [TK-confirm házszám] alatt.', 'interview', 'All', 'interview,formal-register,residence'],
+    ['Kérem, mondja el, házas-e.', 'Please tell me whether you are married.', '[TK-confirm] (Igen, házas vagyok. / Nem, nem vagyok házas.)', 'interview', 'All', 'interview,formal-register,family'],
+    // Shorter questions with concrete answers
+    ['Hány éves?', 'How old are you?', 'Kilencvenegy éves vagyok.', 'interview', 'Maria', 'interview,dates,numbers'],
+    ['Mi a testvére neve?', "What is your sibling's name?", 'Az öcséim neve John és Peter.', 'interview', 'Maria', 'interview,family'],
+    ['Van testvére?', 'Do you have any siblings?', 'Igen, van két öcsém.', 'interview', 'Maria', 'interview,family'],
+    ['Mikor született?', 'When were you born?', 'Ezerkilencszázharmincnégyben születtem.', 'interview', 'Maria', 'interview,dates,numbers'],
+    ['Mi az édesanyja neve?', "What is your mother's name?", 'Az édesanyám neve Maria Angelos volt.', 'interview', 'Maria', 'interview,family'],
+    ['Hol született?', 'Where were you born?', 'Medellínben, Kolumbiában születtem.', 'interview', 'Maria', 'interview,birthplace'],
+    ['Miben segíthetek?', 'How can I help you?', 'Állampolgársági interjúra jöttem.', 'interview', 'All', 'interview,greeting'],
+    ['Mi a neve? / Hogy hívják?', 'What is your name?', 'A nevem Marlene Angelos.', 'interview', 'Maria', 'interview,basic-info'],
+    ['Mi az édesapja neve?', "What is your father's name?", 'Az édesapám neve George Angelos volt.', 'interview', 'Maria', 'interview,family'],
+    ['Elhozta az útlevelét?', 'Did you bring your passport?', 'Igen, elhoztam az útlevelemet.', 'interview', 'All', 'interview,documents'],
+    ['Hol lakik most, és mióta él ott?', 'Where do you live now, and since when have you lived there?', 'Jelenleg Los Angelesben lakom, Kaliforniában, 2015 óta.', 'interview', 'All', 'interview,residence,time-expressions'],
+    ['Az Ön családja Magyarország melyik részéről származik, és mivel foglalkoztak a felmenők?', 'Which part of Hungary does your family come from, and what did your ancestors do for a living?', 'Paternal nagyapám magyar származású volt; 1920-ban érkezett az Egyesült Államokba.', 'interview', 'Maria', 'interview,origins,family'],
+    // Hungarian statements (from Q&A db entries without a question)
+    ['Nyugdíjas orvos vagyok.', 'I am a retired doctor.', '', 'prep', 'All', 'interview,occupation'],
+    ['Az édesanyám nővér volt, az édesapám pedig mérnök volt.', 'My mother was a nurse, and my father was an engineer.', '', 'prep', 'All', 'interview,family,occupation,past-tense'],
+    ['Hol van a személyi igazolványa?', 'Where is your ID card?', '', 'prep', 'All', 'interview,documents,question-words'],
+    ['Korábban orvos voltam, most nyugdíjas vagyok.', 'I used to be a doctor, now I am retired.', '', 'prep', 'All', 'interview,occupation,past-tense'],
+];
+
+// Insert with answer_hu support
+$stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, answer_hu, category, `who`, tags) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en), answer_hu=VALUES(answer_hu), tags=VALUES(tags)");
+foreach ($interview_qa as $row) {
+    $stmt->bind_param('ssssss', $row[0], $row[1], $row[2], $row[3], $row[4], $row[5]);
     $stmt->execute();
-    if ($conn->affected_rows > 0) {
-        if (in_array($p, $sentences)) $counts['sentences']++;
-        elseif (in_array($p, $vocab_phrases)) $counts['vocab']++;
-        elseif (in_array($p, $interview_phrases)) $counts['interview']++;
-        elseif (in_array($p, $history_phrases)) $counts['history']++;
-    }
+    if ($conn->affected_rows > 0) $counts['interview']++;
 }
 $stmt->close();
-$results[] = "Sentences: {$counts['sentences']} | Vocab phrases: {$counts['vocab']} | Interview: {$counts['interview']} | History: {$counts['history']}";
+$results[] = "Interview Q&A: {$counts['interview']} imported/updated";
 
 // ============================================================
-// 3. COMMON EXPRESSIONS → hungarian_prep
+// 3. CITIZENSHIP INTERVIEW WORDS → hungarian_prep
+//    Source: Notion collection 2948fa7e-ab97-8056-97f1-000b748156f7
+//    36 rows - vocabulary for citizenship interview context
+// ============================================================
+// [question_hu (the word), answer_en, answer_hu (example sentence), category, who, tags]
+$citizenship_words = [
+    ['nagykövetség', 'embassy', 'A magyar nagykövetségen voltam.', 'prep', 'All', 'citizenship-words,places'],
+    ['konzulátus', 'consulate', 'Smaller diplomatic office than an embassy.', 'prep', 'All', 'citizenship-words,places'],
+    ['kérelem', 'application / request', 'Állampolgársági kérelmet adtam be.', 'prep', 'All', 'citizenship-words,documents'],
+    ['űrlap / nyomtatvány', 'form', 'Ki kell töltenie az űrlapot.', 'prep', 'All', 'citizenship-words,documents'],
+    ['aláírás', 'signature', 'Ide kérem az aláírását.', 'prep', 'All', 'citizenship-words,actions'],
+    ['aláír', 'to sign', 'Kérem, írja alá!', 'prep', 'All', 'citizenship-words,actions'],
+    ['útlevél', 'passport', 'Van érvényes útlevele?', 'prep', 'All', 'citizenship-words,documents'],
+    ['személyi igazolvány', 'ID card', 'Hungarian personal identification card.', 'prep', 'All', 'citizenship-words,documents'],
+    ['jogosítvány / vezetői engedély', "driver's license", 'Van amerikai jogosítványom.', 'prep', 'All', 'citizenship-words,documents'],
+    ['születési anyakönyvi kivonat', 'birth certificate', 'Be kell mutatnia a születési anyakönyvi kivonatot.', 'prep', 'All', 'citizenship-words,documents'],
+    ['házassági anyakönyvi kivonat', 'marriage certificate', 'Official marriage record.', 'prep', 'All', 'citizenship-words,documents'],
+    ['válási papír / ítélet', 'divorce decree', 'Van válási ítélete?', 'prep', 'All', 'citizenship-words,documents'],
+    ['állampolgárság', 'citizenship', 'Magyar állampolgárságot kérek.', 'prep', 'All', 'citizenship-words,status'],
+    ['állampolgár', 'citizen', 'Amerikai állampolgár vagyok.', 'prep', 'All', 'citizenship-words,people'],
+    ['útlevélkérelem', 'passport application', 'Compound: útlevél + kérelem.', 'prep', 'All', 'citizenship-words,documents'],
+    ['dátum', 'date', 'Mi a mai dátum?', 'prep', 'All', 'citizenship-words,forms'],
+    ['pecsét', 'stamp / seal', 'Kérem a pecsétet ide!', 'prep', 'All', 'citizenship-words,documents'],
+    ['hivatal', 'office / bureau', 'Az okmányirodában dolgozik.', 'prep', 'All', 'citizenship-words,places'],
+    ['okmány', 'document / ID', 'General word for official IDs or papers.', 'prep', 'All', 'citizenship-words,documents'],
+    ['okmányiroda', 'document office', 'Handles passports, IDs, etc.', 'prep', 'All', 'citizenship-words,places'],
+    ['nyilatkozat', 'declaration / statement', 'Aláírtam a nyilatkozatot.', 'prep', 'All', 'citizenship-words,documents'],
+    ['bizonyítvány', 'certificate / diploma', 'Often used for education or proof.', 'prep', 'All', 'citizenship-words,documents'],
+    ['hiteles másolat', 'certified copy', 'For submission of official records.', 'prep', 'All', 'citizenship-words,documents'],
+    ['fordítás', 'translation', 'Hivatalos fordítást kérek.', 'prep', 'All', 'citizenship-words,documents'],
+    ['fordító', 'translator', 'A fordító aláírta a dokumentumot.', 'prep', 'All', 'citizenship-words,people'],
+    ['hivatalos', 'official / formal', 'Hivatalos dokumentum.', 'prep', 'All', 'citizenship-words,descriptive'],
+    ['érvényes', 'valid', 'Az útlevele még érvényes.', 'prep', 'All', 'citizenship-words,status'],
+    ['lejárt', 'expired', 'A jogosítványom lejárt.', 'prep', 'All', 'citizenship-words,status'],
+    ['irat / dokumentum', 'record / document', 'General administrative term.', 'prep', 'All', 'citizenship-words,documents'],
+    ['jelentkezés', 'application / registration', 'Often for school or job applications.', 'prep', 'All', 'citizenship-words,actions'],
+    ['kérelmező', 'applicant', 'The person submitting a request.', 'prep', 'All', 'citizenship-words,people'],
+    ['tanú', 'witness', 'May appear on older documents.', 'prep', 'All', 'citizenship-words,people'],
+    ['állandó lakcím', 'permanent address', 'Appears on all Hungarian IDs.', 'prep', 'All', 'citizenship-words,personal-info'],
+    ['ideiglenes lakcím', 'temporary address', 'For shorter stays.', 'prep', 'All', 'citizenship-words,personal-info'],
+    ['születési hely', 'place of birth', 'Found on official papers.', 'prep', 'All', 'citizenship-words,personal-info'],
+    ['keltezés', 'date of issue / issuance', 'Formal term for "dated."', 'prep', 'All', 'citizenship-words,forms'],
+];
+
+$stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, answer_hu, category, `who`, tags) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en), answer_hu=VALUES(answer_hu), tags=VALUES(tags)");
+foreach ($citizenship_words as $row) {
+    $stmt->bind_param('ssssss', $row[0], $row[1], $row[2], $row[3], $row[4], $row[5]);
+    $stmt->execute();
+    if ($conn->affected_rows > 0) $counts['citizenship_words']++;
+}
+$stmt->close();
+$results[] = "Citizenship words: {$counts['citizenship_words']} imported/updated";
+
+// ============================================================
+// 4. SENTENCES TO PRACTICE → hungarian_prep
+//    Source: Notion collection eaa5d139-2afc-4cb0-abe1-97a2637b4eea
+//    13 rows
+// ============================================================
+$sentences = [
+    ['Korábban orvos voltam, most nyugdíjas vagyok.', 'I used to be a doctor, now I am retired.', '', 'prep', 'All', 'past-tense,occupation'],
+    ['Március tizenötödikén ünneplünk.', 'We celebrate on March 15th.', '', 'prep', 'All', 'dates,ordinals'],
+    ['Január elsején születtem.', 'I was born on January 1st.', '', 'prep', 'All', 'dates,ordinals,past-tense'],
+    ['Annával beszélek.', 'I am speaking with Anna.', '', 'prep', 'All', 'instrumental-val-vel'],
+    ['Ez a ház nagy.', 'This house is big.', '', 'prep', 'All', 'demonstratives,adjectives'],
+    ['Hány könyv van az asztalon?', 'How many books are on the table?', '', 'prep', 'All', 'question-words,quantifiers'],
+    ['Ez a negyedik feladat.', 'This is the fourth task.', '', 'prep', 'All', 'ordinals,demonstratives'],
+    ['Mennyi pénz kell?', 'How much money is needed?', '', 'prep', 'All', 'question-words,quantifiers'],
+    ['Busszal megyek.', 'I am going by bus.', '', 'prep', 'All', 'instrumental-val-vel,assimilation'],
+    ['Napos az idő.', 'The weather is sunny.', '', 'prep', 'All', 'weather-adjectives'],
+    ['Ő a hatodik.', 'They are sixth.', '', 'prep', 'All', 'ordinals'],
+    ['Esős idő van.', 'It is rainy weather.', '', 'prep', 'All', 'weather-adjectives,van-vannak'],
+    ['Az a könyv érdekes.', 'That book is interesting.', '', 'prep', 'All', 'demonstratives,adjectives'],
+];
+
+$stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, answer_hu, category, `who`, tags) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en), tags=VALUES(tags)");
+foreach ($sentences as $row) {
+    $stmt->bind_param('ssssss', $row[0], $row[1], $row[2], $row[3], $row[4], $row[5]);
+    $stmt->execute();
+    if ($conn->affected_rows > 0) $counts['sentences']++;
+}
+$stmt->close();
+$results[] = "Sentences to Practice: {$counts['sentences']} imported/updated";
+
+// ============================================================
+// 5. VOCABULARY → hungarian_prep
+//    Source: Notion collection e4f50d0f-52fd-463a-b9b5-63cbd497cc54
+//    8 rows
+// ============================================================
+$vocabulary = [
+    // [word, meaning, example, pos_as_category]
+    ['megye', 'county', 'Budapest megyében.', 'Noun'],
+    ['foglalkozik', 'to work as, to be occupied with', 'Mivel foglalkozik az édesapja?', 'Verb'],
+    ['dátum', 'date', 'Kérem, mondja a dátumot: YYYY. MM. DD.', 'Noun'],
+    ['család', 'family', 'Az Ön családja melyik részről származik?', 'Noun'],
+    ['lakik', 'lives (resides)', 'Los Angelesben lakom 2015 óta.', 'Verb'],
+    ['mióta', 'since when', 'Mióta él ott?', 'Other'],
+    ['született', 'was born', '1990. 05. 14-én születtem Budapesten.', 'Verb'],
+];
+
+$stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, answer_hu, category, `who`, tags) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en), answer_hu=VALUES(answer_hu), tags=VALUES(tags)");
+$who_all = 'All';
+foreach ($vocabulary as $v) {
+    $tags = 'vocabulary,' . strtolower($v[3]);
+    $cat = 'prep';
+    $stmt->bind_param('ssssss', $v[0], $v[1], $v[2], $cat, $who_all, $tags);
+    $stmt->execute();
+    if ($conn->affected_rows > 0) $counts['vocab']++;
+}
+$stmt->close();
+$results[] = "Vocabulary: {$counts['vocab']} imported/updated";
+
+// ============================================================
+// 6. HISTORICAL DATES → knowledge_cards
+//    Source: Notion collection 2948fa7e-ab97-8029-bd28-000be901b94c
+//    10 rows
+// ============================================================
+$history = [
+    // [title_hu (event name), title_en, content_hu (description), content_en (pronunciation), key_fact (year/date)]
+    ['Honfoglalás', 'Conquest of the Carpathian Basin', 'A magyarok bejönnek a Kárpát-medencébe, Árpád vezetésével.', 'Honfoglalás — [hon-fohg-lah-lahsh]', '895'],
+    ['Államalapítás', 'Foundation of the Hungarian State', 'Szent István király megkoronázása.', 'Államalapítás — [ahl-lah-mah-lah-pee-tahsh]', '1000. augusztus 20.'],
+    ['Tatárjárás', 'Mongol Invasion', 'A tatárok lerombolták az ország nagy részét.', 'Tatárjárás — [tah-tahr-yaː-rahsh]', '1241–1242'],
+    ['Mohácsi csata', 'Battle of Mohács', 'Magyar vereség a törökök ellen.', 'Mohácsi csata — [mo-haa-chi cha-tah]', '1526. augusztus 29.'],
+    ['Buda török megszállása', 'Capture of Buda by the Turks', 'Magyarország középső része török uralom alá került.', 'Buda török megszállása — [boo-dah tö-rök meg-szál-lá-sha]', '1541'],
+    ['Buda visszafoglalása', 'Liberation of Buda', 'A keresztény seregek felszabadították Budát.', 'Buda visszafoglalása — [boo-dah vis-sah-fohg-lah-lah-sha]', '1686'],
+    ['Forradalom és szabadságharc', 'Revolution and War of Independence', 'Kossuth és Petőfi vezették, szabadságot követeltek.', 'Forradalom és szabadságharc — [for-ra-dah-lom eesh sa-bod-shaːg-harts]', '1848. március 15.'],
+    ['Kiegyezés', 'Austro-Hungarian Compromise', 'Létrejött az Osztrák-Magyar Monarchia.', 'Kiegyezés — [kee-egg-yeh-zaysh]', '1867'],
+    ['Trianoni béke', 'Treaty of Trianon', 'Magyarország elveszti területeinek kétharmadát.', 'Trianoni béke — [tree-ɒ-no-ni bay-keh]', '1920. június 4.'],
+    ['Forradalom (1956)', 'Revolution against Soviet rule', 'Felkelés a kommunista hatalom ellen.', 'Forradalom — [for-ra-dah-lom]', '1956. október 23.'],
+    ['Köztársaság kikiáltása', 'Proclamation of the Republic', 'Magyarország demokratikus állammá válik.', 'Köztársaság kikiáltása — [kø-staːr-shah-shahg kee-kee-ahl-tah-sha]', '1989. október 23.'],
+    ['EU-csatlakozás', 'EU accession', 'Magyarország belép az Európai Unióba.', 'EU-csatlakozás — [ay-oo cha-tloh-ko-zaːsh]', '2004. május 1.'],
+];
+
+$stmt = $conn->prepare("INSERT IGNORE INTO knowledge_cards (category, title_hu, title_en, content_hu, content_en, key_fact) VALUES (?, ?, ?, ?, ?, ?)");
+$hist_cat = 'history';
+foreach ($history as $h) {
+    $stmt->bind_param('ssssss', $hist_cat, $h[0], $h[1], $h[2], $h[3], $h[4]);
+    $stmt->execute();
+    if ($conn->affected_rows > 0) $counts['knowledge']++;
+}
+$stmt->close();
+
+// Also add history dates as practice phrases in hungarian_prep
+$history_phrases = [
+    ['Nyolcszázkilencvenötben volt a Honfoglalás.', 'The Hungarian Conquest was in 895.', '', 'prep', 'All', 'history,dates,numbers'],
+    ['Ezerben volt az Államalapítás.', 'The founding of the Hungarian State was in 1000.', '', 'prep', 'All', 'history,dates'],
+    ['Augusztus huszadikán ünnepeljük Szent István napját.', "We celebrate Saint Stephen's Day on August 20th.", '', 'prep', 'All', 'history,dates,ordinals'],
+    ['Ezerkétszáznegyvenegyedikben volt a Muhi csata.', 'The Battle of Muhi was in 1241.', '', 'prep', 'All', 'history,dates,numbers'],
+    ['Ezerötszázhuszonhatban volt a Mohácsi csata.', 'The Battle of Mohács was in 1526.', '', 'prep', 'All', 'history,dates,numbers'],
+    ['Március tizenötödikén ünnepeljük a Forradalmat.', 'We celebrate the Revolution on March 15th.', '', 'prep', 'All', 'history,dates,ordinals'],
+    ['Ezerkilencszázhúszban írták alá a Trianoni békeszerződést.', 'The Treaty of Trianon was signed in 1920.', '', 'prep', 'All', 'history,dates,numbers,past-tense'],
+    ['Ezerkilencszázötvenhatban volt a Forradalom.', 'The Hungarian Revolution was in 1956.', '', 'prep', 'All', 'history,dates,numbers'],
+    ['Ezerkilencszáznyolcvankilencben kikiáltották a Köztársaságot.', 'The Republic was proclaimed in 1989.', '', 'prep', 'All', 'history,dates,numbers'],
+    ['Kétezer-négyben Magyarország belépett az Európai Unióba.', 'Hungary joined the European Union in 2004.', '', 'prep', 'All', 'history,dates,numbers'],
+];
+
+$stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, answer_hu, category, `who`, tags) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en), tags=VALUES(tags)");
+foreach ($history_phrases as $row) {
+    $stmt->bind_param('ssssss', $row[0], $row[1], $row[2], $row[3], $row[4], $row[5]);
+    $stmt->execute();
+    if ($conn->affected_rows > 0) $counts['history']++;
+}
+$stmt->close();
+$results[] = "Historical: {$counts['knowledge']} knowledge cards + {$counts['history']} practice phrases";
+
+// ============================================================
+// 7. COMMON EXPRESSIONS → hungarian_prep
+//    Source: Hungarian Solutions Course textbook content
 // ============================================================
 $expressions = [
     // Ch1 — Introduction
     ['Bocsánat!', "I'm sorry. Pardon. Excuse me."],
-    ['Elnézést! ', "I'm sorry. Pardon. Excuse me."],
+    ['Elnézést!', "I'm sorry. Pardon. Excuse me."],
     ['Elnézést, nem értem.', "I'm sorry, I don't understand."],
     ['Fogalmam sincs.', 'I have no idea.'],
     ['Kérdezhetek valamit?', 'Can I ask you something?'],
@@ -283,36 +411,33 @@ $expressions = [
 
 $cat = 'prep';
 $who = 'All';
-$stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, category, `who`, tags) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en)");
+$empty = '';
+$stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, answer_hu, category, `who`, tags) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en)");
 foreach ($expressions as $e) {
     $tags = 'common-expressions';
-    $stmt->bind_param('sssss', $e[0], $e[1], $cat, $who, $tags);
+    $stmt->bind_param('ssssss', $e[0], $e[1], $empty, $cat, $who, $tags);
     $stmt->execute();
     if ($conn->affected_rows > 0) $counts['expressions']++;
 }
 $stmt->close();
-$results[] = "Common expressions: {$counts['expressions']} processed";
+$results[] = "Common expressions: {$counts['expressions']} imported/updated";
 
 // ============================================================
-// 4. DRILL GROUPS
+// 8. DRILL GROUPS — tag-based phrase groupings
 // ============================================================
-// Ensure tag_match column exists
 $col = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
 if ($col && $col->num_rows === 0) {
     $conn->query("ALTER TABLE drill_groups ADD COLUMN tag_match VARCHAR(500) DEFAULT NULL AFTER description");
 }
 
-// Add unique index on name if missing, then clear duplicates
 $idx = $conn->query("SHOW INDEX FROM drill_groups WHERE Key_name = 'unique_name'");
 if ($idx && $idx->num_rows === 0) {
-    // Remove duplicates first (keep lowest id per name)
     $conn->query("DELETE d FROM drill_groups d INNER JOIN (
         SELECT name, MIN(id) AS keep_id FROM drill_groups GROUP BY name HAVING COUNT(*) > 1
     ) dups ON d.name = dups.name AND d.id != dups.keep_id");
     $conn->query("ALTER TABLE drill_groups ADD UNIQUE KEY unique_name (name)");
 }
 
-// [name, description, tag_match (comma-separated patterns to match in phrase tags), source]
 $drill_groups = [
     ['Asking Questions', 'mi? kit? kinek? — question words & cases', 'question-words', 'notion'],
     ['My, Your, Our — Possessives', 'Possessive endings for all persons', 'possessive', 'notion'],
@@ -327,13 +452,14 @@ $drill_groups = [
     ['Why Hungary?', 'Heritage, motivation for citizenship', 'interview,origins', 'notion'],
     ['Greetings & Expressions', 'Jó reggelt, Szia, Viszontlátásra, etc.', 'common-expressions', 'notion'],
     ['Shopping & Eating Out', 'Ordering, paying, asking prices', 'shopping,restaurant', 'notion'],
-    ['Hungarian History', 'Key dates and events (895–1956)', 'history', 'notion'],
+    ['Hungarian History', 'Key dates and events (895–2004)', 'history', 'notion'],
     ['Daily Routines', 'felkelek, bemegyek — verbs in context', 'daily,verb-prefix', 'notion'],
     ['With Something (-val/-vel)', 'Instrumental case & consonant assimilation', 'instrumental-val-vel,assimilation', 'notion'],
     ['Talking About the Past', 'Past tense sentences', 'past-tense', 'notion'],
     ['Being Polite (Ön)', 'Formal/polite speech', 'formal-register', 'notion'],
     ['Time & Duration', 'Telling time, how long, since when', 'time-expressions', 'notion'],
     ['Places & Directions', 'Where? -ban/-ben, -hoz/-hez, -ból/-ből', 'inessive-ban-ben,places', 'notion'],
+    ['Citizenship Vocabulary', 'Key words for documents, offices, and status', 'citizenship-words', 'notion'],
 ];
 
 $stmt = $conn->prepare("INSERT INTO drill_groups (name, description, tag_match, source) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE description=VALUES(description), tag_match=VALUES(tag_match)");
@@ -368,6 +494,7 @@ a { color: #818cf8; }
 <div class="card">
     <h3>Summary</h3>
     <p>Total items processed: <span class="num"><?= $total ?></span></p>
+    <p><small>Data sourced from Notion workspace on 2026-03-29</small></p>
 </div>
 
 <div class="card">
@@ -383,12 +510,26 @@ a { color: #818cf8; }
     <h3>Counts by Type</h3>
     <ul>
         <li>Grammar patterns: <span class="num"><?= $counts['grammar'] ?></span></li>
-        <li>Practice sentences: <span class="num"><?= $counts['sentences'] ?></span></li>
-        <li>Vocabulary phrases: <span class="num"><?= $counts['vocab'] ?></span></li>
         <li>Interview Q&A: <span class="num"><?= $counts['interview'] ?></span></li>
-        <li>History dates: <span class="num"><?= $counts['history'] ?></span></li>
+        <li>Citizenship words: <span class="num"><?= $counts['citizenship_words'] ?></span></li>
+        <li>Practice sentences: <span class="num"><?= $counts['sentences'] ?></span></li>
+        <li>Vocabulary: <span class="num"><?= $counts['vocab'] ?></span></li>
+        <li>History → knowledge_cards: <span class="num"><?= $counts['knowledge'] ?></span></li>
+        <li>History → practice phrases: <span class="num"><?= $counts['history'] ?></span></li>
         <li>Common expressions: <span class="num"><?= $counts['expressions'] ?></span></li>
         <li>Drill groups: <span class="num"><?= count($drill_groups) ?></span></li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3>Notion Sources</h3>
+    <ul>
+        <li>Interview Q&A: <code>d1cd452f-1c5f-4d23-b5a3-2c4c34f7834e</code> (32 rows)</li>
+        <li>Citizenship Words: <code>2948fa7e-ab97-8056-97f1-000b748156f7</code> (36 rows)</li>
+        <li>Sentences to Practice: <code>eaa5d139-2afc-4cb0-abe1-97a2637b4eea</code> (13 rows)</li>
+        <li>Vocabulary: <code>e4f50d0f-52fd-463a-b9b5-63cbd497cc54</code> (8 rows)</li>
+        <li>Historical Dates: <code>2948fa7e-ab97-8029-bd28-000be901b94c</code> (12 rows)</li>
+        <li>Grammar Patterns: <code>a108ddfa-9490-45d3-9de2-5a56d84dc413</code> (41 rows)</li>
     </ul>
 </div>
 
