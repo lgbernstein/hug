@@ -411,6 +411,170 @@ Give exactly 3 key facts and 3 quiz questions. Key facts should be in Hungarian 
     exit;
 }
 
+// AJAX: generate daily study plan
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
+    header('Content-Type: application/json');
+    $blocks = [];
+    $blockNum = 0;
+
+    // 1. Count SRS due items by type
+    $duePhrases = 0; $dueGrammar = 0; $dueKnowledge = 0;
+    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND (item_type='phrase' OR item_type IS NULL) AND next_review <= NOW()");
+    if ($r) $duePhrases = (int)($r->fetch_assoc()['c'] ?? 0);
+    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND item_type='grammar' AND next_review <= NOW()");
+    if ($r) $dueGrammar = (int)($r->fetch_assoc()['c'] ?? 0);
+    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND item_type='knowledge' AND next_review <= NOW()");
+    if ($r) $dueKnowledge = (int)($r->fetch_assoc()['c'] ?? 0);
+
+    // 2. Check what was done today
+    $todayMin = 0;
+    $todayBlocks = [];
+    $r = $conn->query("SELECT block_type, SUM(duration_min) AS mins FROM study_log WHERE who='$who_safe' AND DATE(completed_at) = CURDATE() GROUP BY block_type");
+    if ($r) { while ($row = $r->fetch_assoc()) { $todayBlocks[$row['block_type']] = (int)$row['mins']; $todayMin += (int)$row['mins']; } }
+
+    // 3. Get available grammar patterns not yet mastered
+    $newGrammar = [];
+    $r = $conn->query("SELECT gp.id, gp.pattern, gp.explanation, gp.suffix_words FROM grammar_patterns gp LEFT JOIN study_history sh ON sh.item_type='grammar' AND sh.item_id=gp.id AND sh.who='$who_safe' WHERE sh.id IS NULL OR sh.pass_count < 3 ORDER BY CASE WHEN sh.id IS NULL THEN 0 ELSE 1 END, RAND() LIMIT 3");
+    if ($r) { while ($row = $r->fetch_assoc()) $newGrammar[] = $row; }
+
+    // 4. Get knowledge categories with weak coverage
+    $knowledgeCats = [];
+    $r = $conn->query("SELECT category, COUNT(*) AS total FROM knowledge_cards GROUP BY category");
+    if ($r) { while ($row = $r->fetch_assoc()) $knowledgeCats[$row['category']] = (int)$row['total']; }
+
+    // 5. Get external resources for rotation
+    $resources = [];
+    $r = $conn->query("SELECT name, url, icon, category FROM learning_resources ORDER BY sort_order");
+    if ($r) { while ($row = $r->fetch_assoc()) $resources[] = $row; }
+
+    // 6. Build blocks — alternating in-app and external, ~45 min each
+    // Block 1: SRS Review (always first if items are due)
+    $totalDue = $duePhrases + $dueGrammar + $dueKnowledge;
+    if ($totalDue > 0 && empty($todayBlocks['phrase_review'])) {
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_review', 'title' => 'Review Due Items', 'subtitle' => $totalDue . ' items due for review', 'duration' => min(45, max(15, $totalDue * 2)), 'icon' => 'rotate-ccw',
+            'session' => ['mode' => 'review', 'limit' => min(25, $totalDue)]];
+    }
+
+    // Block 2: External — Pimsleur (listening/speaking)
+    if (empty($todayBlocks['pimsleur'])) {
+        $pim = array_values(array_filter($resources, function($r) { return $r['name'] === 'Pimsleur'; }));
+        if ($pim) $blocks[] = ['type' => 'external', 'block_type' => 'pimsleur', 'title' => 'Pimsleur', 'subtitle' => 'Listening & speaking practice', 'duration' => 30, 'icon' => 'headphones', 'url' => $pim[0]['url'], 'emoji' => $pim[0]['icon']];
+    }
+
+    // Block 3: Grammar lesson
+    if (!empty($newGrammar) && empty($todayBlocks['grammar_lesson'])) {
+        $g = $newGrammar[0];
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'grammar_lesson', 'title' => 'Grammar: ' . $g['pattern'], 'subtitle' => $g['explanation'] ? substr($g['explanation'], 0, 60) . '...' : 'Learn this pattern', 'duration' => 30, 'icon' => 'book-open',
+            'session' => ['mode' => 'grammar', 'pattern_id' => (int)$g['id']]];
+    }
+
+    // Block 4: Interview simulation — personal questions
+    if (empty($todayBlocks['interview_sim'])) {
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'interview_sim', 'title' => 'Interview Practice', 'subtitle' => 'Practice answering personal questions', 'duration' => 30, 'icon' => 'message-square',
+            'session' => ['mode' => 'interview', 'cat' => 'bios', 'limit' => 10]];
+    }
+
+    // Block 5: Break
+    if (count($blocks) >= 3) {
+        $blocks[] = ['type' => 'break', 'block_type' => 'break', 'title' => 'Break', 'subtitle' => 'Rest, stretch, grab a drink', 'duration' => 15, 'icon' => 'coffee'];
+    }
+
+    // Block 6: Knowledge review
+    if (empty($todayBlocks['knowledge_review'])) {
+        $weakCat = 'history';
+        foreach ($knowledgeCats as $cat => $total) {
+            if (!isset($todayBlocks['knowledge_' . $cat])) { $weakCat = $cat; break; }
+        }
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'knowledge_review', 'title' => 'Knowledge: ' . ucfirst($weakCat), 'subtitle' => 'Quiz on ' . $weakCat . ' facts', 'duration' => 25, 'icon' => 'landmark',
+            'session' => ['mode' => 'knowledge', 'category' => $weakCat, 'limit' => 8]];
+    }
+
+    // Block 7: External — Quizlet or Drops
+    if (empty($todayBlocks['quizlet'])) {
+        $qz = array_values(array_filter($resources, function($r) { return $r['name'] === 'Quizlet'; }));
+        if ($qz) $blocks[] = ['type' => 'external', 'block_type' => 'quizlet', 'title' => 'Quizlet', 'subtitle' => 'Vocabulary flashcards', 'duration' => 25, 'icon' => 'layers', 'url' => $qz[0]['url'], 'emoji' => $qz[0]['icon']];
+    }
+
+    // Block 8: Phrase practice (all categories)
+    if (empty($todayBlocks['phrase_practice'])) {
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_practice', 'title' => 'Phrase Practice', 'subtitle' => 'Mixed pronunciation & comprehension', 'duration' => 30, 'icon' => 'mic',
+            'session' => ['mode' => 'practice', 'cat' => 'all', 'limit' => 15]];
+    }
+
+    // Block 9: External — HungarianPod101 or YouTube
+    if (empty($todayBlocks['hungarianpod'])) {
+        $hp = array_values(array_filter($resources, function($r) { return $r['name'] === 'HungarianPod101'; }));
+        if ($hp) $blocks[] = ['type' => 'external', 'block_type' => 'hungarianpod', 'title' => 'HungarianPod101', 'subtitle' => 'Podcast lessons', 'duration' => 30, 'icon' => 'radio', 'url' => $hp[0]['url'], 'emoji' => $hp[0]['icon']];
+    }
+
+    // Block 10: Free practice / weak areas
+    $blocks[] = ['type' => 'in_app', 'block_type' => 'free_practice', 'title' => 'Free Practice', 'subtitle' => 'Work on weak areas or explore', 'duration' => 30, 'icon' => 'target',
+        'session' => ['mode' => 'practice', 'cat' => 'all', 'limit' => 15]];
+
+    // Calculate streak
+    $streak = 0;
+    $r = $conn->query("SELECT DISTINCT DATE(completed_at) AS d FROM study_log WHERE who='$who_safe' ORDER BY d DESC LIMIT 60");
+    if ($r) {
+        $checkDate = new DateTime('today');
+        while ($row = $r->fetch_assoc()) {
+            $d = new DateTime($row['d']);
+            if ($d->format('Y-m-d') === $checkDate->format('Y-m-d')) {
+                $streak++;
+                $checkDate->modify('-1 day');
+            } else { break; }
+        }
+    }
+    // Also count today if any study_history was updated today
+    if ($streak === 0) {
+        $r = $conn->query("SELECT 1 FROM study_history WHERE who='$who_safe' AND DATE(last_seen) = CURDATE() LIMIT 1");
+        if ($r && $r->num_rows > 0) $streak = 1;
+    }
+
+    $totalPlanMin = 0;
+    foreach ($blocks as $b) $totalPlanMin += $b['duration'];
+
+    echo json_encode([
+        'blocks' => $blocks,
+        'streak' => $streak,
+        'today_min' => $todayMin,
+        'total_plan_min' => $totalPlanMin,
+        'due' => ['phrases' => $duePhrases, 'grammar' => $dueGrammar, 'knowledge' => $dueKnowledge],
+        'completed_blocks' => $todayBlocks
+    ]);
+    exit;
+}
+
+// AJAX: log a completed study block
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'log_block') {
+    header('Content-Type: application/json');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['error'=>'POST only']); exit; }
+    $blockType = trim($_POST['block_type'] ?? '');
+    $blockTitle = trim($_POST['block_title'] ?? '');
+    $duration = max(0, (int)($_POST['duration_min'] ?? 0));
+    $itemsCompleted = max(0, (int)($_POST['items_completed'] ?? 0));
+    $itemsPassed = max(0, (int)($_POST['items_passed'] ?? 0));
+    $startedAt = $_POST['started_at'] ?? date('Y-m-d H:i:s');
+    if (!$blockType) { echo json_encode(['error'=>'block_type required']); exit; }
+    $stmt = $conn->prepare("INSERT INTO study_log (who, block_type, block_title, duration_min, items_completed, items_passed, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('sssiiss', $who, $blockType, $blockTitle, $duration, $itemsCompleted, $itemsPassed, $startedAt);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
+// AJAX: today's study log
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'today_log') {
+    header('Content-Type: application/json');
+    $r = $conn->query("SELECT block_type, block_title, duration_min, items_completed, items_passed, started_at, completed_at FROM study_log WHERE who='$who_safe' AND DATE(completed_at) = CURDATE() ORDER BY completed_at DESC");
+    $rows = [];
+    if ($r) { while ($row = $r->fetch_assoc()) $rows[] = $row; }
+    $totalMin = 0;
+    foreach ($rows as $row) $totalMin += (int)$row['duration_min'];
+    echo json_encode(['log' => $rows, 'total_min' => $totalMin]);
+    exit;
+}
+
 // Shuffle bypasses SRS, pure random
 $shuffle = isset($_GET['shuffle']) && $_GET['shuffle'] === '1';
 if ($shuffle) {
@@ -444,7 +608,7 @@ $conn->close();
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>HUG COACH v7.0</title>
+<title>HUG COACH v8.0</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script>
@@ -605,7 +769,7 @@ select option { background: #111a2e; color: #e2e8f0; }
             </div>
             <div>
                 <span class="text-sm font-bold tracking-wide text-white">HUG COACH</span>
-                <span class="text-[10px] text-slate-500 ml-1.5">v7.0</span>
+                <span class="text-[10px] text-slate-500 ml-1.5">v8.0</span>
             </div>
         </div>
         <div class="flex items-center gap-2">
@@ -620,295 +784,146 @@ select option { background: #111a2e; color: #e2e8f0; }
         </div>
     </header>
 
-    <!-- 5-TAB NAVIGATION -->
+    <!-- 3-TAB NAVIGATION -->
     <nav id="mainNav" class="quick-bar">
-        <button onclick="showView('practice')" id="nav-practice" class="flex flex-col items-center gap-0.5 p-2 text-accent-light transition-all">
-            <i data-lucide="mic" class="w-5 h-5"></i>
-            <span class="text-[10px] font-semibold">Practice</span>
+        <button onclick="showView('today')" id="nav-today" class="flex flex-col items-center gap-0.5 px-4 py-2 text-accent-light transition-all">
+            <i data-lucide="sun" class="w-5 h-5"></i>
+            <span class="text-[10px] font-semibold">Today</span>
         </button>
-        <button onclick="showView('grammar')" id="nav-grammar" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+        <button onclick="showView('study')" id="nav-study" class="flex flex-col items-center gap-0.5 px-4 py-2 text-slate-500 hover:text-accent-light transition-all">
             <i data-lucide="book-open" class="w-5 h-5"></i>
-            <span class="text-[10px] font-semibold">Grammar</span>
+            <span class="text-[10px] font-semibold">Study</span>
         </button>
-        <button onclick="showView('knowledge')" id="nav-knowledge" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
-            <i data-lucide="landmark" class="w-5 h-5"></i>
-            <span class="text-[10px] font-semibold">Knowledge</span>
-        </button>
-        <button onclick="showView('resources')" id="nav-resources" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
-            <i data-lucide="compass" class="w-5 h-5"></i>
-            <span class="text-[10px] font-semibold">Resources</span>
-        </button>
-        <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+        <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 px-4 py-2 text-slate-500 hover:text-accent-light transition-all">
             <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
             <span class="text-[10px] font-semibold">Progress</span>
         </button>
     </nav>
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- VIEW: PRACTICE -->
+    <!-- VIEW: TODAY (command center) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="view-practice" class="view-section active space-y-4">
+    <div id="view-today" class="view-section active space-y-4">
 
-    <!-- Streak + Due + Stats Banner -->
-    <div class="flex items-center gap-2">
-        <div class="glass rounded-xl px-3 py-2 flex items-center gap-1.5">
-            <i data-lucide="flame" class="w-4 h-4 text-amber-400"></i>
-            <span id="homeStreak" class="text-sm font-black text-amber-400">0</span>
+    <!-- Day header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-lg font-bold text-white">Today's Plan</h2>
+            <p class="text-xs text-slate-400"><span id="planTotalTime">—</span> estimated</p>
         </div>
-        <div id="homeDueBadge" class="hidden glass rounded-xl px-3 py-2 flex items-center gap-1.5">
-            <div class="w-2 h-2 rounded-full bg-red-400 animate-pulse"></div>
-            <span id="homeDueCount" class="text-xs font-bold text-red-300">0 due</span>
-        </div>
-        <div class="ml-auto flex items-center gap-2 text-[10px] text-slate-500 font-medium">
-            <span><span id="homeStudied" class="text-blue-400 font-bold">—</span> studied</span>
-            <span><span id="homeMastered" class="text-green-400 font-bold">—</span> mastered</span>
+        <div class="flex items-center gap-2">
+            <div class="glass rounded-xl px-3 py-2 flex items-center gap-1.5">
+                <i data-lucide="flame" class="w-4 h-4 text-amber-400"></i>
+                <span id="planStreak" class="text-sm font-black text-amber-400">0</span>
+            </div>
+            <div class="glass rounded-xl px-3 py-2 flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-4 h-4 text-accent-light"></i>
+                <span id="planTodayMin" class="text-sm font-bold text-accent-light">0m</span>
+            </div>
         </div>
     </div>
 
-    <!-- DRILL MODE BANNER (hidden unless drill active) -->
-    <div id="drillBanner" class="hidden flex items-center justify-between bg-accent/10 border border-accent/20 rounded-xl px-4 py-2.5">
-        <div class="flex items-center gap-2">
-            <i data-lucide="dumbbell" class="w-4 h-4 text-accent-light"></i>
-            <span id="drillBannerName" class="text-sm font-bold text-white"></span>
-            <span id="drillBannerCount" class="text-[10px] text-slate-400"></span>
+    <!-- Day progress bar -->
+    <div class="flex items-center gap-3">
+        <div class="flex-1 h-2 progress-track rounded-full overflow-hidden">
+            <div id="dayProgressFill" class="h-full progress-fill rounded-full" style="width: 0%"></div>
         </div>
-        <button onclick="closeDrill()" class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-            <i data-lucide="x" class="w-3.5 h-3.5"></i> Exit
+        <span id="dayProgressLabel" class="text-[11px] text-slate-500 font-medium tabular-nums">0 / 0 blocks</span>
+    </div>
+
+    <!-- Block list -->
+    <div id="planBlockList" class="space-y-2">
+        <div class="flex flex-col items-center py-8 gap-3">
+            <div class="w-8 h-8 border-2 border-accent-light border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-slate-400 text-sm">Building your study plan...</p>
+        </div>
+    </div>
+
+    <!-- Active session card (hidden until a block is started) -->
+    <div id="sessionCard" class="hidden">
+        <div class="glass rounded-3xl overflow-hidden glow-accent">
+            <!-- Session header -->
+            <div class="flex items-center justify-between px-5 py-3 border-b border-white/5">
+                <div class="flex items-center gap-2">
+                    <span id="sessionBadge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
+                    <span id="sessionTitle" class="text-xs text-slate-400 font-medium"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="sessionProgress" class="text-[11px] text-slate-500 font-medium tabular-nums"></span>
+                    <button onclick="exitSession()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- Session progress -->
+            <div class="px-5 pt-2">
+                <div class="h-1.5 progress-track rounded-full overflow-hidden">
+                    <div id="sessionProgressFill" class="h-full progress-fill rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+            <!-- Session content (rendered dynamically) -->
+            <div id="sessionContent" class="px-5 py-6 text-center min-h-[300px] flex flex-col items-center justify-center">
+            </div>
+            <!-- Session controls -->
+            <div id="sessionControls" class="px-5 pb-5">
+            </div>
+        </div>
+    </div>
+
+    <!-- Session complete summary (hidden) -->
+    <div id="sessionSummary" class="hidden">
+        <div class="glass rounded-3xl overflow-hidden p-6 text-center glow-accent">
+            <div class="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="check-circle" class="w-7 h-7 text-green-400"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1">Block Complete!</h3>
+            <p id="summarySubtitle" class="text-xs text-slate-400 mb-4"></p>
+            <div class="flex justify-center gap-6 mb-4">
+                <div><div id="summaryScore" class="text-2xl font-black text-green-400">0%</div><div class="text-[10px] text-slate-500 uppercase">Score</div></div>
+                <div><div id="summaryItems" class="text-2xl font-black text-accent-light">0</div><div class="text-[10px] text-slate-500 uppercase">Items</div></div>
+                <div><div id="summaryTime" class="text-2xl font-black text-amber-400">0m</div><div class="text-[10px] text-slate-500 uppercase">Time</div></div>
+            </div>
+            <button onclick="closeSessionSummary()" class="w-full py-3 bg-accent hover:bg-accent-dark rounded-xl text-sm font-bold text-white transition-all">
+                Back to Plan
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="flex items-center gap-2">
+        <button onclick="quickReview()" class="flex-1 flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 transition-all">
+            <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+            <span class="text-xs font-semibold text-white">Quick Review</span>
+        </button>
+        <button onclick="switchItUp()" class="flex-1 flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 transition-all">
+            <i data-lucide="shuffle" class="w-4 h-4 text-accent-light"></i>
+            <span class="text-xs font-semibold text-white">Switch It Up</span>
         </button>
     </div>
 
-    <!-- SESSION PROGRESS -->
-    <div class="flex items-center gap-3">
-        <div class="flex-1 h-2 progress-track rounded-full overflow-hidden">
-            <div id="progressFill" class="h-full progress-fill rounded-full" style="width: 0%"></div>
-        </div>
-        <span id="progressLabel" class="text-[11px] text-slate-500 font-medium tabular-nums min-w-[3rem] text-right">0 / 10</span>
-    </div>
-
-    <!-- MAIN CARD -->
-    <main class="glass rounded-3xl overflow-hidden glow-accent">
-
-        <!-- Toolbar -->
-        <div class="flex items-center justify-between px-5 py-3 border-b border-white/5">
-            <div class="flex items-center gap-1.5">
-                <button onclick="setMode('pronunciation')" id="btnPron" class="pill pill-active">
-                    <i data-lucide="mic" class="w-3.5 h-3.5"></i> Pronounce
-                </button>
-                <button onclick="setMode('interview')" id="btnInterview" class="pill pill-inactive">
-                    <i data-lucide="message-square" class="w-3.5 h-3.5"></i> Interview
-                </button>
-            </div>
-            <div class="flex items-center gap-1">
-                <button onclick="toggleSettings()" title="Settings" class="inline-flex items-center px-2 py-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all">
-                    <i data-lucide="settings" class="w-3.5 h-3.5"></i>
-                </button>
-                <div class="flex items-center gap-1.5">
-                    <div id="readyIndicator" class="status-dot dot-off"></div>
-                    <div class="vol-track"><div id="volFill" class="vol-fill"></div></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Settings Drawer (collapsed by default) -->
-        <div id="settingsDrawer" class="border-b border-white/5" style="display:none">
-            <div class="px-5 py-2 space-y-2">
-                <!-- Strictness -->
-                <div class="flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2 flex-1">
-                        <span class="text-[10px] text-slate-300 font-semibold whitespace-nowrap">Strictness</span>
-                        <input type="range" id="strictSlider" min="1" max="5" value="2" class="w-20 h-1 accent-indigo-500 cursor-pointer">
-                        <span id="strictLabel" class="text-[10px] text-indigo-400 font-bold w-16">Meaning</span>
-                    </div>
-                    <button id="repeatFailBtn" onclick="toggleRepeatFail()" title="Speak correct answer after a fail"
-                        class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold border border-white/5">
-                        <i data-lucide="repeat" class="w-3 h-3"></i> Repeat
-                    </button>
-                </div>
-                <!-- Toggles row -->
-                <div class="flex items-center gap-2 flex-wrap">
-                    <button id="listenModeBtn" onclick="toggleListenMode()" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold border border-white/5">
-                        <i data-lucide="ear" class="w-3 h-3"></i> Listen Mode
-                    </button>
-                    <button id="autoAdvanceBtn" onclick="toggleAutoAdvance()" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold border border-white/5">
-                        <i data-lucide="timer" class="w-3 h-3"></i> Auto-Next
-                    </button>
-                </div>
-                <!-- Speed -->
-                <div class="flex items-center gap-2">
-                    <i data-lucide="gauge" class="w-3 h-3 text-slate-300"></i>
-                    <span class="text-[10px] text-slate-300 font-medium">Speed</span>
-                    <div class="flex gap-1">
-                        <button onclick="setSpeed(0.5)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="0.5">0.5x</button>
-                        <button onclick="setSpeed(0.7)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="0.7">0.7x</button>
-                        <button onclick="setSpeed(1.0)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="1.0">1.0x</button>
-                        <button onclick="setSpeed(1.3)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="1.3">1.3x</button>
-                    </div>
-                </div>
-                <!-- Categories -->
-                <div class="flex items-center gap-1.5">
-                    <button id="cat-all"  onclick="setCat('all')"  class="pill pill-active">All</button>
-                    <button id="cat-prep" onclick="setCat('prep')" class="pill pill-inactive">Phrases</button>
-                    <button id="cat-bios" onclick="setCat('bios')" class="pill pill-inactive">Personal</button>
-                    <span id="categoryTag" class="ml-auto text-[10px] text-slate-600 font-medium uppercase tracking-wider"></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Question Area -->
-        <div class="px-5 pt-6 pb-4 text-center">
-            <h1 id="questionText" class="question-text text-white mb-3"><?php echo htmlspecialchars($targetQ); ?></h1>
-            <div class="flex justify-center gap-4 mb-2">
-                <button id="translateBtn" onclick="toggleTranslation()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:text-blue-400 hover:border-blue-400/40 hover:bg-blue-400/5 transition-all">
-                    <i data-lucide="languages" class="w-4 h-4"></i>
-                    <span class="text-xs font-semibold">Translate</span>
-                </button>
-                <button id="phoneticBtn" onclick="togglePhonetic()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 text-slate-200 hover:text-amber-400 hover:border-amber-400/40 hover:bg-amber-400/5 transition-all">
-                    <i data-lucide="spell-check" class="w-4 h-4"></i>
-                    <span class="text-xs font-semibold">Phonetic</span>
-                </button>
-            </div>
-            <p id="inlineTranslation" class="hidden text-blue-300/80 text-sm mt-2 italic"></p>
-            <p id="phoneticHint" class="hidden text-amber-300/80 text-sm mt-2 font-mono tracking-wide"></p>
-        </div>
-
-        <!-- Listen Button -->
-        <div class="px-5 pb-4">
-            <button onclick="speak(currentSpeed)" id="listenBtn"
-                class="w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-6 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98] shadow-lg shadow-accent/5">
-                <i data-lucide="volume-2" class="w-8 h-8 text-accent-light group-hover:scale-110 transition-transform"></i>
-                <span id="listenBtnLabel" class="text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]">Listen &amp; Repeat</span>
-            </button>
-        </div>
-
-        <!-- Result Card -->
-        <div id="resultCard" class="hidden mx-5 mb-4 border rounded-2xl p-5 text-center transition-all">
-            <div id="matchScore" class="mb-3"></div>
-            <p id="transcript" class="text-xs italic text-slate-500 mb-2"></p>
-            <button id="playbackBtn" onclick="playMyVoice()"
-                class="hidden inline-flex items-center gap-2 bg-surface-300 hover:bg-surface-400 px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 transition-all mt-1">
-                <i data-lucide="play" class="w-3.5 h-3.5"></i> Hear Your Answer
-            </button>
-        </div>
-
-        <!-- Control Bar -->
-        <div class="px-5 pb-4">
-            <div class="flex items-center justify-center gap-3">
-                <button id="slowBtn" onclick="toggleSlow()" title="Slow playback" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
-                    <i data-lucide="snail" class="w-5 h-5"></i>
-                    <span class="text-[9px] font-semibold">Slow</span>
-                </button>
-                <button id="recordBtn" onclick="toggleMic()" title="Mic [Space]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-20 h-16 bg-green-600 hover:bg-green-500 text-white glow-green">
-                    <i id="recordIcon" data-lucide="mic" class="w-6 h-6"></i>
-                    <span id="recordLabel" class="text-[9px] font-semibold">Mic</span>
-                </button>
-                <button onclick="nextQuestion()" title="Next [Enter]" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-accent hover:bg-accent-dark text-white">
-                    <i data-lucide="arrow-right" class="w-5 h-5"></i>
-                    <span class="text-[9px] font-semibold">Next</span>
-                </button>
-                <button onclick="shuffleQuestion()" title="Random question" class="ctrl-btn flex flex-col items-center justify-center gap-0.5 w-16 h-16 bg-surface-300 hover:bg-surface-400 text-slate-200 hover:text-white">
-                    <i data-lucide="shuffle" class="w-5 h-5"></i>
-                    <span class="text-[9px] font-semibold">Shuffle</span>
-                </button>
-            </div>
-            <div class="flex items-center justify-center gap-5 mt-3 text-xs">
-                <span class="flex items-center gap-1 text-green-500/70">
-                    <i data-lucide="check" class="w-3.5 h-3.5"></i> <span id="sesPass">0</span>
-                </span>
-                <span class="flex items-center gap-1 text-red-500/70">
-                    <i data-lucide="x" class="w-3.5 h-3.5"></i> <span id="sesFail">0</span>
-                </span>
-                <span class="flex items-center gap-1 text-amber-500/70">
-                    <i data-lucide="flame" class="w-3.5 h-3.5"></i> <span id="sesStreak">0</span>
-                </span>
-            </div>
-        </div>
-
-        <!-- Reveal Answer -->
-        <div class="px-5 pb-4">
-            <details id="revealDetails" class="group">
-                <summary class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition-all cursor-pointer list-none border border-white/5">
-                    <i data-lucide="eye" class="w-4 h-4"></i>
-                    <span class="text-xs font-semibold uppercase tracking-wider">Reveal Answer</span>
-                </summary>
-                <div class="mt-3 p-5 bg-accent/5 rounded-xl border border-accent/10">
-                    <p id="answerText" class="text-lg text-slate-300 italic leading-relaxed"><?php echo htmlspecialchars($targetAH ?: $targetA); ?></p>
-                    <?php if ($targetAH && $targetA): ?>
-                    <p class="text-sm text-slate-500 mt-2"><?php echo htmlspecialchars($targetA); ?></p>
-                    <?php endif; ?>
-                </div>
-            </details>
-        </div>
-
-    </main>
-
-    <!-- Keyboard Shortcuts (desktop) -->
-    <div class="hidden md:flex items-center justify-center gap-4 text-[10px] text-slate-300 mt-2">
-        <span><span class="kbd">Space</span> Mic</span>
-        <span><span class="kbd">&larr;</span> Prev</span>
-        <span><span class="kbd">&rarr;</span> Next</span>
-        <span><span class="kbd">&uarr;</span> Hear</span>
-        <span><span class="kbd">&darr;</span> Reveal</span>
-        <span><span class="kbd">Esc</span> Stop</span>
-        <span><span class="kbd">S</span> Slow</span>
-        <span><span class="kbd">T</span> Translate</span>
-        <span><span class="kbd">P</span> Phonetic</span>
-    </div>
-
-    <!-- Focused Drill Picker -->
-    <div class="relative">
-        <select id="drillPicker" onchange="onDrillPick(this.value)"
-            class="w-full bg-surface-100 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-semibold appearance-none cursor-pointer hover:border-accent/30 transition-all focus:outline-none focus:border-accent/40 pr-10">
-            <option value="">Focused Drill...</option>
-        </select>
-        <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-    </div>
-
-    <!-- Practice Textarea -->
-    <div class="glass rounded-3xl overflow-hidden px-5 py-4">
-        <div class="flex items-center gap-2 mb-3">
-            <i data-lucide="pen-line" class="w-4 h-4 text-slate-500"></i>
-            <span class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Practice Any Phrase</span>
-            <span class="kbd ml-auto hidden md:inline-flex">Ctrl+Enter</span>
-        </div>
-        <div class="flex gap-2">
-            <textarea id="practiceInput" rows="2" placeholder="Type Hungarian or English here..."
-                oninput="this.rows = Math.max(2, this.value.split('\n').length)"
-                class="flex-1 bg-surface-50 rounded-xl px-4 py-2.5 text-white text-sm border border-white/5 focus:outline-none focus:border-accent/40 resize-none transition-colors"></textarea>
-            <div class="flex flex-col gap-1.5">
-                <button onclick="speakPractice()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Speak &amp; record">
-                    <i data-lucide="volume-2" class="w-4 h-4"></i>
-                </button>
-                <button onclick="translatePractice()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Translate">
-                    <i data-lucide="languages" class="w-4 h-4"></i>
-                </button>
-                <button id="savePhraseBtn" onclick="savePracticePhrase()" class="flex-1 bg-surface-300 hover:bg-surface-400 rounded-xl px-3 flex items-center justify-center text-slate-200 hover:text-white transition-all" title="Save to phrase list">
-                    <i data-lucide="plus" class="w-4 h-4"></i>
-                </button>
-            </div>
-        </div>
-        <p id="practiceTranslation" class="hidden text-slate-300 text-sm mt-3 italic px-1"></p>
-    </div>
-
-    </div><!-- end view-practice -->
+    </div><!-- end view-today -->
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- VIEW: GRAMMAR (patterns + drills merged) -->
+    <!-- VIEW: STUDY (Grammar + Knowledge + Resources + Phrases) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="view-grammar" class="view-section hidden space-y-4">
+    <div id="view-study" class="view-section hidden space-y-4">
 
         <div class="flex items-center justify-between">
-            <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                <i data-lucide="book-open" class="w-5 h-5 text-accent-light"></i> Grammar
-            </h2>
-            <span id="grammarCount" class="text-xs text-slate-500"></span>
+            <h2 class="text-lg font-bold text-white">Study Library</h2>
         </div>
 
-        <!-- Sub-nav: Patterns | Drills -->
-        <div class="flex items-center gap-1.5">
-            <button onclick="showGrammarSub('patterns')" id="gramSub-patterns" class="pill pill-active">Patterns</button>
-            <button onclick="showGrammarSub('drills')" id="gramSub-drills" class="pill pill-inactive">Drills</button>
-            <span id="drillGroupCount" class="text-xs text-slate-500 ml-auto"></span>
+        <!-- Sub-nav -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+            <button onclick="showStudySub('grammar')" id="studySub-grammar" class="pill pill-active">Grammar</button>
+            <button onclick="showStudySub('knowledge')" id="studySub-knowledge" class="pill pill-inactive">Knowledge</button>
+            <button onclick="showStudySub('resources')" id="studySub-resources" class="pill pill-inactive">Resources</button>
+            <button onclick="showStudySub('phrases')" id="studySub-phrases" class="pill pill-inactive">Phrases</button>
+            <span id="grammarCount" class="text-xs text-slate-500 ml-auto"></span>
+            <span id="drillGroupCount" class="text-xs text-slate-500 hidden"></span>
         </div>
+
+        <!-- Grammar sub-view -->
+        <div id="study-sub-grammar">
 
         <!-- Patterns sub-view -->
         <div id="grammar-sub-patterns">
@@ -949,19 +964,14 @@ select option { background: #111a2e; color: #e2e8f0; }
             </div>
         </div>
 
-    </div><!-- end view-grammar -->
+        </div><!-- end study-sub-grammar -->
 
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- VIEW: KNOWLEDGE -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="view-knowledge" class="view-section hidden space-y-4">
-
-        <div class="flex items-center justify-between">
-            <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                <i data-lucide="landmark" class="w-5 h-5 text-accent-light"></i> Knowledge
-            </h2>
-            <span id="knowledgeCount" class="text-xs text-slate-500"></span>
-        </div>
+        <!-- Knowledge sub-view -->
+        <div id="study-sub-knowledge" style="display:none">
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <span id="knowledgeCount" class="text-xs text-slate-500"></span>
+            </div>
 
         <!-- Category filter -->
         <div class="flex items-center gap-1.5 flex-wrap">
@@ -1026,18 +1036,12 @@ select option { background: #111a2e; color: #e2e8f0; }
             </div>
         </div>
 
-    </div><!-- end view-knowledge -->
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- VIEW: RESOURCES -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="view-resources" class="view-section hidden space-y-4">
-
-        <div class="flex items-center justify-between">
-            <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                <i data-lucide="compass" class="w-5 h-5 text-accent-light"></i> Resources
-            </h2>
         </div>
+        </div><!-- end study-sub-knowledge -->
+
+        <!-- Resources sub-view -->
+        <div id="study-sub-resources" style="display:none">
+        <div class="space-y-4">
 
         <div id="resourcesList" class="space-y-4">
             <p class="text-slate-500 text-sm text-center py-4">Loading resources...</p>
@@ -1060,7 +1064,23 @@ select option { background: #111a2e; color: #e2e8f0; }
             <div id="sheetsPreview" class="hidden space-y-3"></div>
         </div>
 
-    </div><!-- end view-resources -->
+        </div>
+        </div><!-- end study-sub-resources -->
+
+        <!-- Phrases sub-view -->
+        <div id="study-sub-phrases" style="display:none">
+        <div class="space-y-3">
+            <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+                <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                <input id="studyBrowseSearch" type="text" placeholder="Search phrases..." oninput="searchStudyPhrases()"
+                    class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+            </div>
+            <div id="studyBrowseList" class="space-y-1"></div>
+            <div class="text-center"><span id="studyBrowseCount" class="text-xs text-slate-500"></span></div>
+        </div>
+        </div><!-- end study-sub-phrases -->
+
+    </div><!-- end view-study -->
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- VIEW: PROGRESS -->
@@ -1714,8 +1734,36 @@ recognition.onresult = function(event) {
             }
             if (!questionAttempted) {
                 questionAttempted = true;
-                updateSession(data.pass);
-                recordSRS(targetQ, data.pass);
+                // If in guided session, handle via session engine
+                if (activeSession && sessionSteps.length > 0) {
+                    sessionTotalCount++;
+                    if (data.pass) sessionPassCount++;
+                    recordSRSUnified(targetQ, 'phrase', null, data.pass);
+                    // Show Next button in session
+                    var resultArea = document.getElementById('sessionResultArea');
+                    if (resultArea) {
+                        resultArea.classList.remove('hidden');
+                        resultArea.textContent = '';
+                        var badge = document.createElement('span');
+                        badge.className = data.pass ? 'inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400' : 'inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400';
+                        badge.textContent = data.pass ? 'Pass' : 'Retry';
+                        resultArea.appendChild(badge);
+                        if (data.feedback) {
+                            var fb = document.createElement('p');
+                            fb.className = 'text-xs text-slate-400 mt-1';
+                            fb.textContent = data.feedback;
+                            resultArea.appendChild(fb);
+                        }
+                        var nextBtn = document.createElement('button');
+                        nextBtn.className = 'mt-3 px-6 py-2.5 bg-accent hover:bg-accent-dark rounded-xl text-sm font-bold text-white transition-all';
+                        nextBtn.textContent = 'Next →';
+                        nextBtn.onclick = function() { sessionIdx++; renderSessionStep(); };
+                        resultArea.appendChild(nextBtn);
+                    }
+                } else {
+                    updateSession(data.pass);
+                    recordSRS(targetQ, data.pass);
+                }
             }
             lucide.createIcons();
         })
@@ -2174,8 +2222,8 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ── Tab navigation ────────────────────────────────────────────────────
-var currentView = 'practice';
-var views = ['practice', 'grammar', 'knowledge', 'resources', 'progress'];
+var currentView = 'today';
+var views = ['today', 'study', 'progress'];
 
 function showView(view) {
     currentView = view;
@@ -2184,41 +2232,37 @@ function showView(view) {
         if (el) el.classList.toggle('active', v === view);
         var nav = document.getElementById('nav-' + v);
         if (nav) {
-            if (v === view) {
-                nav.classList.add('text-accent-light');
-                nav.classList.remove('text-slate-500');
-            } else {
-                nav.classList.remove('text-accent-light');
-                nav.classList.add('text-slate-500');
-            }
+            if (v === view) { nav.classList.add('text-accent-light'); nav.classList.remove('text-slate-500'); }
+            else { nav.classList.remove('text-accent-light'); nav.classList.add('text-slate-500'); }
         }
     });
-    // Lazy load data per tab
-    if (view === 'practice') { loadHomeStats(); loadDrillGroups(); }
-    if (view === 'grammar') { loadGrammarPatterns(); loadDrillGroups(); }
-    if (view === 'knowledge') { loadKnowledgeCards(); }
-    if (view === 'resources') { loadResources(); }
+    if (view === 'today') loadDailyPlan();
+    if (view === 'study') { loadGrammarPatterns(); loadDrillGroups(); }
     if (view === 'progress') { loadProgressDashboard(); loadProgressPhrases(); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     lucide.createIcons();
 }
 
-function goHome() {
-    showView('practice');
-}
+function goHome() { showView('today'); }
 
-// Settings drawer toggle
-var settingsOpen = localStorage.getItem('hugSettingsOpen') === '1';
-function toggleSettings() {
-    settingsOpen = !settingsOpen;
-    localStorage.setItem('hugSettingsOpen', settingsOpen ? '1' : '0');
-    document.getElementById('settingsDrawer').style.display = settingsOpen ? 'block' : 'none';
+// Study tab sub-nav
+var studySub = 'grammar';
+function showStudySub(sub) {
+    studySub = sub;
+    ['grammar', 'knowledge', 'resources', 'phrases'].forEach(function(s) {
+        var el = document.getElementById('study-sub-' + s);
+        if (el) el.style.display = s === sub ? 'block' : 'none';
+        var btn = document.getElementById('studySub-' + s);
+        if (btn) btn.className = 'pill ' + (s === sub ? 'pill-active' : 'pill-inactive');
+    });
+    if (sub === 'grammar') { loadGrammarPatterns(); loadDrillGroups(); }
+    if (sub === 'knowledge') loadKnowledgeCards();
+    if (sub === 'resources') loadResources();
+    if (sub === 'phrases') loadStudyPhrases();
     lucide.createIcons();
 }
-// Init settings drawer state
-if (settingsOpen) document.getElementById('settingsDrawer').style.display = 'block';
 
-// Grammar sub-nav
+// Grammar sub-nav (patterns/drills within grammar)
 var grammarSub = 'patterns';
 function showGrammarSub(sub) {
     grammarSub = sub;
@@ -2238,6 +2282,539 @@ function showProgressSub(sub) {
     document.getElementById('progSub-dashboard').className = 'pill ' + (sub === 'dashboard' ? 'pill-active' : 'pill-inactive');
     document.getElementById('progSub-phrases').className = 'pill ' + (sub === 'phrases' ? 'pill-active' : 'pill-inactive');
     if (sub === 'phrases') loadProgressPhrases();
+}
+
+// Study phrases sub-view
+var studyPhrasesLoaded = false;
+function loadStudyPhrases() {
+    if (studyPhrasesLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=phrases')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { studyPhrasesLoaded = true; renderStudyPhrases(data); });
+}
+function searchStudyPhrases() {
+    var q = document.getElementById('studyBrowseSearch').value.trim();
+    fetch('?who=' + who + '&ajax=1&action=phrases' + (q ? '&search=' + encodeURIComponent(q) : ''))
+        .then(function(r) { return r.json(); })
+        .then(function(data) { renderStudyPhrases(data); });
+}
+function renderStudyPhrases(data) {
+    var list = document.getElementById('studyBrowseList');
+    document.getElementById('studyBrowseCount').textContent = data.length + ' phrases';
+    list.textContent = '';
+    data.forEach(function(p) {
+        var mastery = p.pass_count >= 3 ? 'mastered' : p.pass_count >= 1 ? 'known' : p.fail_count > 0 ? 'learning' : 'new';
+        var item = document.createElement('div');
+        item.className = 'phrase-item';
+        var textDiv = document.createElement('div');
+        textDiv.className = 'flex-1 min-w-0';
+        var qLine = document.createElement('p');
+        qLine.className = 'text-sm font-medium text-white truncate';
+        qLine.textContent = p.q;
+        var aLine = document.createElement('p');
+        aLine.className = 'text-xs text-slate-500 truncate';
+        aLine.textContent = p.a;
+        textDiv.appendChild(qLine);
+        textDiv.appendChild(aLine);
+        var dot = document.createElement('div');
+        dot.className = 'w-2 h-2 rounded-full mastery-' + mastery + ' ml-3';
+        item.appendChild(textDiv);
+        item.appendChild(dot);
+        list.appendChild(item);
+    });
+}
+
+// ── Daily Plan Engine ────────────────────────────────────────────────
+var dailyPlan = null;
+var dailyPlanLoaded = false;
+var activeSession = null;
+
+function loadDailyPlan() {
+    if (dailyPlanLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=daily_plan')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            dailyPlanLoaded = true;
+            dailyPlan = data;
+            renderDailyPlan(data);
+            lucide.createIcons();
+        })
+        .catch(function() {
+            document.getElementById('planBlockList').textContent = '';
+            var p = document.createElement('p');
+            p.className = 'text-slate-500 text-sm text-center py-4';
+            p.textContent = 'Could not load plan. Run migrate_v8.php first.';
+            document.getElementById('planBlockList').appendChild(p);
+        });
+}
+
+function renderDailyPlan(data) {
+    document.getElementById('planStreak').textContent = data.streak || 0;
+    document.getElementById('planTodayMin').textContent = (data.today_min || 0) + 'm';
+    var totalHrs = Math.round((data.total_plan_min || 0) / 60 * 10) / 10;
+    document.getElementById('planTotalTime').textContent = totalHrs + ' hours';
+
+    var completedTypes = data.completed_blocks || {};
+    var completedCount = Object.keys(completedTypes).length;
+    var totalBlocks = (data.blocks || []).length;
+    var pct = totalBlocks > 0 ? Math.round((completedCount / totalBlocks) * 100) : 0;
+    document.getElementById('dayProgressFill').style.width = pct + '%';
+    document.getElementById('dayProgressLabel').textContent = completedCount + ' / ' + totalBlocks + ' blocks';
+
+    var list = document.getElementById('planBlockList');
+    list.textContent = '';
+    if (!data.blocks || !data.blocks.length) {
+        var empty = document.createElement('p');
+        empty.className = 'text-green-400 text-sm text-center py-8 font-semibold';
+        empty.textContent = 'All done for today! Great work.';
+        list.appendChild(empty);
+        return;
+    }
+
+    var blockColors = {
+        'phrase_review': 'border-blue-500/20 bg-blue-500/5',
+        'grammar_lesson': 'border-purple-500/20 bg-purple-500/5',
+        'interview_sim': 'border-pink-500/20 bg-pink-500/5',
+        'knowledge_review': 'border-amber-500/20 bg-amber-500/5',
+        'phrase_practice': 'border-green-500/20 bg-green-500/5',
+        'free_practice': 'border-accent/20 bg-accent/5',
+        'break': 'border-slate-500/20 bg-slate-500/5'
+    };
+    var blockBadgeColors = {
+        'phrase_review': 'bg-blue-500/20 text-blue-400',
+        'grammar_lesson': 'bg-purple-500/20 text-purple-400',
+        'interview_sim': 'bg-pink-500/20 text-pink-400',
+        'knowledge_review': 'bg-amber-500/20 text-amber-400',
+        'phrase_practice': 'bg-green-500/20 text-green-400',
+        'free_practice': 'bg-accent/20 text-accent-light',
+        'break': 'bg-slate-500/20 text-slate-400'
+    };
+
+    data.blocks.forEach(function(block, idx) {
+        var isDone = completedTypes[block.block_type];
+        var card = document.createElement('div');
+        card.className = 'rounded-xl border p-4 transition-all ' + (isDone ? 'opacity-50 border-white/5 bg-surface-50' : (blockColors[block.block_type] || 'border-white/5 bg-surface-100'));
+
+        var top = document.createElement('div');
+        top.className = 'flex items-center gap-3';
+
+        // Icon
+        var iconWrap = document.createElement('div');
+        iconWrap.className = 'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ' + (blockBadgeColors[block.block_type] || 'bg-white/5 text-slate-400');
+        if (block.emoji) {
+            iconWrap.textContent = block.emoji;
+            iconWrap.className = 'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xl ' + (blockBadgeColors[block.block_type] || 'bg-white/5');
+        } else {
+            iconWrap.innerHTML = '<i data-lucide="' + (block.icon || 'circle') + '" class="w-5 h-5"></i>';
+        }
+        top.appendChild(iconWrap);
+
+        // Text
+        var textCol = document.createElement('div');
+        textCol.className = 'flex-1 min-w-0';
+        var title = document.createElement('h3');
+        title.className = 'text-sm font-bold ' + (isDone ? 'text-slate-500 line-through' : 'text-white');
+        title.textContent = block.title;
+        textCol.appendChild(title);
+        var sub = document.createElement('p');
+        sub.className = 'text-[11px] text-slate-400 mt-0.5';
+        sub.textContent = block.subtitle + ' · ' + block.duration + ' min';
+        textCol.appendChild(sub);
+        top.appendChild(textCol);
+
+        // Action button
+        if (!isDone) {
+            var btn = document.createElement('button');
+            if (block.type === 'external') {
+                btn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition-all bg-accent/20 text-accent-light hover:bg-accent/30';
+                btn.textContent = 'Open';
+                (function(b, i) { btn.onclick = function() { openExternalBlock(b); }; })(block, idx);
+            } else if (block.type === 'break') {
+                btn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition-all bg-surface-300 text-slate-300 hover:bg-surface-400';
+                btn.textContent = 'Done';
+                (function(b) { btn.onclick = function() { logBlock(b.block_type, b.title, b.duration, 0, 0); }; })(block);
+            } else {
+                btn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition-all bg-accent text-white hover:bg-accent-dark';
+                btn.textContent = 'Start';
+                (function(b, i) { btn.onclick = function() { startSessionBlock(b, i); }; })(block, idx);
+            }
+            top.appendChild(btn);
+        } else {
+            var check = document.createElement('span');
+            check.className = 'text-green-400 text-xs font-bold';
+            check.textContent = '✓ Done';
+            top.appendChild(check);
+        }
+
+        card.appendChild(top);
+        list.appendChild(card);
+    });
+    lucide.createIcons();
+}
+
+function openExternalBlock(block) {
+    window.open(block.url, '_blank');
+    // Show a log confirmation after a delay
+    setTimeout(function() {
+        var min = prompt('How many minutes did you spend on ' + block.title + '?', block.duration);
+        if (min !== null) {
+            logBlock(block.block_type, block.title, parseInt(min) || block.duration, 0, 0);
+        }
+    }, 2000);
+}
+
+function logBlock(blockType, title, duration, completed, passed) {
+    var fd = new FormData();
+    fd.append('block_type', blockType);
+    fd.append('block_title', title);
+    fd.append('duration_min', duration);
+    fd.append('items_completed', completed);
+    fd.append('items_passed', passed);
+    fd.append('started_at', new Date().toISOString().slice(0, 19).replace('T', ' '));
+    fetch('?who=' + who + '&ajax=1&action=log_block', { method: 'POST', body: fd })
+        .then(function() {
+            dailyPlanLoaded = false;
+            loadDailyPlan();
+        });
+}
+
+// ── Session Engine ───────────────────────────────────────────────────
+var sessionSteps = [];
+var sessionIdx = 0;
+var sessionStartTime = null;
+var sessionPassCount = 0;
+var sessionTotalCount = 0;
+var sessionBlockInfo = null;
+
+function startSessionBlock(block, blockIdx) {
+    activeSession = true;
+    sessionBlockInfo = block;
+    sessionStartTime = new Date();
+    sessionPassCount = 0;
+    sessionTotalCount = 0;
+    sessionIdx = 0;
+
+    document.getElementById('planBlockList').classList.add('hidden');
+    document.getElementById('sessionCard').classList.remove('hidden');
+    document.getElementById('sessionSummary').classList.add('hidden');
+
+    var badge = document.getElementById('sessionBadge');
+    badge.textContent = block.title;
+    badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ' +
+        (block.block_type.indexOf('grammar') !== -1 ? 'bg-purple-500/20 text-purple-400' :
+         block.block_type.indexOf('knowledge') !== -1 ? 'bg-amber-500/20 text-amber-400' :
+         block.block_type.indexOf('interview') !== -1 ? 'bg-pink-500/20 text-pink-400' :
+         'bg-accent/20 text-accent-light');
+
+    // Fetch session content based on block mode
+    var mode = block.session.mode;
+    var limit = block.session.limit || 10;
+
+    if (mode === 'review' || mode === 'practice' || mode === 'interview') {
+        var catParam = block.session.cat || 'all';
+        var modeParam = mode === 'interview' ? 'interview' : 'pronunciation';
+        // Fetch multiple phrases
+        var url = '?who=' + who + '&cat=' + catParam + '&ajax=1&action=phrases&limit=' + limit;
+        fetch(url).then(function(r) { return r.json(); }).then(function(phrases) {
+            sessionSteps = phrases.slice(0, limit).map(function(p) {
+                return { type: 'audio', q: p.q, a: p.a, a_hu: p.a_hu || '', category: p.category, mode: modeParam };
+            });
+            if (!sessionSteps.length) {
+                // Fallback to random
+                sessionSteps = [{ type: 'audio', q: targetQ, a: targetA, a_hu: targetAH, category: 'General', mode: modeParam }];
+            }
+            renderSessionStep();
+        });
+    } else if (mode === 'grammar') {
+        // Load grammar pattern + generate quiz
+        var patternId = block.session.pattern_id;
+        sessionSteps = [{ type: 'grammar_teach', pattern_id: patternId }];
+        renderSessionStep();
+    } else if (mode === 'knowledge') {
+        var kcCategory = block.session.category || '';
+        fetch('?who=' + who + '&ajax=1&action=knowledge_cards&kccat=' + kcCategory)
+            .then(function(r) { return r.json(); })
+            .then(function(cards) {
+                var shuffled = cards.sort(function() { return Math.random() - 0.5; }).slice(0, limit);
+                sessionSteps = shuffled.map(function(c) {
+                    return { type: 'knowledge', title_hu: c.title_hu, title_en: c.title_en, content_hu: c.content_hu, content_en: c.content_en, key_fact: c.key_fact, category: c.category, id: c.id };
+                });
+                renderSessionStep();
+            });
+    }
+}
+
+function renderSessionStep() {
+    if (sessionIdx >= sessionSteps.length) {
+        showBlockSummary();
+        return;
+    }
+    var step = sessionSteps[sessionIdx];
+    var content = document.getElementById('sessionContent');
+    var controls = document.getElementById('sessionControls');
+    content.textContent = '';
+    controls.textContent = '';
+
+    var pct = sessionSteps.length > 0 ? Math.round((sessionIdx / sessionSteps.length) * 100) : 0;
+    document.getElementById('sessionProgressFill').style.width = pct + '%';
+    document.getElementById('sessionProgress').textContent = (sessionIdx + 1) + ' / ' + sessionSteps.length;
+
+    if (step.type === 'audio') {
+        renderAudioStep(step, content, controls);
+    } else if (step.type === 'knowledge') {
+        renderKnowledgeStep(step, content, controls);
+    } else if (step.type === 'grammar_teach') {
+        renderGrammarTeachStep(step, content, controls);
+    }
+    lucide.createIcons();
+}
+
+function renderAudioStep(step, content, controls) {
+    // Question text
+    var q = document.createElement('h1');
+    q.className = 'question-text text-white mb-4';
+    q.textContent = step.q;
+    content.appendChild(q);
+
+    // Translation (small)
+    var trans = document.createElement('p');
+    trans.className = 'text-blue-300/70 text-sm italic mb-6';
+    trans.textContent = step.a;
+    content.appendChild(trans);
+
+    // Status indicators
+    var statusRow = document.createElement('div');
+    statusRow.className = 'flex items-center justify-center gap-2 mb-4';
+    var readyDot = document.createElement('div');
+    readyDot.id = 'readyIndicator';
+    readyDot.className = 'status-dot dot-off';
+    var volTrack = document.createElement('div');
+    volTrack.className = 'vol-track';
+    var volFillEl = document.createElement('div');
+    volFillEl.id = 'volFill';
+    volFillEl.className = 'vol-fill';
+    volTrack.appendChild(volFillEl);
+    statusRow.appendChild(readyDot);
+    statusRow.appendChild(volTrack);
+    content.appendChild(statusRow);
+
+    // Listen & Speak button
+    var listenBtn = document.createElement('button');
+    listenBtn.className = 'w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-5 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98] shadow-lg shadow-accent/5';
+    listenBtn.innerHTML = '<i data-lucide="volume-2" class="w-7 h-7 text-accent-light group-hover:scale-110 transition-transform"></i><span class="text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]">Listen &amp; Speak</span>';
+    listenBtn.onclick = function() {
+        targetQ = step.q;
+        targetA = step.a;
+        targetAH = step.a_hu || '';
+        currentMode = step.mode || 'pronunciation';
+        speak(currentSpeed);
+    };
+    controls.appendChild(listenBtn);
+
+    // Result area (filled after eval)
+    var resultArea = document.createElement('div');
+    resultArea.id = 'sessionResultArea';
+    resultArea.className = 'hidden mt-4 text-center';
+    controls.appendChild(resultArea);
+
+    // Set targets for the speech recognition system
+    targetQ = step.q;
+    targetA = step.a;
+    targetAH = step.a_hu || '';
+    currentMode = step.mode || 'pronunciation';
+}
+
+function renderKnowledgeStep(step, content, controls) {
+    // Question
+    var q = document.createElement('h1');
+    q.className = 'text-xl font-bold text-white mb-2';
+    q.textContent = step.title_en || step.title_hu;
+    content.appendChild(q);
+
+    var huTitle = document.createElement('p');
+    huTitle.className = 'text-accent-light text-lg font-semibold mb-4';
+    huTitle.textContent = step.title_hu;
+    content.appendChild(huTitle);
+
+    // Listen button
+    var listenBtn = document.createElement('button');
+    listenBtn.className = 'inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-300 text-slate-200 hover:text-white text-xs font-semibold mb-4';
+    listenBtn.textContent = '▶ Listen';
+    (function(text) { listenBtn.onclick = function() { speakHu(text); }; })(step.title_hu + '. ' + (step.content_hu || ''));
+    content.appendChild(listenBtn);
+
+    // Answer area
+    var answerDiv = document.createElement('div');
+    answerDiv.id = 'kStepAnswer';
+    answerDiv.className = 'hidden bg-accent/5 rounded-xl p-4 border border-accent/10 mt-2 mb-2';
+    if (step.content_en) {
+        var ce = document.createElement('p');
+        ce.className = 'text-sm text-slate-300 mb-1';
+        ce.textContent = step.content_en;
+        answerDiv.appendChild(ce);
+    }
+    var kf = document.createElement('p');
+    kf.className = 'text-base font-bold text-accent-light';
+    kf.textContent = step.key_fact || step.title_hu;
+    answerDiv.appendChild(kf);
+    content.appendChild(answerDiv);
+
+    // Buttons
+    var showBtn = document.createElement('button');
+    showBtn.className = 'w-full py-3 bg-surface-300 hover:bg-surface-400 rounded-xl text-sm font-bold text-white transition-all mb-2';
+    showBtn.textContent = 'Show Answer';
+    showBtn.onclick = function() {
+        answerDiv.classList.remove('hidden');
+        showBtn.classList.add('hidden');
+        actionRow.classList.remove('hidden');
+    };
+    controls.appendChild(showBtn);
+
+    var actionRow = document.createElement('div');
+    actionRow.className = 'hidden flex gap-2';
+    var gotIt = document.createElement('button');
+    gotIt.className = 'flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all';
+    gotIt.textContent = 'Got It ✓';
+    gotIt.onclick = function() {
+        sessionPassCount++;
+        sessionTotalCount++;
+        recordSRSUnified(step.title_hu, 'knowledge', step.id, true);
+        sessionIdx++;
+        renderSessionStep();
+    };
+    var again = document.createElement('button');
+    again.className = 'flex-1 py-3 bg-red-600/80 hover:bg-red-500 rounded-xl text-sm font-bold text-white transition-all';
+    again.textContent = 'Again ✗';
+    again.onclick = function() {
+        sessionTotalCount++;
+        recordSRSUnified(step.title_hu, 'knowledge', step.id, false);
+        sessionIdx++;
+        renderSessionStep();
+    };
+    actionRow.appendChild(gotIt);
+    actionRow.appendChild(again);
+    controls.appendChild(actionRow);
+}
+
+function renderGrammarTeachStep(step, content, controls) {
+    content.textContent = '';
+    var loading = document.createElement('div');
+    loading.className = 'flex flex-col items-center py-8 gap-3';
+    loading.innerHTML = '<div class="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div><p class="text-slate-400 text-sm">Generating grammar lesson...</p>';
+    content.appendChild(loading);
+
+    // Fetch grammar pattern details and teach
+    fetch('?ajax=1&action=grammar_patterns&search=')
+        .then(function(r) { return r.json(); })
+        .then(function(patterns) {
+            var p = patterns.find(function(pt) { return pt.id == step.pattern_id; }) || patterns[0];
+            if (!p) { content.textContent = 'No grammar patterns found.'; return; }
+            var fd = new FormData();
+            fd.append('pattern', p.pattern);
+            fd.append('suffix_words', p.suffix_words || '');
+            fd.append('explanation', p.explanation || '');
+            return fetch('?ajax=1&action=teach_me', { method: 'POST', body: fd });
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { content.textContent = data.error; return; }
+            content.textContent = '';
+            // Render lesson content
+            var lessonEl = document.createElement('div');
+            lessonEl.className = 'text-left space-y-4 w-full';
+            var expl = document.createElement('p');
+            expl.className = 'text-sm text-slate-200 leading-relaxed';
+            expl.textContent = data.lesson;
+            lessonEl.appendChild(expl);
+            if (data.tip) {
+                var tip = document.createElement('p');
+                tip.className = 'text-xs text-yellow-200 bg-yellow-400/5 rounded-lg p-3 border border-yellow-400/15';
+                tip.textContent = '💡 ' + data.tip;
+                lessonEl.appendChild(tip);
+            }
+            content.appendChild(lessonEl);
+
+            // Done button (marks as complete)
+            controls.textContent = '';
+            var doneBtn = document.createElement('button');
+            doneBtn.className = 'w-full py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all';
+            doneBtn.textContent = 'Got It — Next';
+            doneBtn.onclick = function() {
+                sessionPassCount++;
+                sessionTotalCount++;
+                recordSRSUnified(sessionBlockInfo.title, 'grammar', step.pattern_id, true);
+                sessionIdx++;
+                renderSessionStep();
+            };
+            controls.appendChild(doneBtn);
+        })
+        .catch(function(err) { content.textContent = 'Error loading lesson'; });
+}
+
+function recordSRSUnified(phrase, itemType, itemId, pass) {
+    var fd = new FormData();
+    fd.append('phrase', phrase);
+    fd.append('pass', pass ? '1' : '0');
+    fd.append('who', who);
+    fd.append('item_type', itemType);
+    if (itemId) fd.append('item_id', itemId);
+    fetch('record.php', { method: 'POST', body: fd }).catch(function() {});
+}
+
+function showBlockSummary() {
+    document.getElementById('sessionCard').classList.add('hidden');
+    document.getElementById('sessionSummary').classList.remove('hidden');
+    var elapsed = Math.round((new Date() - sessionStartTime) / 60000);
+    var pct = sessionTotalCount > 0 ? Math.round((sessionPassCount / sessionTotalCount) * 100) : 100;
+    document.getElementById('summaryScore').textContent = pct + '%';
+    document.getElementById('summaryItems').textContent = sessionTotalCount;
+    document.getElementById('summaryTime').textContent = elapsed + 'm';
+    document.getElementById('summarySubtitle').textContent = sessionBlockInfo ? sessionBlockInfo.title : '';
+
+    // Log the block
+    if (sessionBlockInfo) {
+        logBlock(sessionBlockInfo.block_type, sessionBlockInfo.title, elapsed || sessionBlockInfo.duration, sessionTotalCount, sessionPassCount);
+    }
+}
+
+function closeSessionSummary() {
+    activeSession = false;
+    document.getElementById('sessionSummary').classList.add('hidden');
+    document.getElementById('planBlockList').classList.remove('hidden');
+    dailyPlanLoaded = false;
+    loadDailyPlan();
+}
+
+function exitSession() {
+    activeSession = false;
+    document.getElementById('sessionCard').classList.add('hidden');
+    document.getElementById('planBlockList').classList.remove('hidden');
+    // Log partial progress
+    if (sessionBlockInfo && sessionTotalCount > 0) {
+        var elapsed = Math.round((new Date() - sessionStartTime) / 60000);
+        logBlock(sessionBlockInfo.block_type, sessionBlockInfo.title, elapsed || 1, sessionTotalCount, sessionPassCount);
+        dailyPlanLoaded = false;
+        loadDailyPlan();
+    }
+}
+
+function quickReview() {
+    startSessionBlock({
+        type: 'in_app', block_type: 'phrase_review', title: 'Quick Review', subtitle: '5 items',
+        duration: 5, icon: 'zap', session: { mode: 'review', limit: 5 }
+    }, -1);
+}
+
+function switchItUp() {
+    var types = ['grammar_lesson', 'knowledge_review', 'interview_sim', 'phrase_practice'];
+    var pick = types[Math.floor(Math.random() * types.length)];
+    var blocks = {
+        grammar_lesson: { type: 'in_app', block_type: 'grammar_lesson', title: 'Grammar Surprise', subtitle: 'Random pattern', duration: 15, icon: 'book-open', session: { mode: 'grammar', pattern_id: null } },
+        knowledge_review: { type: 'in_app', block_type: 'knowledge_review', title: 'Knowledge Quiz', subtitle: 'Random category', duration: 15, icon: 'landmark', session: { mode: 'knowledge', category: '', limit: 5 } },
+        interview_sim: { type: 'in_app', block_type: 'interview_sim', title: 'Interview Practice', subtitle: 'Personal questions', duration: 15, icon: 'message-square', session: { mode: 'interview', cat: 'bios', limit: 5 } },
+        phrase_practice: { type: 'in_app', block_type: 'phrase_practice', title: 'Phrase Sprint', subtitle: 'Quick fire phrases', duration: 15, icon: 'mic', session: { mode: 'practice', cat: 'all', limit: 8 } }
+    };
+    startSessionBlock(blocks[pick], -1);
 }
 
 // Home screen data
@@ -3381,10 +3958,7 @@ applyListenMode();
 applyAutoAdvance();
 applyTranslateState();
 applyPhoneticState();
-if (translateOn) fetchTranslation();
-if (phoneticOn) fetchPhonetic();
-updateProgressBar();
-showView('practice');
+showView('today');
 lucide.createIcons();
 </script>
 </body>
