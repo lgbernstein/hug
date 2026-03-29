@@ -57,7 +57,7 @@ if ((int)$cnt === 0) {
         ['Grammar & Textbook', 'Aktív MagyarOK', 'https://magyar-ok.hu/', '📖', 7],
         ['My Materials', 'Google Sheets', 'https://docs.google.com/spreadsheets/d/1V7ubIGvU_SCWC5z3tWzkf1c1JR02joFJqqhb1x2-bFk/edit?gid=50814931#gid=50814931', '📊', 8],
         ['My Materials', 'Notion Hub', 'https://www.notion.so/lbernstein/Learning-Hungarian-2368fa7eab9780b99fe2fc824d3efa53', '📝', 9],
-        ['My Materials', 'Google Drive', 'https://drive.google.com/', '📁', 10],
+        ['My Materials', 'Google Drive', 'https://drive.google.com/drive/folders/1cEXTtz6HFx1T7RDz3V1GpxNzXu_c5tKz?usp=sharing', '📁', 10],
     ];
     $stmt = $conn->prepare("INSERT INTO learning_resources (category, name, url, icon, sort_order) VALUES (?, ?, ?, ?, ?)");
     foreach ($resources as $r) {
