@@ -6,14 +6,8 @@ $who = in_array($who, ['Maria', 'Larry', 'All']) ? $who : 'All';
 $cat = $_GET['cat'] ?? 'all';
 $cat = in_array($cat, ['all','prep','bios']) ? $cat : 'all';
 
-// Ensure answer_hu column exists (safe for MySQL 5.7)
-$colCheck = $conn->query("SHOW COLUMNS FROM hungarian_prep LIKE 'answer_hu'");
-$hasAnswerHu = ($colCheck && $colCheck->num_rows > 0);
-// Ensure who column exists
-$whoCheck = $conn->query("SHOW COLUMNS FROM hungarian_prep LIKE 'who'");
-if ($whoCheck && $whoCheck->num_rows === 0) {
-    $conn->query("ALTER TABLE hungarian_prep ADD COLUMN `who` VARCHAR(10) DEFAULT 'All' AFTER category");
-}
+// Columns added in v5/v6 migrations — always present
+$hasAnswerHu = true;
 
 $who_safe   = $conn->real_escape_string($who);
 $bio_filter = ($who !== 'All')
@@ -117,11 +111,7 @@ function buildTagWhere($tagMatch, $conn) {
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'drill_groups') {
     header('Content-Type: application/json');
     $groups = [];
-    // Check if tag_match column exists
-    $tmCheck = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
-    $hasTM = ($tmCheck && $tmCheck->num_rows > 0);
-    $cols = $hasTM ? "id, name, description, tag_match, source" : "id, name, description, '' AS tag_match, source";
-    $r = $conn->query("SELECT $cols FROM drill_groups ORDER BY name");
+    $r = $conn->query("SELECT id, name, description, tag_match, source FROM drill_groups ORDER BY name");
     if ($r) { while ($row = $r->fetch_assoc()) {
         $tagMatch = $row['tag_match'] ?: $row['name'];
         $where = buildTagWhere($tagMatch, $conn);
@@ -139,14 +129,10 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'drill_phrases') {
     $groupName = $conn->real_escape_string($_GET['tag'] ?? '');
     if (!$groupName) { echo json_encode([]); exit; }
     // Look up tag_match from drill_groups
-    $tmCheck = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
-    $hasTM = ($tmCheck && $tmCheck->num_rows > 0);
     $tagMatch = $groupName;
-    if ($hasTM) {
-        $lookup = $conn->query("SELECT tag_match FROM drill_groups WHERE name = '$groupName' LIMIT 1");
-        if ($lookup && $row = $lookup->fetch_assoc()) {
-            $tagMatch = $row['tag_match'] ?: $groupName;
-        }
+    $lookup = $conn->query("SELECT tag_match FROM drill_groups WHERE name = '$groupName' LIMIT 1");
+    if ($lookup && $row = $lookup->fetch_assoc()) {
+        $tagMatch = $row['tag_match'] ?: $groupName;
     }
     $where = buildTagWhere($tagMatch, $conn);
     $ahuCol = $hasAnswerHu ? "COALESCE(answer_hu,'')" : "''";
@@ -209,10 +195,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'home_stats') {
     }
     // Top 5 drill groups
     $groups = [];
-    $tmCheck = $conn->query("SHOW COLUMNS FROM drill_groups LIKE 'tag_match'");
-    $hasTM = ($tmCheck && $tmCheck->num_rows > 0);
-    $cols = $hasTM ? "id, name, description, tag_match" : "id, name, description, '' AS tag_match";
-    $gq = $conn->query("SELECT $cols FROM drill_groups ORDER BY name LIMIT 6");
+    $gq = $conn->query("SELECT id, name, description, tag_match FROM drill_groups ORDER BY name LIMIT 6");
     if ($gq) { while ($row = $gq->fetch_assoc()) {
         $tagMatch = $row['tag_match'] ?: $row['name'];
         $where = buildTagWhere($tagMatch, $conn);
@@ -297,14 +280,134 @@ Give exactly 3 examples and 3 quiz questions. Make them relevant to daily life a
     exit;
 }
 
-// AJAX: skill proficiency for current user
-if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'skill_proficiency') {
+// AJAX: list learning resources
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'resources') {
     header('Content-Type: application/json');
-    $sql = "SELECT skill, pass_count, fail_count, level, last_seen FROM skill_proficiency WHERE who='$who_safe' ORDER BY fail_count DESC, skill";
-    $r = $conn->query($sql);
+    $r = $conn->query("SELECT id, category, name, url, icon, sort_order FROM learning_resources ORDER BY sort_order, category, name");
     $rows = [];
     if ($r) { while ($row = $r->fetch_assoc()) $rows[] = $row; }
     echo json_encode($rows);
+    exit;
+}
+
+// AJAX: list knowledge cards
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'knowledge_cards') {
+    header('Content-Type: application/json');
+    $kcCat = $conn->real_escape_string($_GET['kccat'] ?? '');
+    $search = $conn->real_escape_string($_GET['search'] ?? '');
+    $sql = "SELECT id, category, title_hu, title_en, content_hu, content_en, key_fact, tags FROM knowledge_cards WHERE 1=1";
+    if ($kcCat) $sql .= " AND category = '$kcCat'";
+    if ($search) $sql .= " AND (title_hu LIKE '%$search%' OR title_en LIKE '%$search%' OR content_hu LIKE '%$search%' OR content_en LIKE '%$search%')";
+    $sql .= " ORDER BY category, title_hu";
+    $r = $conn->query($sql);
+    $rows = [];
+    if ($r) { while ($row = $r->fetch_assoc()) $rows[] = $row; }
+    // Merge family cards from user_bios if category is family or all
+    if (!$kcCat || $kcCat === 'family') {
+        $bioWho = ($who !== 'All') ? "WHERE subject_name = '$who_safe'" : "";
+        $bios = $conn->query("SELECT subject_name, fact_label_hu, fact_value_hu FROM user_bios $bioWho");
+        if ($bios) {
+            while ($b = $bios->fetch_assoc()) {
+                $rows[] = [
+                    'id' => 'bio_' . md5($b['fact_label_hu'] . $b['subject_name']),
+                    'category' => 'family',
+                    'title_hu' => $b['fact_value_hu'],
+                    'title_en' => $b['fact_label_hu'],
+                    'content_hu' => $b['fact_value_hu'],
+                    'content_en' => $b['fact_label_hu'] . ' (' . $b['subject_name'] . ')',
+                    'key_fact' => $b['fact_value_hu'],
+                    'tags' => 'family,personal'
+                ];
+            }
+        }
+    }
+    echo json_encode($rows);
+    exit;
+}
+
+// AJAX: save a knowledge card
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'save_knowledge') {
+    header('Content-Type: application/json');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['error'=>'POST only']); exit; }
+    $kCat = trim($_POST['category'] ?? 'culture');
+    $tHu = trim($_POST['title_hu'] ?? '');
+    $tEn = trim($_POST['title_en'] ?? '');
+    $cHu = trim($_POST['content_hu'] ?? '');
+    $cEn = trim($_POST['content_en'] ?? '');
+    $kf  = trim($_POST['key_fact'] ?? '');
+    if (!$tHu) { echo json_encode(['error'=>'title_hu required']); exit; }
+    $stmt = $conn->prepare("INSERT IGNORE INTO knowledge_cards (category, title_hu, title_en, content_hu, content_en, key_fact) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param('ssssss', $kCat, $tHu, $tEn, $cHu, $cEn, $kf);
+    $stmt->execute();
+    $ok = $stmt->affected_rows > 0;
+    $stmt->close();
+    echo json_encode(['ok'=>true, 'msg'=> $ok ? 'Saved!' : 'Already exists']);
+    exit;
+}
+
+// AJAX: AI teach knowledge topic
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'knowledge_teach') {
+    header('Content-Type: application/json');
+    $title = trim($_POST['title'] ?? '');
+    $content = trim($_POST['content'] ?? '');
+    $kcCategory = trim($_POST['category'] ?? '');
+    if (!$title) { echo json_encode(['error' => 'No topic']); exit; }
+
+    $prompt = "You are a Hungarian citizenship interview tutor helping an English speaker prepare for the simplified naturalization interview.
+
+Teach this topic: **$title**
+" . ($content ? "Context: $content\n" : "") . "Category: $kcCategory
+
+Respond in JSON with this exact structure:
+{
+  \"lesson\": \"A clear explanation (3-4 sentences) of this topic and why it matters for the citizenship interview. Use simple English.\",
+  \"key_facts\": [
+    {\"hu\": \"Hungarian sentence or phrase\", \"en\": \"English translation\"},
+    {\"hu\": \"...\", \"en\": \"...\"},
+    {\"hu\": \"...\", \"en\": \"...\"}
+  ],
+  \"quiz\": [
+    {\"prompt\": \"A question about this topic\", \"answer\": \"The correct answer\", \"hint\": \"A helpful hint\"},
+    {\"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\"},
+    {\"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}
+  ],
+  \"tip\": \"One practical tip or mnemonic to remember this topic.\"
+}
+
+Give exactly 3 key facts and 3 quiz questions. Key facts should be in Hungarian with English translation. Quiz questions can be in English or Hungarian.";
+
+    $apiKey = $env['GEMINI_KEY'];
+    $url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=$apiKey";
+    $payload = json_encode([
+        'contents' => [['parts' => [['text' => $prompt]]]],
+        'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048, 'responseMimeType' => 'application/json']
+    ]);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+    if ($httpCode !== 200 || !$resp) {
+        $errBody = $resp ? json_decode($resp, true) : null;
+        $msg = $errBody['error']['message'] ?? ($curlErr ?: "HTTP $httpCode");
+        echo json_encode(['error' => 'Gemini API error: ' . $msg]);
+        exit;
+    }
+    $data = json_decode($resp, true);
+    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $text = preg_replace('/^```json\s*/i', '', $text);
+    $text = preg_replace('/\s*```$/', '', $text);
+    $lesson = json_decode($text, true);
+    if (!$lesson) { echo json_encode(['error' => 'Failed to parse AI response', 'raw' => $text]); exit; }
+    echo json_encode($lesson);
     exit;
 }
 
@@ -520,7 +623,7 @@ select option { background: #111a2e; color: #e2e8f0; }
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- VIEW: HOME SCREEN -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="view-home" class="view-section active space-y-4">
+    <div id="view-practice" class="view-section active space-y-4">
 
     <!-- Streak + Due + Stats Banner -->
     <div class="flex items-center gap-2">
@@ -572,13 +675,8 @@ select option { background: #111a2e; color: #e2e8f0; }
                 </button>
             </div>
             <div class="flex items-center gap-1">
-                <button id="listenModeBtn" onclick="toggleListenMode()" title="Listen mode — hides text until you click"
-                    class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold">
-                    <i data-lucide="ear" class="w-3.5 h-3.5"></i> Listen
-                </button>
-                <button id="autoAdvanceBtn" onclick="toggleAutoAdvance()" title="Auto-advance to next question on pass"
-                    class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold">
-                    <i data-lucide="timer" class="w-3.5 h-3.5"></i> Auto-Next
+                <button onclick="toggleSettings()" title="Settings" class="inline-flex items-center px-2 py-1.5 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all">
+                    <i data-lucide="settings" class="w-3.5 h-3.5"></i>
                 </button>
                 <div class="flex items-center gap-1.5">
                     <div id="readyIndicator" class="status-dot dot-off"></div>
@@ -587,25 +685,49 @@ select option { background: #111a2e; color: #e2e8f0; }
             </div>
         </div>
 
-        <!-- Strictness + Repeat -->
-        <div class="flex items-center justify-between px-5 py-2 border-b border-white/5 gap-3">
-            <div class="flex items-center gap-2 flex-1">
-                <span class="text-[10px] text-slate-300 font-semibold whitespace-nowrap">Strictness</span>
-                <input type="range" id="strictSlider" min="1" max="5" value="2" class="w-20 h-1 accent-indigo-500 cursor-pointer">
-                <span id="strictLabel" class="text-[10px] text-indigo-400 font-bold w-16">Meaning</span>
+        <!-- Settings Drawer (collapsed by default) -->
+        <div id="settingsDrawer" class="border-b border-white/5" style="display:none">
+            <div class="px-5 py-2 space-y-2">
+                <!-- Strictness -->
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 flex-1">
+                        <span class="text-[10px] text-slate-300 font-semibold whitespace-nowrap">Strictness</span>
+                        <input type="range" id="strictSlider" min="1" max="5" value="2" class="w-20 h-1 accent-indigo-500 cursor-pointer">
+                        <span id="strictLabel" class="text-[10px] text-indigo-400 font-bold w-16">Meaning</span>
+                    </div>
+                    <button id="repeatFailBtn" onclick="toggleRepeatFail()" title="Speak correct answer after a fail"
+                        class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold border border-white/5">
+                        <i data-lucide="repeat" class="w-3 h-3"></i> Repeat
+                    </button>
+                </div>
+                <!-- Toggles row -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button id="listenModeBtn" onclick="toggleListenMode()" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold border border-white/5">
+                        <i data-lucide="ear" class="w-3 h-3"></i> Listen Mode
+                    </button>
+                    <button id="autoAdvanceBtn" onclick="toggleAutoAdvance()" class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-200 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold border border-white/5">
+                        <i data-lucide="timer" class="w-3 h-3"></i> Auto-Next
+                    </button>
+                </div>
+                <!-- Speed -->
+                <div class="flex items-center gap-2">
+                    <i data-lucide="gauge" class="w-3 h-3 text-slate-300"></i>
+                    <span class="text-[10px] text-slate-300 font-medium">Speed</span>
+                    <div class="flex gap-1">
+                        <button onclick="setSpeed(0.5)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="0.5">0.5x</button>
+                        <button onclick="setSpeed(0.7)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="0.7">0.7x</button>
+                        <button onclick="setSpeed(1.0)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="1.0">1.0x</button>
+                        <button onclick="setSpeed(1.3)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="1.3">1.3x</button>
+                    </div>
+                </div>
+                <!-- Categories -->
+                <div class="flex items-center gap-1.5">
+                    <button id="cat-all"  onclick="setCat('all')"  class="pill pill-active">All</button>
+                    <button id="cat-prep" onclick="setCat('prep')" class="pill pill-inactive">Phrases</button>
+                    <button id="cat-bios" onclick="setCat('bios')" class="pill pill-inactive">Personal</button>
+                    <span id="categoryTag" class="ml-auto text-[10px] text-slate-600 font-medium uppercase tracking-wider"></span>
+                </div>
             </div>
-            <button id="repeatFailBtn" onclick="toggleRepeatFail()" title="Speak correct answer after a fail"
-                class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all text-[10px] font-semibold border border-white/5">
-                <i data-lucide="repeat" class="w-3 h-3"></i> Repeat on Fail
-            </button>
-        </div>
-
-        <!-- Category Pills -->
-        <div class="flex items-center gap-1.5 px-5 py-2.5 border-b border-white/5">
-            <button id="cat-all"  onclick="setCat('all')"  class="pill pill-active">All</button>
-            <button id="cat-prep" onclick="setCat('prep')" class="pill pill-inactive">Phrases</button>
-            <button id="cat-bios" onclick="setCat('bios')" class="pill pill-inactive">Personal</button>
-            <span id="categoryTag" class="ml-auto text-[10px] text-slate-600 font-medium uppercase tracking-wider"></span>
         </div>
 
         <!-- Question Area -->
@@ -632,18 +754,6 @@ select option { background: #111a2e; color: #e2e8f0; }
                 <i data-lucide="volume-2" class="w-8 h-8 text-accent-light group-hover:scale-110 transition-transform"></i>
                 <span id="listenBtnLabel" class="text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]">Listen &amp; Repeat</span>
             </button>
-        </div>
-
-        <!-- Speed Control -->
-        <div class="flex items-center justify-center gap-2 px-5 pb-4">
-            <i data-lucide="gauge" class="w-3.5 h-3.5 text-slate-300"></i>
-            <span class="text-[10px] text-slate-300 font-medium">Speed</span>
-            <div class="flex gap-1">
-                <button onclick="setSpeed(0.5)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="0.5">0.5x</button>
-                <button onclick="setSpeed(0.7)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="0.7">0.7x</button>
-                <button onclick="setSpeed(1.0)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="1.0">1.0x</button>
-                <button onclick="setSpeed(1.3)" class="speed-btn text-[10px] px-2 py-0.5 rounded-md font-semibold transition-all" data-speed="1.3">1.3x</button>
-            </div>
         </div>
 
         <!-- Result Card -->
@@ -720,19 +830,13 @@ select option { background: #111a2e; color: #e2e8f0; }
         <span><span class="kbd">P</span> Phonetic</span>
     </div>
 
-    <!-- Focused Drill Picker + Grammar -->
-    <div class="flex items-center gap-2">
-        <div class="flex-1 relative">
-            <select id="drillPicker" onchange="onDrillPick(this.value)"
-                class="w-full bg-surface-100 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-semibold appearance-none cursor-pointer hover:border-accent/30 transition-all focus:outline-none focus:border-accent/40 pr-10">
-                <option value="">Focused Drill...</option>
-            </select>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-        </div>
-        <button onclick="showView('grammar')" class="bg-surface-100 border border-white/10 rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-semibold text-white hover:border-accent/30 transition-all flex-shrink-0">
-            <i data-lucide="book-open" class="w-4 h-4 text-yellow-400"></i>
-            <span class="hidden sm:inline">Grammar</span>
-        </button>
+    <!-- Focused Drill Picker -->
+    <div class="relative">
+        <select id="drillPicker" onchange="onDrillPick(this.value)"
+            class="w-full bg-surface-100 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-semibold appearance-none cursor-pointer hover:border-accent/30 transition-all focus:outline-none focus:border-accent/40 pr-10">
+            <option value="">Focused Drill...</option>
+        </select>
+        <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
     </div>
 
     <!-- Practice Textarea -->
@@ -761,54 +865,50 @@ select option { background: #111a2e; color: #e2e8f0; }
         <p id="practiceTranslation" class="hidden text-slate-300 text-sm mt-3 italic px-1"></p>
     </div>
 
-    </div><!-- end view-home -->
+    </div><!-- end view-practice -->
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- VIEW: ALL DRILLS -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div id="view-drills" class="view-section hidden space-y-4">
-
-        <div class="flex items-center gap-3">
-            <button onclick="goHome()" class="p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-                <i data-lucide="arrow-left" class="w-5 h-5"></i>
-            </button>
-            <h2 class="text-lg font-bold text-white">All Drill Groups</h2>
-            <span id="drillGroupCount" class="text-xs text-slate-500 ml-auto"></span>
-        </div>
-
-        <div id="drillGroupList" class="space-y-2">
-            <p class="text-slate-500 text-sm text-center py-4">Loading drill groups...</p>
-        </div>
-
-    </div><!-- end view-drills -->
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- VIEW: GRAMMAR / LEARN -->
+    <!-- VIEW: GRAMMAR (patterns + drills merged) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div id="view-grammar" class="view-section hidden space-y-4">
 
-        <div class="flex items-center gap-3">
-            <button onclick="goHome()" class="p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-                <i data-lucide="arrow-left" class="w-5 h-5"></i>
-            </button>
-            <h2 class="text-lg font-bold text-white">Grammar Guide</h2>
-            <span id="grammarCount" class="text-xs text-slate-500 ml-auto"></span>
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="book-open" class="w-5 h-5 text-accent-light"></i> Grammar
+            </h2>
+            <span id="grammarCount" class="text-xs text-slate-500"></span>
         </div>
 
-        <!-- Search + filter -->
-        <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
-            <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
-            <input id="grammarSearch" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
-                class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
-        </div>
-        <div id="grammarTagFilter" class="flex flex-wrap gap-1.5"></div>
-
-        <!-- Pattern cards -->
-        <div id="grammarList" class="space-y-3">
-            <p class="text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
+        <!-- Sub-nav: Patterns | Drills -->
+        <div class="flex items-center gap-1.5">
+            <button onclick="showGrammarSub('patterns')" id="gramSub-patterns" class="pill pill-active">Patterns</button>
+            <button onclick="showGrammarSub('drills')" id="gramSub-drills" class="pill pill-inactive">Drills</button>
+            <span id="drillGroupCount" class="text-xs text-slate-500 ml-auto"></span>
         </div>
 
-        <!-- AI Lesson Panel (slides up over cards) -->
+        <!-- Patterns sub-view -->
+        <div id="grammar-sub-patterns">
+            <div class="space-y-4">
+                <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                    <input id="grammarSearch" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
+                        class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+                </div>
+                <div id="grammarTagFilter" class="flex flex-wrap gap-1.5"></div>
+                <div id="grammarList" class="space-y-3">
+                    <p class="text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Drills sub-view -->
+        <div id="grammar-sub-drills" style="display:none">
+            <div id="drillGroupList" class="space-y-2">
+                <p class="text-slate-500 text-sm text-center py-4">Loading drill groups...</p>
+            </div>
+        </div>
+
+        <!-- AI Lesson Panel -->
         <div id="lessonPanel" class="hidden">
             <div class="glass rounded-2xl overflow-hidden border border-accent/20">
                 <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-accent/5">
@@ -827,29 +927,179 @@ select option { background: #111a2e; color: #e2e8f0; }
 
     </div><!-- end view-grammar -->
 
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- VIEW: KNOWLEDGE -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-knowledge" class="view-section hidden space-y-4">
+
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="landmark" class="w-5 h-5 text-accent-light"></i> Knowledge
+            </h2>
+            <span id="knowledgeCount" class="text-xs text-slate-500"></span>
+        </div>
+
+        <!-- Category filter -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+            <button onclick="filterKnowledge('')" id="kc-all" class="pill pill-active">All</button>
+            <button onclick="filterKnowledge('history')" id="kc-history" class="pill pill-inactive">History</button>
+            <button onclick="filterKnowledge('geography')" id="kc-geography" class="pill pill-inactive">Geography</button>
+            <button onclick="filterKnowledge('family')" id="kc-family" class="pill pill-inactive">Family</button>
+            <button onclick="filterKnowledge('culture')" id="kc-culture" class="pill pill-inactive">Culture</button>
+        </div>
+
+        <!-- Search -->
+        <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+            <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+            <input id="knowledgeSearch" type="text" placeholder="Search knowledge cards..." oninput="searchKnowledge()"
+                class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+        </div>
+
+        <!-- Action row -->
+        <div class="flex items-center gap-2">
+            <button onclick="knowledgeQuizMode()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-500/10 text-green-400 text-xs font-semibold border border-green-500/15 hover:bg-green-500/20 transition-all">
+                <i data-lucide="brain" class="w-3.5 h-3.5"></i> Quiz Me
+            </button>
+            <button onclick="addKnowledgeCard()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-100 text-slate-300 text-xs font-semibold border border-white/10 hover:border-accent/30 transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Card
+            </button>
+        </div>
+
+        <!-- Card grid -->
+        <div id="knowledgeList" class="space-y-3">
+            <p class="text-slate-500 text-sm text-center py-4">Loading knowledge cards...</p>
+        </div>
+
+        <!-- AI Knowledge Lesson Panel -->
+        <div id="knowledgeLessonPanel" class="hidden">
+            <div class="glass rounded-2xl overflow-hidden border border-accent/20">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-accent/5">
+                    <h2 id="knowledgeLessonTitle" class="text-base font-bold flex items-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-yellow-400"></i> <span></span>
+                    </h2>
+                    <button onclick="closeKnowledgeLesson()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div id="knowledgeLessonContent" class="p-4 space-y-4">
+                    <p class="text-slate-400 text-sm text-center py-8">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Knowledge Quiz overlay -->
+        <div id="knowledgeQuizPanel" class="hidden">
+            <div class="glass rounded-2xl overflow-hidden border border-green-500/20">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-green-500/5">
+                    <h2 class="text-base font-bold flex items-center gap-2 text-green-400">
+                        <i data-lucide="brain" class="w-4 h-4"></i> Knowledge Quiz
+                    </h2>
+                    <button onclick="closeKnowledgeQuiz()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div id="knowledgeQuizContent" class="p-4 space-y-4"></div>
+            </div>
+        </div>
+
+    </div><!-- end view-knowledge -->
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- VIEW: RESOURCES -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-resources" class="view-section hidden space-y-4">
+
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="compass" class="w-5 h-5 text-accent-light"></i> Resources
+            </h2>
+        </div>
+
+        <div id="resourcesList" class="space-y-4">
+            <p class="text-slate-500 text-sm text-center py-4">Loading resources...</p>
+        </div>
+
+        <!-- Import section -->
+        <div class="glass rounded-2xl p-4 space-y-3">
+            <div class="flex items-center gap-2">
+                <i data-lucide="upload" class="w-4 h-4 text-accent-light"></i>
+                <h3 class="text-sm font-bold text-white">Import from Google Sheets</h3>
+            </div>
+            <p class="text-xs text-slate-400">Paste a Google Sheets URL to import questions and answers into your phrase bank.</p>
+            <div class="flex gap-2">
+                <input id="sheetsUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/..."
+                    class="flex-1 bg-surface-50 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 outline-none border border-white/5 focus:border-accent/40">
+                <button onclick="fetchSheetPreview()" class="px-4 py-2 bg-accent hover:bg-accent-dark rounded-xl text-xs font-bold text-white transition-all">
+                    Fetch
+                </button>
+            </div>
+            <div id="sheetsPreview" class="hidden space-y-3"></div>
+        </div>
+
+    </div><!-- end view-resources -->
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- VIEW: PROGRESS -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div id="view-progress" class="view-section hidden space-y-4">
+
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="bar-chart-3" class="w-5 h-5 text-accent-light"></i> Progress
+            </h2>
+        </div>
+
+        <!-- Sub-nav -->
+        <div class="flex items-center gap-1.5">
+            <button onclick="showProgressSub('dashboard')" id="progSub-dashboard" class="pill pill-active">Dashboard</button>
+            <button onclick="showProgressSub('phrases')" id="progSub-phrases" class="pill pill-inactive">Phrases</button>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="progress-sub-dashboard" class="space-y-4">
+            <div id="progressDashboard">
+                <p class="text-slate-500 text-sm text-center py-4">Loading stats...</p>
+            </div>
+        </div>
+
+        <!-- Phrases browser (inline) -->
+        <div id="progress-sub-phrases" style="display:none" class="space-y-3">
+            <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+                <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                <input id="progressBrowseSearch" type="text" placeholder="Search phrases..." oninput="searchProgressPhrases()"
+                    class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+            </div>
+            <div id="progressBrowseList" class="space-y-1"></div>
+            <div class="text-center">
+                <span id="progressBrowseCount" class="text-xs text-slate-500"></span>
+            </div>
+        </div>
+
+    </div><!-- end view-progress -->
+
 </div>
 
-<!-- BOTTOM QUICK BAR -->
-<nav id="quickbar-home" class="quick-bar">
-    <button onclick="openBrowse()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
-        <i data-lucide="book-open" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Browse</span>
-    </button>
-    <button onclick="openStats()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
-        <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Stats</span>
-    </button>
-    <button onclick="speak(currentSpeed, false)" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
-        <i data-lucide="volume-2" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Listen</span>
-    </button>
-    <button onclick="toggleMic()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-green-400 transition-all">
+<!-- 5-TAB BOTTOM NAVIGATION -->
+<nav id="mainNav" class="quick-bar">
+    <button onclick="showView('practice')" id="nav-practice" class="flex flex-col items-center gap-0.5 p-2 text-accent-light transition-all">
         <i data-lucide="mic" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Mic</span>
+        <span class="text-[10px] font-semibold">Practice</span>
     </button>
-    <button onclick="nextQuestion()" class="flex flex-col items-center gap-1 p-2 text-slate-200 hover:text-accent-light transition-all">
-        <i data-lucide="skip-forward" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Next</span>
+    <button onclick="showView('grammar')" id="nav-grammar" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+        <i data-lucide="book-open" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Grammar</span>
+    </button>
+    <button onclick="showView('knowledge')" id="nav-knowledge" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+        <i data-lucide="landmark" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Knowledge</span>
+    </button>
+    <button onclick="showView('resources')" id="nav-resources" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+        <i data-lucide="compass" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Resources</span>
+    </button>
+    <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+        <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Progress</span>
     </button>
 </nav>
 
@@ -1923,27 +2173,70 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ── Tab navigation ────────────────────────────────────────────────────
-var currentView = 'home';
+var currentView = 'practice';
+var views = ['practice', 'grammar', 'knowledge', 'resources', 'progress'];
 
 function showView(view) {
     currentView = view;
-    var views = ['home', 'drills', 'grammar'];
     views.forEach(function(v) {
         var el = document.getElementById('view-' + v);
         if (el) el.classList.toggle('active', v === view);
+        var nav = document.getElementById('nav-' + v);
+        if (nav) {
+            if (v === view) {
+                nav.classList.add('text-accent-light');
+                nav.classList.remove('text-slate-500');
+            } else {
+                nav.classList.remove('text-accent-light');
+                nav.classList.add('text-slate-500');
+            }
+        }
     });
-    // Show quickbar only on home
-    document.getElementById('quickbar-home').classList.toggle('hidden', view !== 'home');
-    // Lazy load
-    if (view === 'home') { loadHomeStats(); loadDrillGroups(); }
-    if (view === 'drills') loadDrillGroups();
-    if (view === 'grammar') { loadGrammarPatterns(); }
+    // Lazy load data per tab
+    if (view === 'practice') { loadHomeStats(); loadDrillGroups(); }
+    if (view === 'grammar') { loadGrammarPatterns(); loadDrillGroups(); }
+    if (view === 'knowledge') { loadKnowledgeCards(); }
+    if (view === 'resources') { loadResources(); }
+    if (view === 'progress') { loadProgressDashboard(); loadProgressPhrases(); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     lucide.createIcons();
 }
 
 function goHome() {
-    showView('home');
+    showView('practice');
+}
+
+// Settings drawer toggle
+var settingsOpen = localStorage.getItem('hugSettingsOpen') === '1';
+function toggleSettings() {
+    settingsOpen = !settingsOpen;
+    localStorage.setItem('hugSettingsOpen', settingsOpen ? '1' : '0');
+    document.getElementById('settingsDrawer').style.display = settingsOpen ? 'block' : 'none';
+    lucide.createIcons();
+}
+// Init settings drawer state
+if (settingsOpen) document.getElementById('settingsDrawer').style.display = 'block';
+
+// Grammar sub-nav
+var grammarSub = 'patterns';
+function showGrammarSub(sub) {
+    grammarSub = sub;
+    document.getElementById('grammar-sub-patterns').style.display = sub === 'patterns' ? 'block' : 'none';
+    document.getElementById('grammar-sub-drills').style.display = sub === 'drills' ? 'block' : 'none';
+    document.getElementById('gramSub-patterns').className = 'pill ' + (sub === 'patterns' ? 'pill-active' : 'pill-inactive');
+    document.getElementById('gramSub-drills').className = 'pill ' + (sub === 'drills' ? 'pill-active' : 'pill-inactive');
+    if (sub === 'drills') loadDrillGroups();
+}
+
+// Progress sub-nav
+var progressSub = 'dashboard';
+function showProgressSub(sub) {
+    progressSub = sub;
+    document.getElementById('progress-sub-dashboard').style.display = sub === 'dashboard' ? 'block' : 'none';
+    document.getElementById('progress-sub-phrases').style.display = sub === 'phrases' ? 'block' : 'none';
+    document.getElementById('progSub-dashboard').className = 'pill ' + (sub === 'dashboard' ? 'pill-active' : 'pill-inactive');
+    document.getElementById('progSub-phrases').className = 'pill ' + (sub === 'phrases' ? 'pill-active' : 'pill-inactive');
+    if (sub === 'phrases') loadProgressPhrases();
 }
 
 // Home screen data
@@ -2043,7 +2336,7 @@ function loadDrillGroups() {
 function onDrillPick(name) {
     if (!name) return;
     // Go to home view if not already there
-    if (currentView !== 'home') showView('home');
+    if (currentView !== 'practice') showView('practice');
     startDrill(name);
     document.getElementById('drillPicker').value = '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2322,11 +2615,22 @@ function teachMe(pattern) {
     fetch('?ajax=1&action=teach_me', { method: 'POST', body: fd })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            if (data.error) { content.innerHTML = '<p class="text-red-400 text-sm text-center py-4">' + data.error + '</p>'; return; }
+            if (data.error) {
+                content.textContent = '';
+                var errP = document.createElement('p');
+                errP.className = 'text-red-400 text-sm text-center py-4';
+                errP.textContent = data.error;
+                content.appendChild(errP);
+                return;
+            }
             renderLesson(data, pattern);
         })
         .catch(function(err) {
-            content.innerHTML = '<p class="text-red-400 text-sm text-center py-4">Failed to load lesson: ' + err.message + '</p>';
+            content.textContent = '';
+            var errP = document.createElement('p');
+            errP.className = 'text-red-400 text-sm text-center py-4';
+            errP.textContent = 'Failed to load lesson: ' + err.message;
+            content.appendChild(errP);
         });
 }
 
@@ -2353,7 +2657,8 @@ function renderLesson(data, pattern) {
         html += '<h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Examples</h3>';
         html += '<div class="space-y-2">';
         data.examples.forEach(function(ex, i) {
-            var huText = ex.highlight ? ex.hu.replace(ex.highlight, '<span class="text-accent-light font-bold">' + escHtml(ex.highlight) + '</span>') : escHtml(ex.hu);
+            var huEscaped = escHtml(ex.hu);
+            var huText = ex.highlight ? huEscaped.replace(escHtml(ex.highlight), '<span class="text-accent-light font-bold">' + escHtml(ex.highlight) + '</span>') : huEscaped;
             html += '<div class="bg-surface-50 rounded-lg p-3 border border-white/5">';
             html += '<div class="flex items-center justify-between">';
             html += '<p class="text-sm text-white font-medium">' + huText + '</p>';
@@ -2425,47 +2730,646 @@ function speakHu(text) {
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function escAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
-// ── Skill proficiency display ─────────────────────────────────────────
-function loadSkillProficiency() {
-    fetch('?who=' + who + '&ajax=1&action=skill_proficiency')
+// ── Knowledge tab ────────────────────────────────────────────────────
+var knowledgeLoaded = false;
+var allKnowledgeCards = [];
+var knowledgeActiveCat = '';
+
+function loadKnowledgeCards() {
+    if (knowledgeLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=knowledge_cards')
         .then(function(r) { return r.json(); })
-        .then(function(skills) {
-            var list = document.getElementById('skillList');
-            list.textContent = '';
-            if (!skills.length) {
-                var empty = document.createElement('p');
-                empty.className = 'text-slate-500 text-sm text-center py-4';
-                empty.textContent = 'Start practicing to build your skill profile.';
-                list.appendChild(empty);
+        .then(function(cards) {
+            knowledgeLoaded = true;
+            allKnowledgeCards = cards;
+            document.getElementById('knowledgeCount').textContent = cards.length + ' cards';
+            renderKnowledgeCards(cards);
+            lucide.createIcons();
+        })
+        .catch(function() {
+            document.getElementById('knowledgeList').textContent = '';
+            var p = document.createElement('p');
+            p.className = 'text-slate-500 text-sm text-center py-4';
+            p.textContent = 'Could not load cards. Run migrate_v7.php first.';
+            document.getElementById('knowledgeList').appendChild(p);
+        });
+}
+
+function filterKnowledge(cat) {
+    knowledgeActiveCat = (knowledgeActiveCat === cat) ? '' : cat;
+    ['', 'history', 'geography', 'family', 'culture'].forEach(function(c) {
+        var id = c ? 'kc-' + c : 'kc-all';
+        var el = document.getElementById(id);
+        var isActive = (c === knowledgeActiveCat) || (!knowledgeActiveCat && !c);
+        el.className = 'pill ' + (isActive ? 'pill-active' : 'pill-inactive');
+    });
+    var filtered = knowledgeActiveCat ? allKnowledgeCards.filter(function(c) { return c.category === knowledgeActiveCat; }) : allKnowledgeCards;
+    document.getElementById('knowledgeCount').textContent = filtered.length + ' cards';
+    renderKnowledgeCards(filtered);
+}
+
+var knowledgeDebounce;
+function searchKnowledge() {
+    clearTimeout(knowledgeDebounce);
+    knowledgeDebounce = setTimeout(function() {
+        var q = document.getElementById('knowledgeSearch').value.trim().toLowerCase();
+        var filtered = allKnowledgeCards.filter(function(c) {
+            if (knowledgeActiveCat && c.category !== knowledgeActiveCat) return false;
+            if (!q) return true;
+            return (c.title_hu || '').toLowerCase().indexOf(q) !== -1 ||
+                   (c.title_en || '').toLowerCase().indexOf(q) !== -1 ||
+                   (c.content_en || '').toLowerCase().indexOf(q) !== -1;
+        });
+        document.getElementById('knowledgeCount').textContent = filtered.length + ' cards';
+        renderKnowledgeCards(filtered);
+    }, 200);
+}
+
+function renderKnowledgeCards(cards) {
+    var list = document.getElementById('knowledgeList');
+    list.textContent = '';
+    if (!cards.length) {
+        var empty = document.createElement('p');
+        empty.className = 'text-slate-500 text-sm text-center py-4';
+        empty.textContent = 'No knowledge cards found.';
+        list.appendChild(empty);
+        return;
+    }
+    var catColors = { history: 'bg-amber-500/10 text-amber-400 border-amber-500/15', geography: 'bg-blue-500/10 text-blue-400 border-blue-500/15', family: 'bg-pink-500/10 text-pink-400 border-pink-500/15', culture: 'bg-purple-500/10 text-purple-400 border-purple-500/15' };
+    cards.forEach(function(c) {
+        var card = document.createElement('div');
+        card.className = 'grammar-card';
+
+        // Header: badge + title
+        var header = document.createElement('div');
+        header.className = 'flex items-start gap-2 mb-2';
+        var badge = document.createElement('span');
+        badge.className = 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border flex-shrink-0 ' + (catColors[c.category] || 'bg-white/5 text-slate-500');
+        badge.textContent = c.category;
+        var titleCol = document.createElement('div');
+        titleCol.className = 'flex-1 min-w-0';
+        var title = document.createElement('h3');
+        title.className = 'text-sm font-bold text-white leading-snug';
+        title.textContent = c.title_hu;
+        titleCol.appendChild(title);
+        if (c.title_en) {
+            var sub = document.createElement('p');
+            sub.className = 'text-xs text-slate-400 mt-0.5';
+            sub.textContent = c.title_en;
+            titleCol.appendChild(sub);
+        }
+        header.appendChild(badge);
+        header.appendChild(titleCol);
+        card.appendChild(header);
+
+        if (c.content_en) {
+            var desc = document.createElement('p');
+            desc.className = 'text-xs text-slate-400 leading-relaxed mb-2';
+            desc.textContent = c.content_en;
+            card.appendChild(desc);
+        }
+        if (c.key_fact) {
+            var fact = document.createElement('div');
+            fact.className = 'inline-block px-2 py-0.5 rounded bg-accent/10 text-[11px] font-mono text-accent-light border border-accent/15 mb-2';
+            fact.textContent = c.key_fact;
+            card.appendChild(fact);
+        }
+
+        // Actions
+        var actions = document.createElement('div');
+        actions.className = 'flex items-center gap-2';
+        var listenBtn = document.createElement('button');
+        listenBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-50 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-surface-200 transition-all';
+        listenBtn.textContent = 'Listen';
+        (function(text) { listenBtn.onclick = function(e) { e.stopPropagation(); speakHu(text); }; })(c.title_hu + '. ' + (c.content_hu || ''));
+        actions.appendChild(listenBtn);
+
+        var teachBtn = document.createElement('button');
+        teachBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-yellow-400/10 text-[11px] font-semibold text-yellow-300 hover:bg-yellow-400/20 transition-all border border-yellow-400/15';
+        teachBtn.textContent = 'Study';
+        (function(kc) { teachBtn.onclick = function(e) { e.stopPropagation(); knowledgeTeachMe(kc); }; })(c);
+        actions.appendChild(teachBtn);
+
+        card.appendChild(actions);
+        list.appendChild(card);
+    });
+    lucide.createIcons();
+}
+
+function knowledgeTeachMe(card) {
+    var panel = document.getElementById('knowledgeLessonPanel');
+    var content = document.getElementById('knowledgeLessonContent');
+    document.getElementById('knowledgeLessonTitle').querySelector('span').textContent = card.title_hu;
+    content.textContent = '';
+    var spinner = document.createElement('div');
+    spinner.className = 'flex flex-col items-center py-8 gap-3';
+    var ring = document.createElement('div');
+    ring.className = 'w-8 h-8 border-2 border-accent-light border-t-transparent rounded-full animate-spin';
+    spinner.appendChild(ring);
+    var msg = document.createElement('p');
+    msg.className = 'text-slate-400 text-sm';
+    msg.textContent = 'Generating study guide...';
+    spinner.appendChild(msg);
+    content.appendChild(spinner);
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    var fd = new FormData();
+    fd.append('title', card.title_hu + (card.title_en ? ' (' + card.title_en + ')' : ''));
+    fd.append('content', card.content_hu || card.content_en || '');
+    fd.append('category', card.category);
+
+    fetch('?ajax=1&action=knowledge_teach', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                content.textContent = '';
+                var err = document.createElement('p');
+                err.className = 'text-red-400 text-sm text-center py-4';
+                err.textContent = data.error;
+                content.appendChild(err);
                 return;
             }
-            skills.forEach(function(s) {
-                var total = (parseInt(s.pass_count) || 0) + (parseInt(s.fail_count) || 0);
-                var pct = total > 0 ? Math.round((s.pass_count / total) * 100) : 0;
-                var row = document.createElement('div');
-                row.className = 'flex items-center gap-3 p-3 rounded-xl bg-surface-50';
-
-                var nameEl = document.createElement('span');
-                nameEl.className = 'text-sm text-white font-medium flex-1';
-                nameEl.textContent = s.skill;
-
-                var barWrap = document.createElement('div');
-                barWrap.className = 'w-20 h-2 bg-surface-300 rounded-full overflow-hidden';
-                var barFill = document.createElement('div');
-                barFill.className = 'h-full rounded-full ' + (pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500');
-                barFill.style.width = pct + '%';
-                barWrap.appendChild(barFill);
-
-                var pctEl = document.createElement('span');
-                pctEl.className = 'text-xs text-slate-400 w-10 text-right';
-                pctEl.textContent = pct + '%';
-
-                row.appendChild(nameEl);
-                row.appendChild(barWrap);
-                row.appendChild(pctEl);
-                list.appendChild(row);
-            });
+            renderKnowledgeLesson(data);
+        })
+        .catch(function(err) {
+            content.textContent = '';
+            var errP = document.createElement('p');
+            errP.className = 'text-red-400 text-sm text-center py-4';
+            errP.textContent = 'Failed: ' + err.message;
+            content.appendChild(errP);
         });
+}
+
+function renderKnowledgeLesson(data) {
+    var content = document.getElementById('knowledgeLessonContent');
+    var html = '';
+    html += '<div class="bg-surface-50 rounded-xl p-4 border border-white/5"><p class="text-sm text-slate-200 leading-relaxed">' + escHtml(data.lesson) + '</p></div>';
+    if (data.tip) {
+        html += '<div class="bg-yellow-400/5 rounded-xl p-4 border border-yellow-400/15 flex items-start gap-3"><p class="text-sm text-yellow-200">' + escHtml(data.tip) + '</p></div>';
+    }
+    if (data.key_facts && data.key_facts.length) {
+        html += '<div><h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Key Facts</h3><div class="space-y-2">';
+        data.key_facts.forEach(function(f) {
+            html += '<div class="bg-surface-50 rounded-lg p-3 border border-white/5"><p class="text-sm text-white font-medium">' + escHtml(f.hu) + '</p><p class="text-xs text-slate-400 mt-1">' + escHtml(f.en) + '</p></div>';
+        });
+        html += '</div></div>';
+    }
+    if (data.quiz && data.quiz.length) {
+        html += '<div><h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Quick Quiz</h3><div class="space-y-3">';
+        data.quiz.forEach(function(q, i) {
+            html += '<div class="bg-surface-50 rounded-lg p-4 border border-white/5">';
+            html += '<p class="text-sm text-white mb-2">' + escHtml(q.prompt) + '</p>';
+            html += '<div class="flex items-center gap-2">';
+            html += '<input type="text" class="flex-1 bg-surface-300 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 outline-none border border-white/5 focus:border-accent/40" placeholder="Your answer..." id="kquiz-input-' + i + '" data-answer="' + escAttr(q.answer) + '" onkeydown="if(event.key===\'Enter\')checkKQuiz(' + i + ')">';
+            html += '<button onclick="checkKQuiz(' + i + ')" class="px-3 py-2 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-dark transition-all">Check</button></div>';
+            html += '<p class="text-xs text-slate-500 mt-1.5 hidden" id="kquiz-hint-' + i + '">' + escHtml(q.hint) + '</p>';
+            html += '<p class="text-xs mt-1.5 hidden" id="kquiz-result-' + i + '"></p></div>';
+        });
+        html += '</div></div>';
+    }
+    content.innerHTML = html;
+    lucide.createIcons();
+}
+
+function checkKQuiz(idx) {
+    var input = document.getElementById('kquiz-input-' + idx);
+    var result = document.getElementById('kquiz-result-' + idx);
+    var hint = document.getElementById('kquiz-hint-' + idx);
+    result.classList.remove('hidden');
+    if (input.value.toLowerCase().trim() === input.dataset.answer.toLowerCase().trim()) {
+        result.className = 'text-xs mt-1.5 text-green-400 font-semibold';
+        result.textContent = 'Correct!';
+    } else {
+        result.className = 'text-xs mt-1.5 text-red-400';
+        result.textContent = 'Answer: ' + input.dataset.answer;
+        hint.classList.remove('hidden');
+    }
+}
+
+function closeKnowledgeLesson() { document.getElementById('knowledgeLessonPanel').classList.add('hidden'); }
+
+function knowledgeQuizMode() {
+    var cards = knowledgeActiveCat ? allKnowledgeCards.filter(function(c) { return c.category === knowledgeActiveCat; }) : allKnowledgeCards;
+    if (cards.length < 3) { alert('Need at least 3 cards for a quiz.'); return; }
+    var shuffled = cards.slice().sort(function() { return Math.random() - 0.5; }).slice(0, 5);
+    var panel = document.getElementById('knowledgeQuizPanel');
+    var content = document.getElementById('knowledgeQuizContent');
+    content.textContent = '';
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth' });
+    shuffled.forEach(function(c, i) {
+        var card = document.createElement('div');
+        card.className = 'bg-surface-50 rounded-lg p-4 border border-white/5';
+        var prompt = document.createElement('p');
+        prompt.className = 'text-sm text-white mb-2 font-medium';
+        prompt.textContent = c.title_en || ('Translate: ' + c.title_hu);
+        card.appendChild(prompt);
+        var row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'flex-1 bg-surface-300 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 outline-none border border-white/5 focus:border-accent/40';
+        inp.placeholder = 'Answer in Hungarian...';
+        inp.id = 'kqm-input-' + i;
+        inp.dataset.answer = c.key_fact || c.title_hu;
+        var btn = document.createElement('button');
+        btn.className = 'px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-500 transition-all';
+        btn.textContent = 'Check';
+        (function(idx) { btn.onclick = function() { checkKQM(idx); }; })(i);
+        row.appendChild(inp);
+        row.appendChild(btn);
+        card.appendChild(row);
+        var res = document.createElement('p');
+        res.className = 'text-xs mt-1.5 hidden';
+        res.id = 'kqm-result-' + i;
+        card.appendChild(res);
+        content.appendChild(card);
+    });
+}
+
+function checkKQM(idx) {
+    var input = document.getElementById('kqm-input-' + idx);
+    var result = document.getElementById('kqm-result-' + idx);
+    var answer = input.dataset.answer.toLowerCase().trim();
+    var userAnswer = input.value.toLowerCase().trim();
+    result.classList.remove('hidden');
+    if (userAnswer === answer || answer.indexOf(userAnswer) !== -1) {
+        result.className = 'text-xs mt-1.5 text-green-400 font-semibold';
+        result.textContent = 'Correct!';
+    } else {
+        result.className = 'text-xs mt-1.5 text-red-400';
+        result.textContent = 'Answer: ' + input.dataset.answer;
+    }
+}
+
+function closeKnowledgeQuiz() { document.getElementById('knowledgeQuizPanel').classList.add('hidden'); }
+
+function addKnowledgeCard() {
+    var title = prompt('Title in Hungarian:');
+    if (!title) return;
+    var titleEn = prompt('Title in English (optional):') || '';
+    var kcat = prompt('Category (history/geography/family/culture):') || 'culture';
+    var fd = new FormData();
+    fd.append('category', kcat);
+    fd.append('title_hu', title);
+    fd.append('title_en', titleEn);
+    fetch('?ajax=1&action=save_knowledge', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            alert(data.msg || data.error);
+            knowledgeLoaded = false;
+            loadKnowledgeCards();
+        });
+}
+
+// ── Resources tab ────────────────────────────────────────────────────
+var resourcesLoaded = false;
+
+function loadResources() {
+    if (resourcesLoaded) return;
+    fetch('?ajax=1&action=resources')
+        .then(function(r) { return r.json(); })
+        .then(function(resources) {
+            resourcesLoaded = true;
+            renderResources(resources);
+            lucide.createIcons();
+        })
+        .catch(function() {
+            var el = document.getElementById('resourcesList');
+            el.textContent = '';
+            var p = document.createElement('p');
+            p.className = 'text-slate-500 text-sm text-center py-4';
+            p.textContent = 'Could not load resources. Run migrate_v7.php first.';
+            el.appendChild(p);
+        });
+}
+
+function renderResources(resources) {
+    var list = document.getElementById('resourcesList');
+    list.textContent = '';
+    if (!resources.length) {
+        var p = document.createElement('p');
+        p.className = 'text-slate-500 text-sm text-center py-4';
+        p.textContent = 'No resources yet. Run migrate_v7.php to seed them.';
+        list.appendChild(p);
+        return;
+    }
+    var groups = {};
+    resources.forEach(function(r) {
+        if (!groups[r.category]) groups[r.category] = [];
+        groups[r.category].push(r);
+    });
+    Object.keys(groups).forEach(function(cat) {
+        var section = document.createElement('div');
+        section.className = 'space-y-2';
+        var header = document.createElement('h3');
+        header.className = 'text-xs font-bold text-slate-400 uppercase tracking-wider';
+        header.textContent = cat;
+        section.appendChild(header);
+
+        var grid = document.createElement('div');
+        grid.className = 'grid grid-cols-2 sm:grid-cols-3 gap-2';
+        groups[cat].forEach(function(r) {
+            var link = document.createElement('a');
+            link.href = r.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.className = 'flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 hover:bg-surface-200 transition-all';
+            var icon = document.createElement('span');
+            icon.className = 'text-lg';
+            icon.textContent = r.icon || '🔗';
+            var name = document.createElement('span');
+            name.className = 'text-sm font-semibold text-white';
+            name.textContent = r.name;
+            link.appendChild(icon);
+            link.appendChild(name);
+            grid.appendChild(link);
+        });
+        section.appendChild(grid);
+        list.appendChild(section);
+    });
+}
+
+// ── Google Sheets import (basic) ─────────────────────────────────────
+function fetchSheetPreview() {
+    var url = document.getElementById('sheetsUrl').value.trim();
+    if (!url) return;
+    var preview = document.getElementById('sheetsPreview');
+    preview.classList.remove('hidden');
+    preview.textContent = '';
+    var loading = document.createElement('p');
+    loading.className = 'text-slate-400 text-sm';
+    loading.textContent = 'Fetching sheet...';
+    preview.appendChild(loading);
+
+    fetch('import_sheets.php?action=fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'url=' + encodeURIComponent(url)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) {
+            preview.textContent = '';
+            var err = document.createElement('p');
+            err.className = 'text-red-400 text-sm';
+            err.textContent = data.error;
+            preview.appendChild(err);
+            return;
+        }
+        renderSheetPreview(data, url);
+    })
+    .catch(function(err) {
+        preview.textContent = '';
+        var errP = document.createElement('p');
+        errP.className = 'text-red-400 text-sm';
+        errP.textContent = 'Error: ' + err.message;
+        preview.appendChild(errP);
+    });
+}
+
+function renderSheetPreview(data, url) {
+    var preview = document.getElementById('sheetsPreview');
+    preview.textContent = '';
+    var info = document.createElement('p');
+    info.className = 'text-green-400 text-xs font-semibold';
+    info.textContent = data.total_rows + ' rows found';
+    preview.appendChild(info);
+
+    // Column mapping selects
+    var mapGrid = document.createElement('div');
+    mapGrid.className = 'grid grid-cols-2 gap-2';
+    var headers = data.headers || [];
+    ['question_hu', 'answer_hu', 'answer_en', 'category'].forEach(function(field) {
+        var wrap = document.createElement('div');
+        var label = document.createElement('label');
+        label.className = 'text-[10px] text-slate-400 font-semibold uppercase';
+        label.textContent = field;
+        wrap.appendChild(label);
+        var sel = document.createElement('select');
+        sel.id = 'map-' + field;
+        sel.className = 'w-full bg-surface-300 rounded-lg px-2 py-1.5 text-xs text-white border border-white/5';
+        var skip = document.createElement('option');
+        skip.value = '-1';
+        skip.textContent = '-- skip --';
+        sel.appendChild(skip);
+        headers.forEach(function(h, i) {
+            var opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = h;
+            if (h.toLowerCase().indexOf(field.replace('_', ' ')) !== -1) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        wrap.appendChild(sel);
+        mapGrid.appendChild(wrap);
+    });
+    preview.appendChild(mapGrid);
+
+    var importBtn = document.createElement('button');
+    importBtn.className = 'w-full py-2 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all mt-2';
+    importBtn.textContent = 'Import ' + data.total_rows + ' rows';
+    (function(u) { importBtn.onclick = function() { confirmSheetImport(u); }; })(url);
+    preview.appendChild(importBtn);
+}
+
+function confirmSheetImport(url) {
+    var preview = document.getElementById('sheetsPreview');
+    var fields = {};
+    ['question_hu', 'answer_hu', 'answer_en', 'category'].forEach(function(f) {
+        var sel = document.getElementById('map-' + f);
+        fields['col_' + f] = sel ? sel.value : '-1';
+    });
+    preview.textContent = '';
+    var loading = document.createElement('p');
+    loading.className = 'text-slate-400 text-sm';
+    loading.textContent = 'Importing...';
+    preview.appendChild(loading);
+    var body = 'url=' + encodeURIComponent(url);
+    Object.keys(fields).forEach(function(k) { body += '&' + k + '=' + fields[k]; });
+    body += '&who=' + who;
+
+    fetch('import_sheets.php?action=import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        preview.textContent = '';
+        var msg = document.createElement('p');
+        if (data.error) {
+            msg.className = 'text-red-400 text-sm';
+            msg.textContent = data.error;
+        } else {
+            msg.className = 'text-green-400 text-sm font-semibold';
+            msg.textContent = 'Imported ' + data.imported + ' phrases (' + data.skipped + ' skipped, ' + data.duplicates + ' duplicates)';
+        }
+        preview.appendChild(msg);
+    })
+    .catch(function(err) {
+        preview.textContent = '';
+        var errP = document.createElement('p');
+        errP.className = 'text-red-400 text-sm';
+        errP.textContent = 'Error: ' + err.message;
+        preview.appendChild(errP);
+    });
+}
+
+// ── Progress tab (inline stats + phrases) ────────────────────────────
+var progressDashboardLoaded = false;
+var progressPhrasesLoaded = false;
+
+function loadProgressDashboard() {
+    if (progressDashboardLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=stats')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            progressDashboardLoaded = true;
+            renderProgressDashboard(data);
+        });
+}
+
+function renderProgressDashboard(data) {
+    var container = document.getElementById('progressDashboard');
+    container.textContent = '';
+    var pct = data.total > 0 ? Math.round((data.mastered / data.total) * 100) : 0;
+    var studiedPct = data.total > 0 ? Math.round((data.studied / data.total) * 100) : 0;
+
+    var grid = document.createElement('div');
+    grid.className = 'grid grid-cols-2 gap-3';
+    grid.appendChild(makeStatCard('Total Phrases', data.total));
+    grid.appendChild(makeStatCard('Studied', data.studied + ' (' + studiedPct + '%)'));
+    grid.appendChild(makeStatCard('Mastered', data.mastered + ' (' + pct + '%)'));
+    grid.appendChild(makeStatCard('Due for Review', data.due));
+    container.appendChild(grid);
+
+    // Mastery bar
+    var barSection = document.createElement('div');
+    barSection.className = 'mt-4';
+    var barLabel = document.createElement('h3');
+    barLabel.className = 'text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
+    barLabel.textContent = 'Overall Mastery';
+    barSection.appendChild(barLabel);
+    var barTrack = document.createElement('div');
+    barTrack.className = 'h-3 bg-surface-50 rounded-full overflow-hidden';
+    var barFill = document.createElement('div');
+    barFill.className = 'h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all';
+    barFill.style.width = pct + '%';
+    barTrack.appendChild(barFill);
+    barSection.appendChild(barTrack);
+    container.appendChild(barSection);
+
+    // Weak phrases
+    if (data.weak && data.weak.length) {
+        var weakSection = document.createElement('div');
+        weakSection.className = 'mt-4';
+        var weakLabel = document.createElement('h3');
+        weakLabel.className = 'text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
+        weakLabel.textContent = 'Needs Practice';
+        weakSection.appendChild(weakLabel);
+        data.weak.forEach(function(w) {
+            var row = document.createElement('div');
+            row.className = 'flex items-center justify-between p-2.5 rounded-lg bg-surface-50 mb-1';
+            var phrase = document.createElement('span');
+            phrase.className = 'text-sm text-white truncate flex-1 mr-3';
+            phrase.textContent = w.phrase;
+            var fails = document.createElement('span');
+            fails.className = 'text-xs text-red-400 whitespace-nowrap';
+            fails.textContent = w.fail_count + ' fails';
+            row.appendChild(phrase);
+            row.appendChild(fails);
+            weakSection.appendChild(row);
+        });
+        container.appendChild(weakSection);
+    }
+
+    // Recent activity
+    if (data.recent && data.recent.length) {
+        var recentSection = document.createElement('div');
+        recentSection.className = 'mt-4';
+        var recentLabel = document.createElement('h3');
+        recentLabel.className = 'text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
+        recentLabel.textContent = 'Recent Activity';
+        recentSection.appendChild(recentLabel);
+        data.recent.forEach(function(r) {
+            var row = document.createElement('div');
+            row.className = 'flex items-center justify-between p-2.5 rounded-lg bg-surface-50 mb-1';
+            var phrase = document.createElement('span');
+            phrase.className = 'text-sm text-white truncate flex-1 mr-3';
+            phrase.textContent = r.phrase;
+            var date = document.createElement('span');
+            date.className = 'text-[10px] text-slate-500';
+            date.textContent = (r.last_seen || '').substring(0, 10);
+            row.appendChild(phrase);
+            row.appendChild(date);
+            recentSection.appendChild(row);
+        });
+        container.appendChild(recentSection);
+    }
+}
+
+function loadProgressPhrases() {
+    if (progressPhrasesLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=phrases')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            progressPhrasesLoaded = true;
+            renderProgressPhrases(data);
+        });
+}
+
+function searchProgressPhrases() {
+    var q = document.getElementById('progressBrowseSearch').value.trim();
+    fetch('?who=' + who + '&ajax=1&action=phrases' + (q ? '&search=' + encodeURIComponent(q) : ''))
+        .then(function(r) { return r.json(); })
+        .then(function(data) { renderProgressPhrases(data); });
+}
+
+function renderProgressPhrases(data) {
+    var list = document.getElementById('progressBrowseList');
+    document.getElementById('progressBrowseCount').textContent = data.length + ' phrases';
+    list.textContent = '';
+    if (!data.length) {
+        var empty = document.createElement('p');
+        empty.className = 'text-slate-500 text-sm text-center py-8';
+        empty.textContent = 'No phrases found.';
+        list.appendChild(empty);
+        return;
+    }
+    data.forEach(function(p) {
+        var mastery = p.pass_count >= 3 ? 'mastered' : p.pass_count >= 1 ? 'known' : p.fail_count > 0 ? 'learning' : 'new';
+        var item = document.createElement('div');
+        item.className = 'phrase-item';
+        (function(q, a) {
+            item.onclick = function() {
+                showView('practice');
+                setTimeout(function() { jumpToPhrase(q, a); }, 100);
+            };
+        })(p.q, p.a);
+        var textDiv = document.createElement('div');
+        textDiv.className = 'flex-1 min-w-0';
+        var qLine = document.createElement('p');
+        qLine.className = 'text-sm font-medium text-white truncate';
+        qLine.textContent = p.q;
+        var aLine = document.createElement('p');
+        aLine.className = 'text-xs text-slate-500 truncate';
+        aLine.textContent = p.a;
+        textDiv.appendChild(qLine);
+        textDiv.appendChild(aLine);
+        var metaDiv = document.createElement('div');
+        metaDiv.className = 'flex items-center gap-2 ml-3';
+        var catSpan = document.createElement('span');
+        catSpan.className = 'text-[10px] text-slate-600';
+        catSpan.textContent = p.category;
+        var dot = document.createElement('div');
+        dot.className = 'w-2 h-2 rounded-full mastery-' + mastery;
+        metaDiv.appendChild(catSpan);
+        metaDiv.appendChild(dot);
+        item.appendChild(textDiv);
+        item.appendChild(metaDiv);
+        list.appendChild(item);
+    });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
@@ -2479,7 +3383,7 @@ applyPhoneticState();
 if (translateOn) fetchTranslation();
 if (phoneticOn) fetchPhonetic();
 updateProgressBar();
-showView('home');
+showView('practice');
 lucide.createIcons();
 </script>
 </body>
