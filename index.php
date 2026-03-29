@@ -55,6 +55,22 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'save_phrase') {
     exit;
 }
 
+// AJAX: save a user bio fact
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'save_bio') {
+    header('Content-Type: application/json');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['error'=>'POST only']); exit; }
+    $subj = trim($_POST['subject_name'] ?? '');
+    $label = trim($_POST['fact_label_hu'] ?? '');
+    $value = trim($_POST['fact_value_hu'] ?? '');
+    if (!$subj || !$label) { echo json_encode(['error'=>'subject_name and fact_label_hu required']); exit; }
+    $stmt = $conn->prepare("INSERT INTO user_bios (subject_name, fact_label_hu, fact_value_hu) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE fact_value_hu = VALUES(fact_value_hu)");
+    $stmt->bind_param('sss', $subj, $label, $value);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['ok'=>true]);
+    exit;
+}
+
 // AJAX: list all phrases for browser
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'phrases') {
     header('Content-Type: application/json');
