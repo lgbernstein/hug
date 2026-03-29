@@ -1153,18 +1153,22 @@ var questionHistory = [{ q: targetQ, a: targetA, a_hu: targetAH }];
 var historyIndex = 0;
 
 var strictLabels = { 1: 'Relaxed', 2: 'Meaning', 3: 'Balanced', 4: 'Strict', 5: 'Exam' };
-document.getElementById('strictSlider').value = strictness;
-document.getElementById('strictLabel').textContent = strictLabels[strictness];
-document.getElementById('strictSlider').addEventListener('input', function() {
-    strictness = parseInt(this.value);
-    localStorage.setItem('hugStrict', strictness);
+var strictSliderEl = document.getElementById('strictSlider');
+if (strictSliderEl) {
+    strictSliderEl.value = strictness;
     document.getElementById('strictLabel').textContent = strictLabels[strictness];
-});
+    strictSliderEl.addEventListener('input', function() {
+        strictness = parseInt(this.value);
+        localStorage.setItem('hugStrict', strictness);
+        document.getElementById('strictLabel').textContent = strictLabels[strictness];
+    });
+}
 
 function toggleRepeatFail() {
     repeatOnFail = !repeatOnFail;
     localStorage.setItem('hugRepeatFail', repeatOnFail ? '1' : '0');
     var btn = document.getElementById('repeatFailBtn');
+    if (!btn) return;
     if (repeatOnFail) {
         btn.classList.add('bg-indigo-600/30', 'border-indigo-500/50', 'text-white');
         btn.classList.remove('border-white/5', 'text-slate-300');
@@ -1190,9 +1194,12 @@ let sessionPass = 0, sessionFail = 0, sessionStreak = 0, sessionBestStreak = 0, 
 const SESSION_SIZE = 10;
 
 function updateProgressBar() {
+    var pf = document.getElementById('progressFill');
+    var pl = document.getElementById('progressLabel');
+    if (!pf || !pl) return;
     const pct = Math.min(100, (sessionCount / SESSION_SIZE) * 100);
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressLabel').textContent = sessionCount + ' / ' + SESSION_SIZE;
+    pf.style.width = pct + '%';
+    pl.textContent = sessionCount + ' / ' + SESSION_SIZE;
 }
 
 function updateSession(pass) {
@@ -2820,33 +2827,7 @@ function switchItUp() {
 // Home screen data
 var homeLoaded = false;
 function loadHomeStats() {
-    fetch('?who=' + who + '&ajax=1&action=home_stats')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            homeLoaded = true;
-            document.getElementById('homeStreak').textContent = data.streak || 0;
-            document.getElementById('homeStudied').textContent = data.studied || 0;
-            document.getElementById('homeMastered').textContent = data.mastered || 0;
-
-            // Due badge
-            var badge = document.getElementById('homeDueBadge');
-            if (data.due > 0) {
-                badge.classList.remove('hidden');
-                document.getElementById('homeDueCount').textContent = data.due + ' due';
-            } else {
-                badge.classList.add('hidden');
-            }
-
-            // Counts on drill/grammar buttons
-            // These elements may exist depending on layout
-            var gc = document.getElementById('homeGrammarCount');
-            if (gc && data.grammar_count) gc.textContent = data.grammar_count + ' patterns';
-            var dc = document.getElementById('homeDrillCount');
-            var drillCount = (data.groups || []).filter(function(g) { return g.phrase_count > 0; }).length;
-            if (dc && drillCount) dc.textContent = drillCount + ' groups';
-            lucide.createIcons();
-        })
-        .catch(function() {});
+    // Home stats are now shown via daily plan; this is kept for backward compat
 }
 
 
@@ -3951,13 +3932,14 @@ function renderProgressPhrases(data) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
-setMode(currentMode);
-setCat(cat, true);
-setSpeed(currentSpeed);
-applyListenMode();
-applyAutoAdvance();
-applyTranslateState();
-applyPhoneticState();
+// Guard old practice card inits — elements may not exist in v8 layout
+try { setMode(currentMode); } catch(e) {}
+try { setCat(cat, true); } catch(e) {}
+try { setSpeed(currentSpeed); } catch(e) {}
+try { applyListenMode(); } catch(e) {}
+try { applyAutoAdvance(); } catch(e) {}
+try { applyTranslateState(); } catch(e) {}
+try { applyPhoneticState(); } catch(e) {}
 showView('today');
 lucide.createIcons();
 </script>
