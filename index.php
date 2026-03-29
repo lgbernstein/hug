@@ -500,8 +500,8 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .mastery-mastered { background: #22c55e; }
 .question-text { font-size: clamp(1.5rem, 5vw, 3rem); line-height: 1.2; font-weight: 800; letter-spacing: -0.02em; }
 .kbd { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-family: monospace; background: rgba(255,255,255,0.05); color: #64748b; border: 1px solid rgba(255,255,255,0.1); }
-.quick-bar { position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; align-items: center; padding: 8px 16px; background: rgba(17, 26, 46, 0.95); backdrop-filter: blur(30px); z-index: 40; border-top: 1px solid rgba(255,255,255,0.05); }
-@media (min-width: 768px) { .quick-bar { position: static; border: none; background: transparent; backdrop-filter: none; justify-content: center; gap: 8px; margin-top: 24px; } }
+.quick-bar { display: flex; justify-content: space-around; align-items: center; padding: 6px 8px; background: rgba(17, 26, 46, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(99, 102, 241, 0.08); border-radius: 16px; }
+@media (min-width: 768px) { .quick-bar { justify-content: center; gap: 4px; } }
 .view-section { display: none; }
 .view-section.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -517,7 +517,7 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 select option { background: #111a2e; color: #e2e8f0; }
 </style>
 </head>
-<body class="min-h-screen flex flex-col items-center pb-20 md:pb-6">
+<body class="min-h-screen flex flex-col items-center pb-6">
 
 <!-- SESSION SUMMARY MODAL -->
 <div id="summaryModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50 p-4">
@@ -620,8 +620,32 @@ select option { background: #111a2e; color: #e2e8f0; }
         </div>
     </header>
 
+    <!-- 5-TAB NAVIGATION -->
+    <nav id="mainNav" class="quick-bar">
+        <button onclick="showView('practice')" id="nav-practice" class="flex flex-col items-center gap-0.5 p-2 text-accent-light transition-all">
+            <i data-lucide="mic" class="w-5 h-5"></i>
+            <span class="text-[10px] font-semibold">Practice</span>
+        </button>
+        <button onclick="showView('grammar')" id="nav-grammar" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+            <i data-lucide="book-open" class="w-5 h-5"></i>
+            <span class="text-[10px] font-semibold">Grammar</span>
+        </button>
+        <button onclick="showView('knowledge')" id="nav-knowledge" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+            <i data-lucide="landmark" class="w-5 h-5"></i>
+            <span class="text-[10px] font-semibold">Knowledge</span>
+        </button>
+        <button onclick="showView('resources')" id="nav-resources" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+            <i data-lucide="compass" class="w-5 h-5"></i>
+            <span class="text-[10px] font-semibold">Resources</span>
+        </button>
+        <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
+            <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+            <span class="text-[10px] font-semibold">Progress</span>
+        </button>
+    </nav>
+
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- VIEW: HOME SCREEN -->
+    <!-- VIEW: PRACTICE -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div id="view-practice" class="view-section active space-y-4">
 
@@ -1079,29 +1103,6 @@ select option { background: #111a2e; color: #e2e8f0; }
 
 </div>
 
-<!-- 5-TAB BOTTOM NAVIGATION -->
-<nav id="mainNav" class="quick-bar">
-    <button onclick="showView('practice')" id="nav-practice" class="flex flex-col items-center gap-0.5 p-2 text-accent-light transition-all">
-        <i data-lucide="mic" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Practice</span>
-    </button>
-    <button onclick="showView('grammar')" id="nav-grammar" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
-        <i data-lucide="book-open" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Grammar</span>
-    </button>
-    <button onclick="showView('knowledge')" id="nav-knowledge" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
-        <i data-lucide="landmark" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Knowledge</span>
-    </button>
-    <button onclick="showView('resources')" id="nav-resources" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
-        <i data-lucide="compass" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Resources</span>
-    </button>
-    <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 p-2 text-slate-500 hover:text-accent-light transition-all">
-        <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-        <span class="text-[10px] font-semibold">Progress</span>
-    </button>
-</nav>
 
 <script>
 // Escape HTML to prevent XSS when inserting dynamic content
