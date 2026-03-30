@@ -180,6 +180,164 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'grammar_patterns') {
     exit;
 }
 
+// AJAX: scenario-based study data
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'scenarios') {
+    header('Content-Type: application/json');
+    $ahuCol = $hasAnswerHu ? "COALESCE(answer_hu,'')" : "''";
+    $whoFilter = ($who !== 'All') ? " AND (`who` = 'All' OR `who` = '$who_safe')" : "";
+
+    // Define scenarios with tag/category mappings
+    $scenarioDefs = [
+        ['id' => 'greeting', 'title' => 'Greeting & Small Talk', 'emoji' => '👋', 'desc' => 'Jó napot! Weather, nerves, travel', 'tags' => ['greeting','greetings','closing','interview'], 'cats' => ['interview'], 'tagRequired' => ['greeting','greetings','closing']],
+        ['id' => 'who_are_you', 'title' => 'Who Are You?', 'emoji' => '🪪', 'desc' => 'Name, birthday, marriage, profession, education', 'tags' => ['personal-info','profession','education','family'], 'cats' => ['interview','personal'], 'tagRequired' => ['personal-info','profession','education']],
+        ['id' => 'roots', 'title' => 'Hungarian Roots', 'emoji' => '🌳', 'desc' => 'Ancestry, Polena, Trianon, why citizenship', 'tags' => ['origin','motivation','history'], 'cats' => ['origin','motivation'], 'tagRequired' => ['origin','motivation']],
+        ['id' => 'budapest', 'title' => 'Budapest Trip', 'emoji' => '🏛️', 'desc' => 'What you saw, liked, ate', 'tags' => ['budapest','food'], 'cats' => ['budapest','food'], 'tagRequired' => ['budapest','food']],
+        ['id' => 'hungary_knowledge', 'title' => 'Hungary Knowledge', 'emoji' => '📚', 'desc' => 'History, geography, government, culture', 'tags' => ['facts','history','geography','government','culture'], 'cats' => ['prep'], 'tagRequired' => ['facts','history','geography','government']],
+        ['id' => 'documents', 'title' => 'Documents & Closing', 'emoji' => '📋', 'desc' => 'Passport, application, goodbye', 'tags' => ['documents','closing','colors','time','flag'], 'cats' => ['interview'], 'tagRequired' => ['documents','colors','time','flag']],
+        ['id' => 'daily_vocab', 'title' => 'Daily Vocabulary', 'emoji' => '💬', 'desc' => 'Core verbs, adjectives, places, food', 'tags' => ['tana-vocab','vocabulary','noun','verb','adjective','expression'], 'cats' => ['prep','vocab'], 'tagRequired' => ['tana-vocab','vocabulary']],
+    ];
+
+    $scenarios = [];
+    foreach ($scenarioDefs as $s) {
+        // Build WHERE clause: match tags OR categories
+        $tagClauses = [];
+        foreach ($s['tagRequired'] as $t) {
+            $te = $conn->real_escape_string($t);
+            $tagClauses[] = "tags LIKE '%$te%'";
+        }
+        $catClauses = [];
+        foreach ($s['cats'] as $c) {
+            $ce = $conn->real_escape_string($c);
+            $catClauses[] = "category = '$ce'";
+        }
+        $where = '(' . implode(' OR ', array_merge($tagClauses, $catClauses)) . ')';
+
+        // Count total phrases
+        $total = 0;
+        $r = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep WHERE $where $whoFilter");
+        if ($r) $total = (int)($r->fetch_assoc()['c'] ?? 0);
+
+        // Count mastered (pass_count >= 3)
+        $mastered = 0;
+        $r = $conn->query("SELECT COUNT(DISTINCT sh.phrase) AS c FROM study_history sh INNER JOIN hungarian_prep hp ON sh.phrase = hp.question_hu WHERE sh.who='$who_safe' AND sh.pass_count >= 3 AND $where");
+        if ($r) $mastered = (int)($r->fetch_assoc()['c'] ?? 0);
+
+        // Count due for review
+        $due = 0;
+        $r = $conn->query("SELECT COUNT(DISTINCT sh.phrase) AS c FROM study_history sh INNER JOIN hungarian_prep hp ON sh.phrase = hp.question_hu WHERE sh.who='$who_safe' AND sh.next_review <= NOW() AND $where");
+        if ($r) $due = (int)($r->fetch_assoc()['c'] ?? 0);
+
+        $scenarios[] = [
+            'id' => $s['id'], 'title' => $s['title'], 'emoji' => $s['emoji'],
+            'desc' => $s['desc'], 'total' => $total, 'mastered' => $mastered, 'due' => $due,
+            'pct' => $total > 0 ? round(($mastered / $total) * 100) : 0
+        ];
+    }
+    echo json_encode($scenarios);
+    exit;
+}
+
+// AJAX: get phrases for a scenario
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'scenario_phrases') {
+    header('Content-Type: application/json');
+    $scenarioId = $conn->real_escape_string($_GET['scenario'] ?? '');
+    $ahuCol = $hasAnswerHu ? "COALESCE(answer_hu,'')" : "''";
+    $whoFilter = ($who !== 'All') ? " AND (`who` = 'All' OR `who` = '$who_safe')" : "";
+
+    $tagMap = [
+        'greeting' => ['greeting','greetings','closing'],
+        'who_are_you' => ['personal-info','profession','education'],
+        'roots' => ['origin','motivation'],
+        'budapest' => ['budapest','food'],
+        'hungary_knowledge' => ['facts','history','geography','government'],
+        'documents' => ['documents','colors','time','flag'],
+        'daily_vocab' => ['tana-vocab','vocabulary'],
+    ];
+    $catMap = [
+        'greeting' => ['interview'],
+        'who_are_you' => ['interview','personal'],
+        'roots' => ['origin','motivation'],
+        'budapest' => ['budapest','food'],
+        'hungary_knowledge' => ['prep'],
+        'documents' => ['interview'],
+        'daily_vocab' => ['prep','vocab'],
+    ];
+
+    $tags = $tagMap[$scenarioId] ?? [];
+    $cats = $catMap[$scenarioId] ?? [];
+    $clauses = [];
+    foreach ($tags as $t) { $te = $conn->real_escape_string($t); $clauses[] = "tags LIKE '%$te%'"; }
+    foreach ($cats as $c) { $ce = $conn->real_escape_string($c); $clauses[] = "category = '$ce'"; }
+    if (!$clauses) { echo json_encode([]); exit; }
+    $where = '(' . implode(' OR ', $clauses) . ')';
+
+    // Join with study_history to get mastery info, prioritize due/unseen items
+    $sql = "SELECT hp.question_hu AS q, hp.answer_en AS a, $ahuCol AS a_hu, hp.category, hp.tags,
+                   COALESCE(sh.pass_count, 0) AS pass_count, COALESCE(sh.fail_count, 0) AS fail_count,
+                   sh.next_review,
+                   CASE
+                     WHEN sh.id IS NULL THEN 0
+                     WHEN sh.next_review <= NOW() THEN 1
+                     WHEN sh.pass_count >= 3 THEN 3
+                     ELSE 2
+                   END AS priority
+            FROM hungarian_prep hp
+            LEFT JOIN study_history sh ON sh.phrase = hp.question_hu AND sh.who = '$who_safe'
+            WHERE $where $whoFilter
+            ORDER BY priority ASC, RAND()";
+    $r = $conn->query($sql);
+    $rows = [];
+    if ($r) { while ($row = $r->fetch_assoc()) $rows[] = $row; }
+    echo json_encode($rows);
+    exit;
+}
+
+// AJAX: must-nail phrases (essential interview questions)
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'must_nail') {
+    header('Content-Type: application/json');
+    $ahuCol = $hasAnswerHu ? "COALESCE(answer_hu,'')" : "''";
+    $whoFilter = ($who !== 'All') ? " AND (`who` = 'All' OR `who` = '$who_safe')" : "";
+    $sql = "SELECT hp.question_hu AS q, hp.answer_en AS a, $ahuCol AS a_hu, hp.category, hp.tags,
+                   COALESCE(sh.pass_count, 0) AS pass_count, COALESCE(sh.fail_count, 0) AS fail_count
+            FROM hungarian_prep hp
+            LEFT JOIN study_history sh ON sh.phrase = hp.question_hu AND sh.who = '$who_safe'
+            WHERE hp.tags LIKE '%essential%' $whoFilter
+            ORDER BY COALESCE(sh.pass_count, 0) ASC, COALESCE(sh.fail_count, 0) DESC";
+    $r = $conn->query($sql);
+    $rows = [];
+    if ($r) { while ($row = $r->fetch_assoc()) $rows[] = $row; }
+    echo json_encode($rows);
+    exit;
+}
+
+// AJAX: smart recommendations (weak areas)
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'recommendations') {
+    header('Content-Type: application/json');
+    // Find grammar patterns with most failed related phrases
+    $recs = [];
+    // 1. Weakest grammar patterns
+    $sql = "SELECT gp.id, gp.pattern, gp.explanation, gp.tags,
+                   SUM(COALESCE(sh.fail_count,0)) AS total_fails,
+                   COUNT(DISTINCT sh.phrase) AS studied
+            FROM grammar_patterns gp
+            LEFT JOIN hungarian_prep hp ON " . buildTagWhere('gp.tags', $conn) . "
+            LEFT JOIN study_history sh ON sh.phrase = hp.question_hu AND sh.who = '$who_safe'
+            GROUP BY gp.id
+            ORDER BY total_fails DESC, studied ASC
+            LIMIT 5";
+    // Simplified: just get patterns with most failures or least studied
+    $sql = "SELECT gp.id, gp.pattern, gp.explanation, gp.suffix_words, gp.part_of_speech, gp.tags
+            FROM grammar_patterns gp
+            LEFT JOIN study_history sh ON sh.item_type='grammar' AND sh.item_id=gp.id AND sh.who='$who_safe'
+            WHERE sh.id IS NULL OR sh.pass_count < 3
+            ORDER BY COALESCE(sh.fail_count,0) DESC, COALESCE(sh.pass_count,0) ASC, RAND()
+            LIMIT 5";
+    $r = $conn->query($sql);
+    if ($r) { while ($row = $r->fetch_assoc()) $recs[] = $row; }
+    echo json_encode($recs);
+    exit;
+}
+
 // AJAX: home screen stats (due count, streak, drill groups preview)
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'home_stats') {
     header('Content-Type: application/json');
@@ -463,69 +621,75 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     $r = $conn->query("SELECT name, url, icon, category FROM learning_resources ORDER BY sort_order");
     if ($r) { while ($row = $r->fetch_assoc()) $resources[] = $row; }
 
-    // 6. Build blocks — alternating in-app and external, ~45 min each
-    // Block 1: SRS Review (always first if items are due)
+    // 6. Build blocks — 20 min max, alternating active/passive
     $totalDue = $duePhrases + $dueGrammar + $dueKnowledge;
+
+    // Block 1: SRS Review (active, always first)
     if ($totalDue > 0 && empty($todayBlocks['phrase_review'])) {
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_review', 'title' => 'Review Due Items', 'subtitle' => $totalDue . ' items due for review', 'duration' => min(45, max(15, $totalDue * 2)), 'icon' => 'rotate-ccw',
-            'session' => ['mode' => 'review', 'limit' => min(25, $totalDue)]];
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_review', 'title' => 'Review Due Items', 'subtitle' => $totalDue . ' items due', 'duration' => min(20, max(10, $totalDue * 2)), 'icon' => 'rotate-ccw',
+            'session' => ['mode' => 'review', 'limit' => min(10, $totalDue)]];
     }
 
-    // Block 2: External — Pimsleur (listening/speaking)
+    // Block 2: External — Pimsleur (passive listening)
     if (empty($todayBlocks['pimsleur'])) {
         $pim = array_values(array_filter($resources, function($r) { return $r['name'] === 'Pimsleur'; }));
-        if ($pim) $blocks[] = ['type' => 'external', 'block_type' => 'pimsleur', 'title' => 'Pimsleur', 'subtitle' => 'Listening & speaking practice', 'duration' => 30, 'icon' => 'headphones', 'url' => $pim[0]['url'], 'emoji' => $pim[0]['icon']];
+        if ($pim) $blocks[] = ['type' => 'external', 'block_type' => 'pimsleur', 'title' => 'Pimsleur', 'subtitle' => 'Listening & speaking', 'duration' => 20, 'icon' => 'headphones', 'url' => $pim[0]['url'], 'emoji' => $pim[0]['icon']];
     }
 
-    // Block 3: Grammar lesson
+    // Block 3: Grammar lesson (active)
     if (!empty($newGrammar) && empty($todayBlocks['grammar_lesson'])) {
         $g = $newGrammar[0];
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'grammar_lesson', 'title' => 'Grammar: ' . $g['pattern'], 'subtitle' => $g['explanation'] ? substr($g['explanation'], 0, 60) . '...' : 'Learn this pattern', 'duration' => 30, 'icon' => 'book-open',
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'grammar_lesson', 'title' => 'Grammar: ' . $g['pattern'], 'subtitle' => $g['explanation'] ? substr($g['explanation'], 0, 50) . '...' : 'Learn this pattern', 'duration' => 15, 'icon' => 'book-open',
             'session' => ['mode' => 'grammar', 'pattern_id' => (int)$g['id']]];
     }
 
-    // Block 4: Interview simulation — personal questions
-    if (empty($todayBlocks['interview_sim'])) {
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'interview_sim', 'title' => 'Interview Practice', 'subtitle' => 'Practice answering personal questions', 'duration' => 30, 'icon' => 'message-square',
-            'session' => ['mode' => 'interview', 'cat' => 'bios', 'limit' => 10]];
-    }
-
-    // Block 5: Break
+    // Break
     if (count($blocks) >= 3) {
-        $blocks[] = ['type' => 'break', 'block_type' => 'break', 'title' => 'Break', 'subtitle' => 'Rest, stretch, grab a drink', 'duration' => 15, 'icon' => 'coffee'];
+        $blocks[] = ['type' => 'break', 'block_type' => 'break', 'title' => 'Break', 'subtitle' => 'Stretch, water, move', 'duration' => 5, 'icon' => 'coffee'];
     }
 
-    // Block 6: Knowledge review
+    // Block 4: Interview sim (active — speaking)
+    if (empty($todayBlocks['interview_sim'])) {
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'interview_sim', 'title' => 'Interview Practice', 'subtitle' => 'Answer personal questions', 'duration' => 15, 'icon' => 'message-square',
+            'session' => ['mode' => 'interview', 'cat' => 'bios', 'limit' => 8]];
+    }
+
+    // Block 5: External — Quizlet (passive flashcards)
+    if (empty($todayBlocks['quizlet'])) {
+        $qz = array_values(array_filter($resources, function($r) { return $r['name'] === 'Quizlet'; }));
+        if ($qz) $blocks[] = ['type' => 'external', 'block_type' => 'quizlet', 'title' => 'Quizlet', 'subtitle' => 'Vocabulary flashcards', 'duration' => 15, 'icon' => 'layers', 'url' => $qz[0]['url'], 'emoji' => $qz[0]['icon']];
+    }
+
+    // Block 6: Knowledge quiz (active)
     if (empty($todayBlocks['knowledge_review'])) {
         $weakCat = 'history';
         foreach ($knowledgeCats as $cat => $total) {
             if (!isset($todayBlocks['knowledge_' . $cat])) { $weakCat = $cat; break; }
         }
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'knowledge_review', 'title' => 'Knowledge: ' . ucfirst($weakCat), 'subtitle' => 'Quiz on ' . $weakCat . ' facts', 'duration' => 25, 'icon' => 'landmark',
-            'session' => ['mode' => 'knowledge', 'category' => $weakCat, 'limit' => 8]];
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'knowledge_review', 'title' => 'Knowledge: ' . ucfirst($weakCat), 'subtitle' => 'Quiz on ' . $weakCat . ' facts', 'duration' => 15, 'icon' => 'landmark',
+            'session' => ['mode' => 'knowledge', 'category' => $weakCat, 'limit' => 6]];
     }
 
-    // Block 7: External — Quizlet or Drops
-    if (empty($todayBlocks['quizlet'])) {
-        $qz = array_values(array_filter($resources, function($r) { return $r['name'] === 'Quizlet'; }));
-        if ($qz) $blocks[] = ['type' => 'external', 'block_type' => 'quizlet', 'title' => 'Quizlet', 'subtitle' => 'Vocabulary flashcards', 'duration' => 25, 'icon' => 'layers', 'url' => $qz[0]['url'], 'emoji' => $qz[0]['icon']];
+    // Break
+    if (count($blocks) >= 6) {
+        $blocks[] = ['type' => 'break', 'block_type' => 'break2', 'title' => 'Break', 'subtitle' => 'Rest your brain', 'duration' => 5, 'icon' => 'coffee'];
     }
 
-    // Block 8: Phrase practice (all categories)
+    // Block 7: Phrase practice (active — pronunciation)
     if (empty($todayBlocks['phrase_practice'])) {
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_practice', 'title' => 'Phrase Practice', 'subtitle' => 'Mixed pronunciation & comprehension', 'duration' => 30, 'icon' => 'mic',
-            'session' => ['mode' => 'practice', 'cat' => 'all', 'limit' => 15]];
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_practice', 'title' => 'Phrase Practice', 'subtitle' => 'Mixed pronunciation', 'duration' => 20, 'icon' => 'mic',
+            'session' => ['mode' => 'practice', 'cat' => 'all', 'limit' => 10]];
     }
 
-    // Block 9: External — HungarianPod101 or YouTube
+    // Block 8: External — HungarianPod101 (passive listening)
     if (empty($todayBlocks['hungarianpod'])) {
         $hp = array_values(array_filter($resources, function($r) { return $r['name'] === 'HungarianPod101'; }));
-        if ($hp) $blocks[] = ['type' => 'external', 'block_type' => 'hungarianpod', 'title' => 'HungarianPod101', 'subtitle' => 'Podcast lessons', 'duration' => 30, 'icon' => 'radio', 'url' => $hp[0]['url'], 'emoji' => $hp[0]['icon']];
+        if ($hp) $blocks[] = ['type' => 'external', 'block_type' => 'hungarianpod', 'title' => 'HungarianPod101', 'subtitle' => 'Podcast lesson', 'duration' => 20, 'icon' => 'radio', 'url' => $hp[0]['url'], 'emoji' => $hp[0]['icon']];
     }
 
-    // Block 10: Free practice / weak areas
-    $blocks[] = ['type' => 'in_app', 'block_type' => 'free_practice', 'title' => 'Free Practice', 'subtitle' => 'Work on weak areas or explore', 'duration' => 30, 'icon' => 'target',
-        'session' => ['mode' => 'practice', 'cat' => 'all', 'limit' => 15]];
+    // Block 9: Free practice (active)
+    $blocks[] = ['type' => 'in_app', 'block_type' => 'free_practice', 'title' => 'Free Practice', 'subtitle' => 'Weak areas & explore', 'duration' => 20, 'icon' => 'target',
+        'session' => ['mode' => 'practice', 'cat' => 'all', 'limit' => 10]];
 
     // Calculate streak
     $streak = 0;
@@ -921,50 +1085,63 @@ select option { background: #111a2e; color: #e2e8f0; }
     </div><!-- end view-today -->
 
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- VIEW: STUDY (Grammar + Knowledge + Resources + Phrases) -->
+    <!-- VIEW: STUDY (Scenario-based + Grammar + Resources) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div id="view-study" class="view-section hidden space-y-4">
 
-        <div class="flex items-center justify-between">
-            <h2 class="text-lg font-bold text-white">Study Library</h2>
-        </div>
-
-        <!-- Sub-nav -->
-        <div class="flex items-center gap-1.5 flex-wrap">
-            <button onclick="showStudySub('grammar')" id="studySub-grammar" class="pill pill-active">Grammar</button>
-            <button onclick="showStudySub('knowledge')" id="studySub-knowledge" class="pill pill-inactive">Knowledge</button>
-            <button onclick="showStudySub('resources')" id="studySub-resources" class="pill pill-inactive">Resources</button>
-            <button onclick="showStudySub('phrases')" id="studySub-phrases" class="pill pill-inactive">Phrases</button>
-            <span id="grammarCount" class="text-xs text-slate-500 ml-auto"></span>
-            <span id="drillGroupCount" class="text-xs text-slate-500 hidden"></span>
-        </div>
-
-        <!-- Grammar sub-view -->
-        <div id="study-sub-grammar">
-
-        <!-- Patterns sub-view -->
-        <div id="grammar-sub-patterns">
-            <div class="space-y-4">
-                <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
-                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
-                    <input id="grammarSearch" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
-                        class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
-                </div>
-                <div id="grammarTagFilter" class="flex flex-wrap gap-1.5"></div>
-                <div id="grammarList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    <p class="col-span-2 text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
-                </div>
+        <!-- Must Nail section -->
+        <div id="mustNailSection">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <span class="text-red-400">★</span> Must Nail
+                </h2>
+                <button onclick="startMustNailQuiz()" class="px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 text-[11px] font-bold border border-red-500/20 hover:bg-red-500/25 transition-all">Quiz Me</button>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-2">The ~15 questions they <em>will</em> ask. Drill to automaticity.</p>
+            <div id="mustNailGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                <p class="col-span-full text-slate-500 text-sm text-center py-4">Loading...</p>
             </div>
         </div>
 
-        <!-- Drills sub-view -->
-        <div id="grammar-sub-drills" style="display:none">
-            <div id="drillGroupList" class="space-y-2">
-                <p class="text-slate-500 text-sm text-center py-4">Loading drill groups...</p>
+        <!-- Scenarios -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-bold text-white">Interview Scenarios</h2>
+            </div>
+            <div id="scenarioGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                <p class="col-span-full text-slate-500 text-sm text-center py-4">Loading scenarios...</p>
             </div>
         </div>
 
-        <!-- AI Lesson Panel -->
+        <!-- Recommended Grammar (collapsed) -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="lightbulb" class="w-4 h-4 text-yellow-400"></i> Work On These
+                </h2>
+                <button onclick="toggleAllGrammar()" id="showAllGrammarBtn" class="text-[11px] text-slate-500 hover:text-white transition-colors">See all ▸</button>
+            </div>
+            <div id="recGrammarGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                <p class="col-span-full text-slate-500 text-sm text-center py-4">Loading...</p>
+            </div>
+        </div>
+
+        <!-- All Grammar (hidden by default) -->
+        <div id="allGrammarSection" class="hidden space-y-3">
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-bold text-white">All Grammar Patterns</h2>
+                <span id="grammarCount" class="text-xs text-slate-500"></span>
+            </div>
+            <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+                <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                <input id="grammarSearch" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
+                    class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+            </div>
+            <div id="grammarTagFilter" class="flex flex-wrap gap-1.5"></div>
+            <div id="grammarList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"></div>
+        </div>
+
+        <!-- AI Lesson Panel (shared) -->
         <div id="lessonPanel" class="hidden">
             <div class="glass rounded-2xl overflow-hidden border border-accent/20">
                 <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-accent/5">
@@ -979,46 +1156,6 @@ select option { background: #111a2e; color: #e2e8f0; }
                     <p class="text-slate-400 text-sm text-center py-8">Loading AI lesson...</p>
                 </div>
             </div>
-        </div>
-
-        </div><!-- end study-sub-grammar -->
-
-        <!-- Knowledge sub-view -->
-        <div id="study-sub-knowledge" style="display:none">
-        <div class="space-y-4">
-            <div class="flex items-center justify-between">
-                <span id="knowledgeCount" class="text-xs text-slate-500"></span>
-            </div>
-
-        <!-- Category filter -->
-        <div class="flex items-center gap-1.5 flex-wrap">
-            <button onclick="filterKnowledge('')" id="kc-all" class="pill pill-active">All</button>
-            <button onclick="filterKnowledge('history')" id="kc-history" class="pill pill-inactive">History</button>
-            <button onclick="filterKnowledge('geography')" id="kc-geography" class="pill pill-inactive">Geography</button>
-            <button onclick="filterKnowledge('family')" id="kc-family" class="pill pill-inactive">Family</button>
-            <button onclick="filterKnowledge('culture')" id="kc-culture" class="pill pill-inactive">Culture</button>
-        </div>
-
-        <!-- Search -->
-        <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
-            <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
-            <input id="knowledgeSearch" type="text" placeholder="Search knowledge cards..." oninput="searchKnowledge()"
-                class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
-        </div>
-
-        <!-- Action row -->
-        <div class="flex items-center gap-2">
-            <button onclick="knowledgeQuizMode()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-500/10 text-green-400 text-xs font-semibold border border-green-500/15 hover:bg-green-500/20 transition-all">
-                <i data-lucide="brain" class="w-3.5 h-3.5"></i> Quiz Me
-            </button>
-            <button onclick="addKnowledgeCard()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-100 text-slate-300 text-xs font-semibold border border-white/10 hover:border-accent/30 transition-all">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Card
-            </button>
-        </div>
-
-        <!-- Card grid -->
-        <div id="knowledgeList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-            <p class="col-span-2 text-slate-500 text-sm text-center py-4">Loading knowledge cards...</p>
         </div>
 
         <!-- AI Knowledge Lesson Panel -->
@@ -1038,64 +1175,54 @@ select option { background: #111a2e; color: #e2e8f0; }
             </div>
         </div>
 
-        <!-- Knowledge Quiz overlay -->
-        <div id="knowledgeQuizPanel" class="hidden">
-            <div class="glass rounded-2xl overflow-hidden border border-green-500/20">
-                <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-green-500/5">
-                    <h2 class="text-base font-bold flex items-center gap-2 text-green-400">
-                        <i data-lucide="brain" class="w-4 h-4"></i> Knowledge Quiz
-                    </h2>
-                    <button onclick="closeKnowledgeQuiz()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
-                        <i data-lucide="x" class="w-4 h-4"></i>
-                    </button>
+        <!-- Scenario drill panel (quiz-first) -->
+        <div id="scenarioDrillPanel" class="hidden">
+            <div class="glass rounded-2xl overflow-hidden border border-accent/20">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
+                    <h2 id="scenarioDrillTitle" class="text-base font-bold text-white flex items-center gap-2"><span></span></h2>
+                    <div class="flex items-center gap-2">
+                        <span id="scenarioDrillProgress" class="text-[11px] text-slate-500 font-medium tabular-nums"></span>
+                        <button onclick="closeScenarioDrill()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                            <i data-lucide="x" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 </div>
-                <div id="knowledgeQuizContent" class="p-4 space-y-4"></div>
+                <div class="px-4 pt-2">
+                    <div class="h-1.5 progress-track rounded-full overflow-hidden">
+                        <div id="scenarioDrillFill" class="h-full progress-fill rounded-full" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div id="scenarioDrillContent" class="p-5 min-h-[250px] flex flex-col items-center justify-center"></div>
+                <div id="scenarioDrillControls" class="px-5 pb-5"></div>
             </div>
         </div>
 
-        </div>
-        </div><!-- end study-sub-knowledge -->
-
-        <!-- Resources sub-view -->
-        <div id="study-sub-resources" style="display:none">
-        <div class="space-y-4">
-
-        <div id="resourcesList" class="space-y-4">
-            <p class="text-slate-500 text-sm text-center py-4">Loading resources...</p>
-        </div>
-
-        <!-- Import section -->
-        <div class="glass rounded-2xl p-4 space-y-3">
-            <div class="flex items-center gap-2">
-                <i data-lucide="upload" class="w-4 h-4 text-accent-light"></i>
-                <h3 class="text-sm font-bold text-white">Import from Google Sheets</h3>
+        <!-- Resources (collapsed) -->
+        <div>
+            <button onclick="toggleResources()" class="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-white transition-colors mb-2">
+                <i data-lucide="external-link" class="w-4 h-4"></i> External Resources <span id="resToggle" class="text-[10px]">▸</span>
+            </button>
+            <div id="resourcesCollapsed" class="hidden space-y-4">
+                <div id="resourcesList" class="space-y-4">
+                    <p class="text-slate-500 text-sm text-center py-4">Loading resources...</p>
+                </div>
+                <div class="glass rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="upload" class="w-4 h-4 text-accent-light"></i>
+                        <h3 class="text-sm font-bold text-white">Import from Google Sheets</h3>
+                    </div>
+                    <p class="text-xs text-slate-400">Paste a Google Sheets URL to import questions and answers into your phrase bank.</p>
+                    <div class="flex gap-2">
+                        <input id="sheetsUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/..."
+                            class="flex-1 bg-surface-50 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 outline-none border border-white/5 focus:border-accent/40">
+                        <button onclick="fetchSheetPreview()" class="px-4 py-2 bg-accent hover:bg-accent-dark rounded-xl text-xs font-bold text-white transition-all">
+                            Fetch
+                        </button>
+                    </div>
+                    <div id="sheetsPreview" class="hidden space-y-3"></div>
+                </div>
             </div>
-            <p class="text-xs text-slate-400">Paste a Google Sheets URL to import questions and answers into your phrase bank.</p>
-            <div class="flex gap-2">
-                <input id="sheetsUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/..."
-                    class="flex-1 bg-surface-50 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 outline-none border border-white/5 focus:border-accent/40">
-                <button onclick="fetchSheetPreview()" class="px-4 py-2 bg-accent hover:bg-accent-dark rounded-xl text-xs font-bold text-white transition-all">
-                    Fetch
-                </button>
-            </div>
-            <div id="sheetsPreview" class="hidden space-y-3"></div>
         </div>
-
-        </div>
-        </div><!-- end study-sub-resources -->
-
-        <!-- Phrases sub-view -->
-        <div id="study-sub-phrases" style="display:none">
-        <div class="space-y-3">
-            <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
-                <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
-                <input id="studyBrowseSearch" type="text" placeholder="Search phrases..." oninput="searchStudyPhrases()"
-                    class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
-            </div>
-            <div id="studyBrowseList" class="space-y-1"></div>
-            <div class="text-center"><span id="studyBrowseCount" class="text-xs text-slate-500"></span></div>
-        </div>
-        </div><!-- end study-sub-phrases -->
 
     </div><!-- end view-study -->
 
@@ -2270,7 +2397,7 @@ function showView(view) {
         }
     });
     if (view === 'today') loadDailyPlan();
-    if (view === 'study') { loadGrammarPatterns(); loadDrillGroups(); }
+    if (view === 'study') { loadScenarios(); loadMustNail(); loadRecommendedGrammar(); }
     if (view === 'progress') { loadProgressDashboard(); loadProgressPhrases(); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     lucide.createIcons();
@@ -2278,33 +2405,352 @@ function showView(view) {
 
 function goHome() { showView('today'); }
 
-// Study tab sub-nav
-var studySub = 'grammar';
-function showStudySub(sub) {
-    studySub = sub;
-    ['grammar', 'knowledge', 'resources', 'phrases'].forEach(function(s) {
-        var el = document.getElementById('study-sub-' + s);
-        if (el) el.style.display = s === sub ? 'block' : 'none';
-        var btn = document.getElementById('studySub-' + s);
-        if (btn) btn.className = 'pill ' + (s === sub ? 'pill-active' : 'pill-inactive');
+// ═══ SCENARIO-BASED STUDY ═══
+var scenariosLoaded = false;
+var mustNailLoaded = false;
+var recGrammarLoaded = false;
+var allGrammarVisible = false;
+
+function loadScenarios() {
+    if (scenariosLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=scenarios')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { scenariosLoaded = true; renderScenarios(data); });
+}
+
+function renderScenarios(scenarios) {
+    var grid = document.getElementById('scenarioGrid');
+    grid.textContent = '';
+    scenarios.forEach(function(s) {
+        var tile = document.createElement('button');
+        tile.className = 'grammar-card text-left flex flex-col gap-1.5 p-3 active:scale-95 cursor-pointer relative';
+
+        var emoji = document.createElement('span');
+        emoji.className = 'text-xl';
+        emoji.textContent = s.emoji;
+        tile.appendChild(emoji);
+
+        var title = document.createElement('h3');
+        title.className = 'text-[12px] font-bold text-white leading-snug';
+        title.textContent = s.title;
+        tile.appendChild(title);
+
+        var desc = document.createElement('p');
+        desc.className = 'text-[10px] text-slate-500 leading-snug line-clamp-2';
+        desc.textContent = s.desc;
+        tile.appendChild(desc);
+
+        // Progress bar
+        var barWrap = document.createElement('div');
+        barWrap.className = 'mt-auto pt-2';
+        var barTrack = document.createElement('div');
+        barTrack.className = 'h-1.5 bg-surface-50 rounded-full overflow-hidden';
+        var barFill = document.createElement('div');
+        barFill.className = 'h-full rounded-full transition-all ' + (s.pct >= 80 ? 'bg-green-500' : s.pct >= 40 ? 'bg-amber-500' : 'bg-accent');
+        barFill.style.width = s.pct + '%';
+        barTrack.appendChild(barFill);
+        barWrap.appendChild(barTrack);
+        var stats = document.createElement('div');
+        stats.className = 'flex items-center justify-between mt-1';
+        var pctLabel = document.createElement('span');
+        pctLabel.className = 'text-[9px] font-bold ' + (s.pct >= 80 ? 'text-green-400' : s.pct >= 40 ? 'text-amber-400' : 'text-accent-light');
+        pctLabel.textContent = s.pct + '% mastered';
+        var countLabel = document.createElement('span');
+        countLabel.className = 'text-[9px] text-slate-600';
+        countLabel.textContent = s.total + ' items';
+        stats.appendChild(pctLabel);
+        stats.appendChild(countLabel);
+        barWrap.appendChild(stats);
+        tile.appendChild(barWrap);
+
+        // Due badge
+        if (s.due > 0) {
+            var dueBadge = document.createElement('span');
+            dueBadge.className = 'absolute top-2 right-2 text-[9px] font-bold bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full';
+            dueBadge.textContent = s.due + ' due';
+            tile.appendChild(dueBadge);
+        }
+
+        (function(scenario) {
+            tile.onclick = function() { startScenarioDrill(scenario); };
+        })(s);
+        grid.appendChild(tile);
     });
-    if (sub === 'grammar') { loadGrammarPatterns(); loadDrillGroups(); }
-    if (sub === 'knowledge') loadKnowledgeCards();
-    if (sub === 'resources') loadResources();
-    if (sub === 'phrases') loadStudyPhrases();
     lucide.createIcons();
 }
 
-// Grammar sub-nav (patterns/drills within grammar)
-var grammarSub = 'patterns';
-function showGrammarSub(sub) {
-    grammarSub = sub;
-    document.getElementById('grammar-sub-patterns').style.display = sub === 'patterns' ? 'block' : 'none';
-    document.getElementById('grammar-sub-drills').style.display = sub === 'drills' ? 'block' : 'none';
-    document.getElementById('gramSub-patterns').className = 'pill ' + (sub === 'patterns' ? 'pill-active' : 'pill-inactive');
-    document.getElementById('gramSub-drills').className = 'pill ' + (sub === 'drills' ? 'pill-active' : 'pill-inactive');
-    if (sub === 'drills') loadDrillGroups();
+// Must Nail
+function loadMustNail() {
+    if (mustNailLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=must_nail')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { mustNailLoaded = true; renderMustNail(data); });
 }
+
+function renderMustNail(items) {
+    var grid = document.getElementById('mustNailGrid');
+    grid.textContent = '';
+    if (!items.length) {
+        var empty = document.createElement('p');
+        empty.className = 'col-span-full text-slate-500 text-sm text-center py-4';
+        empty.textContent = 'No essential phrases tagged yet.';
+        grid.appendChild(empty);
+        return;
+    }
+    items.forEach(function(p) {
+        var mastered = p.pass_count >= 3;
+        var failing = p.fail_count > 0 && p.pass_count < 3;
+        var tile = document.createElement('button');
+        tile.className = 'rounded-xl border p-2.5 text-left transition-all active:scale-95 flex flex-col gap-1 '
+            + (mastered ? 'border-green-500/20 bg-green-500/5 opacity-60' : failing ? 'border-red-500/20 bg-red-500/5' : 'border-white/10 bg-surface-100 hover:border-accent/30');
+
+        var q = document.createElement('span');
+        q.className = 'text-[11px] font-bold leading-snug ' + (mastered ? 'text-green-400' : 'text-white');
+        q.textContent = p.q;
+        tile.appendChild(q);
+
+        var a = document.createElement('span');
+        a.className = 'text-[9px] text-slate-500 leading-snug line-clamp-1';
+        a.textContent = p.a;
+        tile.appendChild(a);
+
+        // Status
+        var status = document.createElement('span');
+        status.className = 'text-[9px] font-bold mt-auto ' + (mastered ? 'text-green-500' : failing ? 'text-red-400' : 'text-slate-600');
+        status.textContent = mastered ? '✓ Mastered' : failing ? p.fail_count + ' fails' : 'New';
+        tile.appendChild(status);
+
+        (function(phrase) {
+            tile.onclick = function() { speakHu(phrase.q); };
+        })(p);
+        grid.appendChild(tile);
+    });
+}
+
+function startMustNailQuiz() {
+    fetch('?who=' + who + '&ajax=1&action=must_nail')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            // Filter to unmastered, shuffle
+            var items = data.filter(function(p) { return p.pass_count < 3; });
+            if (!items.length) items = data;
+            items.sort(function() { return Math.random() - 0.5; });
+            startQuizFirstDrill('★ Must Nail Quiz', items.slice(0, 10));
+        });
+}
+
+// Recommended Grammar
+function loadRecommendedGrammar() {
+    if (recGrammarLoaded) return;
+    fetch('?who=' + who + '&ajax=1&action=recommendations')
+        .then(function(r) { return r.json(); })
+        .then(function(data) { recGrammarLoaded = true; renderRecGrammar(data); });
+}
+
+function renderRecGrammar(patterns) {
+    var grid = document.getElementById('recGrammarGrid');
+    grid.textContent = '';
+    if (!patterns.length) {
+        var empty = document.createElement('p');
+        empty.className = 'col-span-full text-slate-500 text-sm text-center py-2';
+        empty.textContent = 'All grammar mastered!';
+        grid.appendChild(empty);
+        return;
+    }
+    patterns.forEach(function(p) { grid.appendChild(buildPatternCard(p)); });
+    lucide.createIcons();
+}
+
+function toggleAllGrammar() {
+    allGrammarVisible = !allGrammarVisible;
+    document.getElementById('allGrammarSection').classList.toggle('hidden', !allGrammarVisible);
+    document.getElementById('showAllGrammarBtn').textContent = allGrammarVisible ? 'Hide ▾' : 'See all ▸';
+    if (allGrammarVisible) loadGrammarPatterns();
+}
+
+function toggleResources() {
+    var el = document.getElementById('resourcesCollapsed');
+    var toggle = document.getElementById('resToggle');
+    var isHidden = el.classList.toggle('hidden');
+    toggle.textContent = isHidden ? '▸' : '▾';
+    if (!isHidden) loadResources();
+}
+
+// Scenario Drill (quiz-first flow)
+var scenarioDrillItems = [];
+var scenarioDrillIdx = 0;
+var scenarioDrillPass = 0;
+var scenarioDrillTotal = 0;
+
+function startScenarioDrill(scenario) {
+    fetch('?who=' + who + '&ajax=1&action=scenario_phrases&scenario=' + scenario.id)
+        .then(function(r) { return r.json(); })
+        .then(function(phrases) {
+            // Prioritize: unseen/due first, mastered last. Take up to 10.
+            var items = phrases.slice(0, 10);
+            startQuizFirstDrill(scenario.emoji + ' ' + scenario.title, items);
+        });
+}
+
+function startQuizFirstDrill(title, items) {
+    if (!items.length) { alert('No items for this scenario.'); return; }
+    scenarioDrillItems = items;
+    scenarioDrillIdx = 0;
+    scenarioDrillPass = 0;
+    scenarioDrillTotal = items.length;
+
+    document.getElementById('scenarioDrillPanel').classList.remove('hidden');
+    document.getElementById('scenarioDrillTitle').querySelector('span').textContent = title;
+
+    // Hide other sections
+    document.getElementById('mustNailSection').classList.add('hidden');
+    document.getElementById('scenarioGrid').parentElement.classList.add('hidden');
+
+    renderQuizStep();
+    lucide.createIcons();
+}
+
+function closeScenarioDrill() {
+    document.getElementById('scenarioDrillPanel').classList.add('hidden');
+    document.getElementById('mustNailSection').classList.remove('hidden');
+    document.getElementById('scenarioGrid').parentElement.classList.remove('hidden');
+    // Refresh data
+    scenariosLoaded = false; mustNailLoaded = false;
+    loadScenarios(); loadMustNail();
+}
+
+function renderQuizStep() {
+    if (scenarioDrillIdx >= scenarioDrillItems.length) {
+        renderDrillSummary();
+        return;
+    }
+    var item = scenarioDrillItems[scenarioDrillIdx];
+    var content = document.getElementById('scenarioDrillContent');
+    var controls = document.getElementById('scenarioDrillControls');
+    content.textContent = '';
+    controls.textContent = '';
+
+    var pct = Math.round((scenarioDrillIdx / scenarioDrillTotal) * 100);
+    document.getElementById('scenarioDrillFill').style.width = pct + '%';
+    document.getElementById('scenarioDrillProgress').textContent = (scenarioDrillIdx + 1) + ' / ' + scenarioDrillTotal;
+
+    // Round 1: Quiz first — show English, ask for Hungarian
+    var prompt = document.createElement('p');
+    prompt.className = 'text-xs text-slate-500 uppercase tracking-wider font-bold mb-3';
+    prompt.textContent = 'Say this in Hungarian:';
+    content.appendChild(prompt);
+
+    var english = document.createElement('h2');
+    english.className = 'text-lg font-bold text-white mb-2';
+    english.textContent = item.a || '(translate)';
+    content.appendChild(english);
+
+    // Hidden answer
+    var answerWrap = document.createElement('div');
+    answerWrap.id = 'quizAnswer';
+    answerWrap.className = 'hidden mt-4 space-y-3 w-full max-w-md';
+
+    var hunText = document.createElement('div');
+    hunText.className = 'bg-accent/10 rounded-xl p-4 border border-accent/20 text-center';
+    var hunLabel = document.createElement('p');
+    hunLabel.className = 'text-xs text-accent-light/60 uppercase tracking-wider font-bold mb-1';
+    hunLabel.textContent = 'Answer';
+    hunText.appendChild(hunLabel);
+    var hunPhrase = document.createElement('p');
+    hunPhrase.className = 'text-base font-bold text-accent-light';
+    hunPhrase.textContent = item.q;
+    hunText.appendChild(hunPhrase);
+    if (item.a_hu && item.a_hu !== item.q) {
+        var altAnswer = document.createElement('p');
+        altAnswer.className = 'text-xs text-slate-400 mt-1';
+        altAnswer.textContent = 'Full answer: ' + item.a_hu;
+        hunText.appendChild(altAnswer);
+    }
+    answerWrap.appendChild(hunText);
+    content.appendChild(answerWrap);
+
+    // Controls: Reveal button
+    var revealBtn = document.createElement('button');
+    revealBtn.id = 'quizRevealBtn';
+    revealBtn.className = 'w-full py-3 bg-accent hover:bg-accent-dark rounded-xl text-sm font-bold text-white transition-all';
+    revealBtn.textContent = 'Show Answer';
+    revealBtn.onclick = function() {
+        document.getElementById('quizAnswer').classList.remove('hidden');
+        revealBtn.classList.add('hidden');
+        speakHu(item.q);
+        // Show pass/fail buttons
+        gradeRow.classList.remove('hidden');
+    };
+    controls.appendChild(revealBtn);
+
+    // Grade buttons (hidden until reveal)
+    var gradeRow = document.createElement('div');
+    gradeRow.className = 'hidden flex gap-2 mt-2';
+
+    var failBtn = document.createElement('button');
+    failBtn.className = 'flex-1 py-3 bg-red-500/15 hover:bg-red-500/25 border border-red-500/20 rounded-xl text-sm font-bold text-red-400 transition-all';
+    failBtn.textContent = 'Didn\'t Know';
+    failBtn.onclick = function() { scoreQuizItem(item, false); };
+    gradeRow.appendChild(failBtn);
+
+    var passBtn = document.createElement('button');
+    passBtn.className = 'flex-1 py-3 bg-green-500/15 hover:bg-green-500/25 border border-green-500/20 rounded-xl text-sm font-bold text-green-400 transition-all';
+    passBtn.textContent = 'Got It!';
+    passBtn.onclick = function() { scoreQuizItem(item, true); };
+    gradeRow.appendChild(passBtn);
+
+    controls.appendChild(gradeRow);
+}
+
+function scoreQuizItem(item, passed) {
+    if (passed) scenarioDrillPass++;
+    // Record to SRS
+    var fd = new FormData();
+    fd.append('phrase', item.q);
+    fd.append('pass', passed ? '1' : '0');
+    fd.append('who', who);
+    fetch('record.php', { method: 'POST', body: fd });
+
+    scenarioDrillIdx++;
+    renderQuizStep();
+}
+
+function renderDrillSummary() {
+    var content = document.getElementById('scenarioDrillContent');
+    var controls = document.getElementById('scenarioDrillControls');
+    content.textContent = '';
+    controls.textContent = '';
+    document.getElementById('scenarioDrillFill').style.width = '100%';
+    document.getElementById('scenarioDrillProgress').textContent = '';
+
+    var pct = scenarioDrillTotal > 0 ? Math.round((scenarioDrillPass / scenarioDrillTotal) * 100) : 0;
+
+    var icon = document.createElement('div');
+    icon.className = 'w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 ' + (pct >= 70 ? 'bg-green-500/20' : 'bg-amber-500/20');
+    icon.textContent = pct >= 70 ? '🎉' : '💪';
+    icon.style.fontSize = '24px';
+    content.appendChild(icon);
+
+    var h = document.createElement('h3');
+    h.className = 'text-lg font-bold text-white mb-1';
+    h.textContent = pct >= 70 ? 'Great job!' : 'Keep practicing!';
+    content.appendChild(h);
+
+    var score = document.createElement('p');
+    score.className = 'text-sm text-slate-400 mb-4';
+    score.textContent = scenarioDrillPass + ' / ' + scenarioDrillTotal + ' correct (' + pct + '%)';
+    content.appendChild(score);
+
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'w-full py-3 bg-accent hover:bg-accent-dark rounded-xl text-sm font-bold text-white transition-all';
+    closeBtn.textContent = 'Back to Study';
+    closeBtn.onclick = closeScenarioDrill;
+    controls.appendChild(closeBtn);
+}
+
+// Legacy sub-nav compat
+var studySub = 'grammar';
+function showStudySub(sub) { /* no-op, scenarios replace sub-nav */ }
 
 // Progress sub-nav
 var progressSub = 'dashboard';
