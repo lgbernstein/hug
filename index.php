@@ -1074,6 +1074,20 @@ select option { background: #111a2e; color: #e2e8f0; }
                     </button>
                 </div>
             </div>
+            <!-- Session toolbar: speed + strictness + blur -->
+            <div class="flex items-center gap-4 px-5 py-2 border-b border-white/5 bg-surface-50/50 flex-wrap">
+                <!-- Speed -->
+                <div class="flex items-center gap-1">
+                    <span class="text-[10px] text-slate-500">Speed</span>
+                    <div id="sessionSpeedBar" class="flex gap-0.5"></div>
+                </div>
+                <!-- Strictness -->
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] text-slate-500">Grading</span>
+                    <input id="strictSlider" type="range" min="1" max="5" step="1" class="w-20 h-1 accent-accent cursor-pointer">
+                    <span id="strictLabel" class="text-[10px] font-bold text-accent-light w-16"></span>
+                </div>
+            </div>
             <!-- Session progress -->
             <div class="px-5 pt-2">
                 <div class="h-1.5 progress-track rounded-full overflow-hidden">
@@ -1432,22 +1446,49 @@ let currentSpeed = parseFloat(localStorage.getItem('hugSpeed')) || 1.0;
 let autoAdvance    = localStorage.getItem('hugAutoAdvance') === '1';
 let translateOn    = localStorage.getItem('hugTranslate') === '1';
 let phoneticOn     = localStorage.getItem('hugPhonetic') === '1';
-let strictness     = parseInt(localStorage.getItem('hugStrict')) || 2;
+let strictness     = parseInt(localStorage.getItem('hugStrict')) || 3;
 let repeatOnFail   = localStorage.getItem('hugRepeatFail') === '1';
 
 // Question history for prev/next navigation
 var questionHistory = [{ q: targetQ, a: targetA, a_hu: targetAH }];
 var historyIndex = 0;
 
-var strictLabels = { 1: 'Relaxed', 2: 'Meaning', 3: 'Balanced', 4: 'Strict', 5: 'Exam' };
-var strictSliderEl = document.getElementById('strictSlider');
-if (strictSliderEl) {
-    strictSliderEl.value = strictness;
-    document.getElementById('strictLabel').textContent = strictLabels[strictness];
-    strictSliderEl.addEventListener('input', function() {
+// 1=Beginner, 2=Forgiving, 3=Interview standard, 4=Tough interviewer, 5=Exam board
+var strictLabels = { 1: 'Beginner', 2: 'Forgiving', 3: 'Interview', 4: 'Tough', 5: 'Exam' };
+var strictColors = { 1: 'text-green-400', 2: 'text-blue-400', 3: 'text-accent-light', 4: 'text-amber-400', 5: 'text-red-400' };
+
+function initStrictSlider() {
+    var el = document.getElementById('strictSlider');
+    var label = document.getElementById('strictLabel');
+    if (!el || !label) return;
+    el.value = strictness;
+    label.textContent = strictLabels[strictness];
+    label.className = 'text-[10px] font-bold w-16 ' + (strictColors[strictness] || 'text-accent-light');
+    el.oninput = function() {
         strictness = parseInt(this.value);
         localStorage.setItem('hugStrict', strictness);
-        document.getElementById('strictLabel').textContent = strictLabels[strictness];
+        label.textContent = strictLabels[strictness];
+        label.className = 'text-[10px] font-bold w-16 ' + (strictColors[strictness] || 'text-accent-light');
+    };
+}
+
+function initSessionToolbar() {
+    initStrictSlider();
+    var bar = document.getElementById('sessionSpeedBar');
+    if (!bar) return;
+    bar.textContent = '';
+    [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].forEach(function(s) {
+        var pill = document.createElement('button');
+        pill.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ' + (currentSpeed === s ? 'bg-amber-500 text-white' : 'bg-surface-100 text-slate-500 hover:text-white');
+        pill.textContent = s === 1.0 ? '1.0' : s.toFixed(1);
+        pill.onclick = function() {
+            setSpeed(s);
+            bar.querySelectorAll('button').forEach(function(p) {
+                var ps = parseFloat(p.textContent);
+                p.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ' + (ps === s ? 'bg-amber-500 text-white' : 'bg-surface-100 text-slate-500 hover:text-white');
+            });
+        };
+        bar.appendChild(pill);
     });
 }
 
@@ -1688,22 +1729,33 @@ function toggleListenMode() {
     listenMode = !listenMode;
     localStorage.setItem('hugListen', listenMode ? '1' : '0');
     applyListenMode();
+    updateBlurButton();
 }
 
 function applyListenMode() {
     var q   = document.getElementById('questionText');
-    var btn = document.getElementById('listenModeBtn');
     if (!q) return;
     if (listenMode) {
         q.classList.add('listen-blur');
         q.title = 'Click to reveal';
         q.onclick = revealQuestion;
-        if (btn) { btn.classList.add('bg-violet-600', 'text-white'); btn.classList.remove('bg-surface-300', 'text-slate-200'); }
     } else {
         q.classList.remove('listen-blur');
         q.title = '';
         q.onclick = null;
-        if (btn) { btn.classList.remove('bg-violet-600', 'text-white'); btn.classList.add('bg-surface-300', 'text-slate-200'); }
+    }
+}
+
+function updateBlurButton() {
+    var btn = document.getElementById('listenModeBtn');
+    if (!btn) return;
+    btn.textContent = listenMode ? '👁 Blur ON' : '👁 Blur';
+    if (listenMode) {
+        btn.classList.add('bg-violet-600', 'text-white');
+        btn.classList.remove('bg-surface-300', 'text-slate-200');
+    } else {
+        btn.classList.remove('bg-violet-600', 'text-white');
+        btn.classList.add('bg-surface-300', 'text-slate-200');
     }
 }
 
@@ -3283,6 +3335,8 @@ function startSessionBlock(block, blockIdx) {
     document.getElementById('planBlockList').classList.add('hidden');
     document.getElementById('sessionCard').classList.remove('hidden');
     document.getElementById('sessionSummary').classList.add('hidden');
+    initSessionToolbar();
+    updateBlurButton();
 
     var badge = document.getElementById('sessionBadge');
     badge.textContent = block.title;
