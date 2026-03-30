@@ -849,7 +849,7 @@ select option { background: #111a2e; color: #e2e8f0; }
     </div>
 
     <!-- Block grid -->
-    <div id="planBlockList" class="grid grid-cols-3 gap-2">
+    <div id="planBlockList" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
         <div class="col-span-3 flex flex-col items-center py-8 gap-3">
             <div class="w-8 h-8 border-2 border-accent-light border-t-transparent rounded-full animate-spin"></div>
             <p class="text-slate-400 text-sm">Building your study plan...</p>
