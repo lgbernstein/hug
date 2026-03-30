@@ -1,7 +1,8 @@
 <?php
 // MagyarOK A1+ Grammar Workbook → Hug MySQL Import
 // Source: Szita Szilvia – Pelcz Katalin, MagyarOK Nyelvtani munkafüzet A1+, 1. kötet
-// Chapters 2-3 (pages 6-20): van, -ban/-ben, -i, -ul/-ül, regular verbs, possessives, questions, negation
+// Chapters 2-9: van, -ban/-ben, -i, -ul/-ül, regular verbs, possessives, questions, negation,
+// demonstratives, ordinals, months, seasons, -ba/-be, time, -val/-vel, definite/indefinite, colors, clothing, occupations
 // Safe to re-run: ON DUPLICATE KEY UPDATE
 
 session_start();
@@ -10,7 +11,7 @@ $conn = new mysqli($env['DB_HOST'], $env['DB_USER'], $env['DB_PASS'], $env['DB_N
 if ($conn->connect_error) { die('DB connection failed: ' . $conn->connect_error); }
 $conn->set_charset('utf8mb4');
 
-$batch = 'magyarok_a1_workbook_ch2-3';
+$batch = 'magyarok_a1_workbook_ch2-9';
 $counts = ['phrases' => 0, 'grammar' => 0];
 
 // ============================================================
@@ -197,6 +198,70 @@ $ch3 = [
 ];
 
 // ============================================================
+// CHAPTER 4: Demonstratives, ordinals, months/seasons, dates, -ba/-be
+// ============================================================
+
+$ch4 = [
+    // --- Demonstratives: ez/az ---
+    ['Ez egy könyv.', 'This is a book.', '', 'prep', 'All', 'magyarok-ch4,demonstrative,beginner,level-1'],
+    ['Az egy ház.', 'That is a house.', '', 'prep', 'All', 'magyarok-ch4,demonstrative,beginner,level-1'],
+    ['Ez a könyv érdekes.', 'This book is interesting.', '', 'prep', 'All', 'magyarok-ch4,demonstrative,article,beginner,level-1'],
+    ['Az a ház nagy.', 'That house is big.', '', 'prep', 'All', 'magyarok-ch4,demonstrative,article,beginner,level-1'],
+    ['Ezek a diákok magyarok.', 'These students are Hungarian.', '', 'prep', 'All', 'magyarok-ch4,demonstrative,plural,beginner,level-1'],
+    ['Azok az autók drágák.', 'Those cars are expensive.', '', 'prep', 'All', 'magyarok-ch4,demonstrative,plural,beginner,level-1'],
+    ['Ez az én könyvem.', 'This is my book.', '', 'prep', 'All', 'magyarok-ch4,demonstrative,possessive,beginner,level-1'],
+
+    // --- Ordinals ---
+    ['Első', 'first', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Második', 'second', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Harmadik', 'third', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Negyedik', 'fourth', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Ötödik', 'fifth', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Hatodik', 'sixth', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Hetedik', 'seventh', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Nyolcadik', 'eighth', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Kilencedik', 'ninth', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+    ['Tizedik', 'tenth', '', 'prep', 'All', 'magyarok-ch4,ordinal,beginner,level-1'],
+
+    // --- Months ---
+    ['Január', 'January', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Február', 'February', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Március', 'March', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Április', 'April', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Május', 'May', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Június', 'June', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Július', 'July', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Augusztus', 'August', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Szeptember', 'September', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['Október', 'October', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['November', 'November', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+    ['December', 'December', '', 'prep', 'All', 'magyarok-ch4,month,beginner,level-1'],
+
+    // --- Seasons ---
+    ['Tavasz', 'spring', '', 'prep', 'All', 'magyarok-ch4,season,beginner,level-1'],
+    ['Nyár', 'summer', '', 'prep', 'All', 'magyarok-ch4,season,beginner,level-1'],
+    ['Ősz', 'autumn / fall', '', 'prep', 'All', 'magyarok-ch4,season,beginner,level-1'],
+    ['Tél', 'winter', '', 'prep', 'All', 'magyarok-ch4,season,beginner,level-1'],
+    ['Tavasszal meleg van.', 'In spring it is warm.', '', 'prep', 'All', 'magyarok-ch4,season,sentence,beginner,level-1'],
+    ['Nyáron forró van.', 'In summer it is hot.', '', 'prep', 'All', 'magyarok-ch4,season,sentence,beginner,level-1'],
+    ['Ősszel hűvös van.', 'In autumn it is cool.', '', 'prep', 'All', 'magyarok-ch4,season,sentence,beginner,level-1'],
+    ['Télen hideg van.', 'In winter it is cold.', '', 'prep', 'All', 'magyarok-ch4,season,sentence,beginner,level-1'],
+
+    // --- -ba/-be (into) ---
+    ['Megyek a boltba.', 'I\'m going to the store.', '', 'prep', 'All', 'magyarok-ch4,ba-be,direction,beginner,level-1'],
+    ['Bemegyek az iskolába.', 'I\'m going into the school.', '', 'prep', 'All', 'magyarok-ch4,ba-be,direction,beginner,level-1'],
+    ['Budapestre megyek.', 'I\'m going to Budapest.', '', 'prep', 'All', 'magyarok-ch4,ba-be,direction,beginner,level-1'],
+    ['Magyarországra megyek.', 'I\'m going to Hungary.', '', 'prep', 'All', 'magyarok-ch4,ba-be,direction,beginner,level-1'],
+    ['Étterembe megyünk.', 'We\'re going to a restaurant.', '', 'prep', 'All', 'magyarok-ch4,ba-be,direction,beginner,level-1'],
+    ['Hova mész?', 'Where are you going?', '', 'prep', 'All', 'magyarok-ch4,ba-be,question,beginner,level-1'],
+
+    // --- Dates ---
+    ['Mikor született?', 'When were you born?', '', 'prep', 'All', 'magyarok-ch4,date,question,beginner,level-1'],
+    ['1957. november 7-én születtem.', 'I was born on November 7, 1957.', '', 'prep', 'Larry', 'magyarok-ch4,date,beginner,level-1'],
+    ['Augusztus 20-án van az államalapítás napja.', 'August 20 is the day of the state foundation.', '', 'prep', 'All', 'magyarok-ch4,date,culture,beginner,level-1'],
+];
+
+// ============================================================
 // CHAPTER 5: Hány/Mennyi, object -t, -s/-sz/-z verbs, transitive/intransitive, ik-verbs
 // ============================================================
 
@@ -361,10 +426,144 @@ $ch7 = [
     ['Egy e-mailt küldök Gábornak.', 'I\'m sending an email to Gábor. (indefinite — egy)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
 ];
 
+// ============================================================
+// CHAPTER 6: Telling time, -val/-vel (with/by), review
+// ============================================================
+
+$ch6 = [
+    // --- Telling time ---
+    ['Hány óra van?', 'What time is it?', '', 'prep', 'All', 'magyarok-ch6,time,question,beginner,level-2'],
+    ['Egy óra van.', 'It is one o\'clock.', '', 'prep', 'All', 'magyarok-ch6,time,beginner,level-2'],
+    ['Kettő óra van.', 'It is two o\'clock.', '', 'prep', 'All', 'magyarok-ch6,time,beginner,level-2'],
+    ['Fél három van.', 'It is half past two.', '', 'prep', 'All', 'magyarok-ch6,time,beginner,level-2'],
+    ['Negyed négy van.', 'It is quarter past three.', '', 'prep', 'All', 'magyarok-ch6,time,beginner,level-2'],
+    ['Háromnegyed öt van.', 'It is quarter to five.', '', 'prep', 'All', 'magyarok-ch6,time,beginner,level-2'],
+    ['Tizennégy óra tizenöt perc van.', 'It is 14:15.', '', 'prep', 'All', 'magyarok-ch6,time,beginner,level-2'],
+    ['Este nyolc óra harminc perc van.', 'It is 8:30 PM.', '', 'prep', 'All', 'magyarok-ch6,time,beginner,level-2'],
+    ['Hány órakor?', 'At what time?', '', 'prep', 'All', 'magyarok-ch6,time,question,beginner,level-2'],
+    ['Nyolckor kelek.', 'I get up at eight.', '', 'prep', 'All', 'magyarok-ch6,time,routine,beginner,level-2'],
+    ['Délben ebédelek.', 'I eat lunch at noon.', '', 'prep', 'All', 'magyarok-ch6,time,routine,beginner,level-2'],
+
+    // --- -val/-vel (with, by means of) ---
+    ['Busszal megyek.', 'I\'m going by bus.', '', 'prep', 'All', 'magyarok-ch6,val-vel,transport,beginner,level-2'],
+    ['Vonattal utazom.', 'I\'m traveling by train.', '', 'prep', 'All', 'magyarok-ch6,val-vel,transport,beginner,level-2'],
+    ['Autóval megyek.', 'I\'m going by car.', '', 'prep', 'All', 'magyarok-ch6,val-vel,transport,beginner,level-2'],
+    ['Mariával megyek.', 'I\'m going with Maria.', '', 'prep', 'All', 'magyarok-ch6,val-vel,beginner,level-2'],
+    ['Péterrel beszélek.', 'I\'m talking with Péter.', '', 'prep', 'All', 'magyarok-ch6,val-vel,assimilation,beginner,level-2'],
+    ['Kanállal eszem.', 'I eat with a spoon.', '', 'prep', 'All', 'magyarok-ch6,val-vel,assimilation,beginner,level-2'],
+    ['A feleségemmel élek.', 'I live with my wife.', '', 'prep', 'All', 'magyarok-ch6,val-vel,beginner,level-2'],
+
+    // --- Hány? / Mennyi? ---
+    ['Hány ember van itt?', 'How many people are here?', '', 'prep', 'All', 'magyarok-ch6,hany-mennyi,question,beginner,level-2'],
+    ['Mennyi idő van még?', 'How much time is left?', '', 'prep', 'All', 'magyarok-ch6,hany-mennyi,question,beginner,level-2'],
+    ['Mennyibe kerül?', 'How much does it cost?', '', 'prep', 'All', 'magyarok-ch6,hany-mennyi,question,beginner,level-2'],
+];
+
+// ============================================================
+// CHAPTER 8: Definite/indefinite conjugation intro, colors, clothing
+// ============================================================
+
+$ch8 = [
+    // --- Definite vs indefinite concept ---
+    ['Látok egy kutyát.', 'I see a dog. (indefinite)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Látom a kutyát.', 'I see the dog. (definite)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Beszélek magyarul.', 'I speak Hungarian. (indefinite — no object)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Beszélem a magyart.', 'I speak the Hungarian (language). (definite)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Rajzol egy házat.', 'He draws a house. (indefinite)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Rajzolja a házat.', 'He draws the house. (definite)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Látom a macskát.', 'I see the cat. (definite)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Látok egy macskát.', 'I see a cat. (indefinite)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Tanulom a magyart.', 'I\'m learning Hungarian. (definite)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+    ['Embereket látok.', 'I see people. (indefinite — no article)', '', 'prep', 'All', 'magyarok-ch8,def-indef-intro,beginner,level-2'],
+
+    // --- Colors ---
+    ['Kék', 'blue', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Piros', 'red', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Fekete', 'black', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Fehér', 'white', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Szürke', 'gray', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Sárga', 'yellow', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Zöld', 'green', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Barna', 'brown', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Lila', 'purple', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Rózsaszín', 'pink', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Narancssárga', 'orange', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Világoskék', 'light blue', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+    ['Sötétkék', 'dark blue', '', 'prep', 'All', 'magyarok-ch8,color,beginner,level-2'],
+
+    // --- Clothing ---
+    ['Kabát', 'coat', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Ing', 'shirt', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Nadrág', 'trousers / pants', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Szoknya', 'skirt', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Öltöny', 'suit (men)', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Kosztüm', 'suit (women)', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Zokni', 'socks', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Pizsama', 'pajamas', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Dzseki', 'jacket', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Mellény', 'vest', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+
+    // --- Shopping sentences ---
+    ['Van kabátod?', 'Do you have a coat?', '', 'prep', 'All', 'magyarok-ch8,clothing,question,beginner,level-2'],
+    ['Igen, van kabátom.', 'Yes, I have a coat.', '', 'prep', 'All', 'magyarok-ch8,clothing,beginner,level-2'],
+    ['Van piros kabátod?', 'Do you have a red coat?', '', 'prep', 'All', 'magyarok-ch8,clothing,color,beginner,level-2'],
+    ['Nem, nincs lila kabátom.', 'No, I don\'t have a purple coat.', '', 'prep', 'All', 'magyarok-ch8,clothing,color,negation,beginner,level-2'],
+    ['Mennyibe kerül ez a kabát?', 'How much does this coat cost?', '', 'prep', 'All', 'magyarok-ch8,shopping,question,beginner,level-2'],
+    ['A kabát huszonkilencezer-kilencszázkilencven forintba kerül.', 'The coat costs 29,990 forints.', '', 'prep', 'All', 'magyarok-ch8,shopping,number,beginner,level-2'],
+    ['Egy üveg vörösbor hétezer-ötszáz forintba kerül.', 'A bottle of red wine costs 7,500 forints.', '', 'prep', 'All', 'magyarok-ch8,shopping,number,beginner,level-2'],
+];
+
+// ============================================================
+// CHAPTER 9: Question words, biography structure, occupations
+// ============================================================
+
+$ch9 = [
+    // --- Question words (kérdőszavak) ---
+    ['Ki?', 'Who?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Mi?', 'What?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Hol?', 'Where?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Hova?', 'Where to?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Mikor?', 'When?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Miért?', 'Why?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Hogyan?', 'How?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Hány?', 'How many?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Mennyi?', 'How much?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Milyen?', 'What kind of? / What is ... like?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+    ['Melyik?', 'Which one?', '', 'prep', 'All', 'magyarok-ch9,question-word,beginner,level-2'],
+
+    // --- Occupations ---
+    ['Asztalos', 'carpenter / furniture maker', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Óvónő', 'kindergarten teacher (female)', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Könyvtáros', 'librarian', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Főszakács', 'chef', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Pincér', 'waiter', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Postás', 'mailman', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Bolti eladó', 'shop assistant', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Szobafestő', 'painter and decorator', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Gazdálkodó', 'farmer', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Cukrász', 'pastry cook / confectioner', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Ápolónő', 'nurse', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Varrónő', 'seamstress', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Kozmetikus', 'beautician', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+    ['Informatikus', 'IT professional', '', 'prep', 'All', 'magyarok-ch9,occupation,beginner,level-2'],
+
+    // --- Biography Q&A pattern ---
+    ['Hogy hívják?', 'What is your name?', '', 'prep', 'All', 'magyarok-ch9,biography,question,beginner,level-2'],
+    ['Mi a foglalkozása?', 'What is your occupation?', '', 'prep', 'All', 'magyarok-ch9,biography,question,beginner,level-2'],
+    ['Milyen színű a szeme?', 'What color are your eyes?', '', 'prep', 'All', 'magyarok-ch9,biography,question,beginner,level-2'],
+    ['A szemem kék.', 'My eyes are blue.', '', 'prep', 'All', 'magyarok-ch9,biography,beginner,level-2'],
+    ['Kék szemű vagyok.', 'I have blue eyes.', '', 'prep', 'All', 'magyarok-ch9,biography,beginner,level-2'],
+    ['Barna hajam van.', 'I have brown hair.', '', 'prep', 'All', 'magyarok-ch9,biography,beginner,level-2'],
+    ['Barna hajú vagyok.', 'I am brown-haired.', '', 'prep', 'All', 'magyarok-ch9,biography,beginner,level-2'],
+    ['Mit csinál a munkahelyén?', 'What do you do at your workplace?', '', 'prep', 'All', 'magyarok-ch9,biography,question,beginner,level-2'],
+    ['Segít.', 'He/she helps.', '', 'prep', 'All', 'magyarok-ch9,verb,beginner,level-2'],
+    ['Embereket gyógyítok.', 'I heal people.', '', 'prep', 'All', 'magyarok-ch9,biography,sentence,beginner,level-2'],
+];
+
 // Insert all phrases
 $stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, answer_hu, category, `who`, tags, import_batch) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en), answer_hu=VALUES(answer_hu), tags=VALUES(tags)");
 
-foreach (array_merge($ch2, $ch3, $ch5, $ch7) as $r) {
+foreach (array_merge($ch2, $ch3, $ch4, $ch5, $ch6, $ch7, $ch8, $ch9) as $r) {
     $stmt->bind_param('sssssss', $r[0], $r[1], $r[2], $r[3], $r[4], $r[5], $batch);
     $stmt->execute();
     $counts['phrases']++;
@@ -406,9 +605,9 @@ echo "<ul>";
 echo "<li>Phrases imported: {$counts['phrases']}</li>";
 echo "<li>Grammar patterns tagged: {$counts['grammar']}</li>";
 echo "</ul>";
-$allCount = count($ch2) + count($ch3) + count($ch5) + count($ch7);
-echo "<p><strong>Ch2: " . count($ch2) . " | Ch3: " . count($ch3) . " | Ch5: " . count($ch5) . " | Ch7: " . count($ch7) . " | Total: $allCount phrases</strong></p>";
+$allCount = count($ch2) + count($ch3) + count($ch4) + count($ch5) + count($ch6) + count($ch7) + count($ch8) + count($ch9);
+echo "<p><strong>Ch2: " . count($ch2) . " | Ch3: " . count($ch3) . " | Ch4: " . count($ch4) . " | Ch5: " . count($ch5) . " | Ch6: " . count($ch6) . " | Ch7: " . count($ch7) . " | Ch8: " . count($ch8) . " | Ch9: " . count($ch9) . " | Total: $allCount phrases</strong></p>";
 echo "<p>Tagged: <code>magyarok-chN</code> + grammar topic + <code>beginner</code> + <code>level-1/2/3</code></p>";
-echo "<p>Level 1 = basics (van, locations, questions) | Level 2 = intermediate (objects, ik-verbs) | Level 3 = definite/indefinite conjugation</p>";
+echo "<p>Level 1 = basics (van, locations, questions) | Level 2 = time, colors, clothing, occupations, questions | Level 3 = definite/indefinite conjugation</p>";
 echo "<p>Safe to re-run.</p>";
 ?>
