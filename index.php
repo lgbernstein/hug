@@ -1030,6 +1030,8 @@ select option { background: #111a2e; color: #e2e8f0; }
                     <span id="sessionTitle" class="text-xs text-slate-400 font-medium"></span>
                 </div>
                 <div class="flex items-center gap-2">
+                    <button id="slowBtn" onclick="toggleSlow()" title="Slow playback" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-300 text-slate-200 hover:bg-amber-600 hover:text-white transition-all">🐢 Slow</button>
+                    <button id="listenModeBtn" onclick="toggleListenMode()" title="Blur text — listen only" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-300 text-slate-200 hover:bg-violet-600 hover:text-white transition-all">👁 Blur</button>
                     <span id="sessionProgress" class="text-[11px] text-slate-500 font-medium tabular-nums"></span>
                     <button onclick="exitSession()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
                         <i data-lucide="x" class="w-4 h-4"></i>
@@ -1088,6 +1090,18 @@ select option { background: #111a2e; color: #e2e8f0; }
     <!-- VIEW: STUDY (Scenario-based + Grammar + Resources) -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div id="view-study" class="view-section hidden space-y-4">
+
+        <!-- Sub-nav -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+            <button onclick="showStudySub('scenarios')" id="studySub-scenarios" class="pill pill-active">Scenarios</button>
+            <button onclick="showStudySub('grammar')" id="studySub-grammar" class="pill pill-inactive">Grammar</button>
+            <button onclick="showStudySub('knowledge')" id="studySub-knowledge" class="pill pill-inactive">Knowledge</button>
+            <button onclick="showStudySub('resources')" id="studySub-resources" class="pill pill-inactive">Resources</button>
+            <button onclick="showStudySub('phrases')" id="studySub-phrases" class="pill pill-inactive">Phrases</button>
+        </div>
+
+        <!-- ═══ Scenarios sub-view (NEW default) ═══ -->
+        <div id="study-sub-scenarios">
 
         <!-- Must Nail section -->
         <div id="mustNailSection">
@@ -1181,6 +1195,8 @@ select option { background: #111a2e; color: #e2e8f0; }
                 <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
                     <h2 id="scenarioDrillTitle" class="text-base font-bold text-white flex items-center gap-2"><span></span></h2>
                     <div class="flex items-center gap-2">
+                        <button onclick="toggleSlow()" title="Slow playback" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-300 text-slate-200 hover:bg-amber-600 hover:text-white transition-all">🐢</button>
+                        <button onclick="toggleListenMode()" title="Blur text" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-300 text-slate-200 hover:bg-violet-600 hover:text-white transition-all">👁</button>
                         <span id="scenarioDrillProgress" class="text-[11px] text-slate-500 font-medium tabular-nums"></span>
                         <button onclick="closeScenarioDrill()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
                             <i data-lucide="x" class="w-4 h-4"></i>
@@ -1221,6 +1237,98 @@ select option { background: #111a2e; color: #e2e8f0; }
                     </div>
                     <div id="sheetsPreview" class="hidden space-y-3"></div>
                 </div>
+            </div>
+        </div>
+
+        </div><!-- end study-sub-scenarios -->
+
+        <!-- ═══ Grammar sub-view ═══ -->
+        <div id="study-sub-grammar" style="display:none">
+            <div class="space-y-4">
+                <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                    <input id="grammarSearch2" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
+                        class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+                </div>
+                <div id="grammarTagFilter2" class="flex flex-wrap gap-1.5"></div>
+                <div id="grammarList2" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"></div>
+            </div>
+        </div>
+
+        <!-- ═══ Knowledge sub-view ═══ -->
+        <div id="study-sub-knowledge" style="display:none">
+            <div class="space-y-4">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <button onclick="filterKnowledge('')" id="kc-all" class="pill pill-active">All</button>
+                    <button onclick="filterKnowledge('history')" id="kc-history" class="pill pill-inactive">History</button>
+                    <button onclick="filterKnowledge('geography')" id="kc-geography" class="pill pill-inactive">Geography</button>
+                    <button onclick="filterKnowledge('family')" id="kc-family" class="pill pill-inactive">Family</button>
+                    <button onclick="filterKnowledge('culture')" id="kc-culture" class="pill pill-inactive">Culture</button>
+                </div>
+                <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                    <input id="knowledgeSearch" type="text" placeholder="Search knowledge cards..." oninput="searchKnowledge()"
+                        class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="knowledgeQuizMode()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-500/10 text-green-400 text-xs font-semibold border border-green-500/15 hover:bg-green-500/20 transition-all">
+                        <i data-lucide="brain" class="w-3.5 h-3.5"></i> Quiz Me
+                    </button>
+                    <button onclick="addKnowledgeCard()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-100 text-slate-300 text-xs font-semibold border border-white/10 hover:border-accent/30 transition-all">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Card
+                    </button>
+                </div>
+                <div id="knowledgeList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    <p class="col-span-2 text-slate-500 text-sm text-center py-4">Loading...</p>
+                </div>
+                <div id="knowledgeQuizPanel" class="hidden">
+                    <div class="glass rounded-2xl overflow-hidden border border-green-500/20">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-green-500/5">
+                            <h2 class="text-base font-bold flex items-center gap-2 text-green-400">
+                                <i data-lucide="brain" class="w-4 h-4"></i> Knowledge Quiz
+                            </h2>
+                            <button onclick="closeKnowledgeQuiz()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                                <i data-lucide="x" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <div id="knowledgeQuizContent" class="p-4 space-y-4"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ Resources sub-view ═══ -->
+        <div id="study-sub-resources" style="display:none">
+            <div class="space-y-4">
+                <div id="resourcesList2" class="space-y-4">
+                    <p class="text-slate-500 text-sm text-center py-4">Loading resources...</p>
+                </div>
+                <div class="glass rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="upload" class="w-4 h-4 text-accent-light"></i>
+                        <h3 class="text-sm font-bold text-white">Import from Google Sheets</h3>
+                    </div>
+                    <p class="text-xs text-slate-400">Paste a Google Sheets URL to import questions and answers into your phrase bank.</p>
+                    <div class="flex gap-2">
+                        <input id="sheetsUrl2" type="text" placeholder="https://docs.google.com/spreadsheets/d/..."
+                            class="flex-1 bg-surface-50 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 outline-none border border-white/5 focus:border-accent/40">
+                        <button onclick="fetchSheetPreview()" class="px-4 py-2 bg-accent hover:bg-accent-dark rounded-xl text-xs font-bold text-white transition-all">Fetch</button>
+                    </div>
+                    <div id="sheetsPreview2" class="hidden space-y-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ Phrases sub-view ═══ -->
+        <div id="study-sub-phrases" style="display:none">
+            <div class="space-y-3">
+                <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+                    <input id="studyBrowseSearch" type="text" placeholder="Search phrases..." oninput="searchStudyPhrases()"
+                        class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
+                </div>
+                <div id="studyBrowseList" class="space-y-1"></div>
+                <div class="text-center"><span id="studyBrowseCount" class="text-xs text-slate-500"></span></div>
             </div>
         </div>
 
@@ -1356,9 +1464,9 @@ function updateSession(pass) {
         sessionFail++;
         sessionStreak = 0;
     }
-    document.getElementById('sesPass').textContent   = sessionPass;
-    document.getElementById('sesFail').textContent   = sessionFail;
-    document.getElementById('sesStreak').textContent = sessionStreak;
+    var sp = document.getElementById('sesPass'); if (sp) sp.textContent = sessionPass;
+    var sf = document.getElementById('sesFail'); if (sf) sf.textContent = sessionFail;
+    var ss = document.getElementById('sesStreak'); if (ss) ss.textContent = sessionStreak;
     updateProgressBar();
     if (sessionCount >= SESSION_SIZE) showSummary();
 }
@@ -1370,9 +1478,9 @@ function showSummary() {
     document.getElementById('summaryStreak').textContent = sessionBestStreak;
     document.getElementById('summaryModal').classList.remove('hidden');
     sessionPass = sessionFail = sessionStreak = sessionBestStreak = sessionCount = 0;
-    document.getElementById('sesPass').textContent   = '0';
-    document.getElementById('sesFail').textContent   = '0';
-    document.getElementById('sesStreak').textContent = '0';
+    var sp2 = document.getElementById('sesPass'); if (sp2) sp2.textContent = '0';
+    var sf2 = document.getElementById('sesFail'); if (sf2) sf2.textContent = '0';
+    var ss2 = document.getElementById('sesStreak'); if (ss2) ss2.textContent = '0';
     updateProgressBar();
 }
 
@@ -1384,7 +1492,7 @@ function closeSummary(keepGoing) {
 // ── Audio ─────────────────────────────────────────────────────────────
 let audioCtx = null, analyser = null, micStream = null, volTimer = null;
 let mediaRecorder = null, audioChunks = [], lastRecordingBlob = null;
-const volFill = document.getElementById('volFill');
+var volFill = document.getElementById('volFill');
 
 const VAD_THRESHOLD = 8;
 const VAD_SILENCE   = 1200;
@@ -1433,12 +1541,12 @@ function startVolume() {
 
 function stopVolume() {
     clearInterval(volTimer);
-    volFill.style.width = '0%';
+    if (volFill) volFill.style.width = '0%';
 }
 
 function cleanupAudio() {
     clearInterval(volTimer);
-    volFill.style.width = '0%';
+    if (volFill) volFill.style.width = '0%';
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         try { mediaRecorder.stop(); } catch(e) {}
     }
@@ -1479,11 +1587,11 @@ function speak(rate, autoRecord) {
     clearTimeout(advanceTimeout);
     try { recognition.abort(); } catch(e) {}
     // Reset result card so re-listen triggers fresh eval
-    document.getElementById('resultCard').classList.add('hidden');
-    document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
-    document.getElementById('matchScore').textContent = '';
-    document.getElementById('transcript').textContent = '';
-    document.getElementById('playbackBtn').classList.add('hidden');
+    var rc = document.getElementById('resultCard');
+    if (rc) { rc.classList.add('hidden'); rc.classList.remove('result-pass', 'result-fail'); }
+    var ms = document.getElementById('matchScore'); if (ms) ms.textContent = '';
+    var tr = document.getElementById('transcript'); if (tr) tr.textContent = '';
+    var pb = document.getElementById('playbackBtn'); if (pb) pb.classList.add('hidden');
     setTimeout(function() {
         var msg = new SpeechSynthesisUtterance(targetQ);
         msg.lang = 'hu-HU';
@@ -1496,15 +1604,10 @@ function speak(rate, autoRecord) {
 
 // ── Speed control ─────────────────────────────────────────────────────
 function toggleSlow() {
-    var btn = document.getElementById('slowBtn');
     if (currentSpeed === 0.5) {
         setSpeed(1.0);
-        btn.classList.remove('bg-amber-600', 'text-white');
-        btn.classList.add('bg-surface-300', 'text-slate-200');
     } else {
         setSpeed(0.5);
-        btn.classList.remove('bg-surface-300', 'text-slate-200');
-        btn.classList.add('bg-amber-600', 'text-white');
     }
     speak(currentSpeed);
 }
@@ -1513,12 +1616,14 @@ function setSpeed(speed) {
     currentSpeed = speed;
     localStorage.setItem('hugSpeed', speed);
     var slowBtn = document.getElementById('slowBtn');
-    if (speed === 0.5) {
-        slowBtn.classList.remove('bg-surface-300', 'text-slate-200');
-        slowBtn.classList.add('bg-amber-600', 'text-white');
-    } else {
-        slowBtn.classList.remove('bg-amber-600', 'text-white');
-        slowBtn.classList.add('bg-surface-300', 'text-slate-200');
+    if (slowBtn) {
+        if (speed === 0.5) {
+            slowBtn.classList.remove('bg-surface-300', 'text-slate-200');
+            slowBtn.classList.add('bg-amber-600', 'text-white');
+        } else {
+            slowBtn.classList.remove('bg-amber-600', 'text-white');
+            slowBtn.classList.add('bg-surface-300', 'text-slate-200');
+        }
     }
     document.querySelectorAll('.speed-btn').forEach(function(btn) {
         var s = parseFloat(btn.dataset.speed);
@@ -1553,18 +1658,17 @@ function toggleListenMode() {
 function applyListenMode() {
     var q   = document.getElementById('questionText');
     var btn = document.getElementById('listenModeBtn');
+    if (!q) return;
     if (listenMode) {
         q.classList.add('listen-blur');
         q.title = 'Click to reveal';
         q.onclick = revealQuestion;
-        btn.classList.add('text-amber-400');
-        btn.classList.remove('text-slate-500', 'text-slate-200');
+        if (btn) { btn.classList.add('bg-violet-600', 'text-white'); btn.classList.remove('bg-surface-300', 'text-slate-200'); }
     } else {
         q.classList.remove('listen-blur');
         q.title = '';
         q.onclick = null;
-        btn.classList.remove('text-amber-400');
-        btn.classList.add('text-slate-200');
+        if (btn) { btn.classList.remove('bg-violet-600', 'text-white'); btn.classList.add('bg-surface-300', 'text-slate-200'); }
     }
 }
 
@@ -1595,13 +1699,15 @@ function applyAutoAdvance() {
 function setMode(mode) {
     currentMode = mode;
     localStorage.setItem('hugMode', mode);
-    // Session toolbar buttons
-    document.getElementById('btnPron').className = 'pill ' + (mode === 'pronunciation' ? 'pill-active' : 'pill-inactive');
-    document.getElementById('btnInterview').className = 'pill ' + (mode === 'interview' ? 'pill-active' : 'pill-inactive');
-    document.getElementById('listenBtnLabel').textContent = mode === 'pronunciation' ? 'Listen & Repeat' : 'Hear Question';
+    var bp = document.getElementById('btnPron'); if (bp) bp.className = 'pill ' + (mode === 'pronunciation' ? 'pill-active' : 'pill-inactive');
+    var bi = document.getElementById('btnInterview'); if (bi) bi.className = 'pill ' + (mode === 'interview' ? 'pill-active' : 'pill-inactive');
+    var lb = document.getElementById('listenBtnLabel'); if (lb) lb.textContent = mode === 'pronunciation' ? 'Listen & Repeat' : 'Hear Question';
 }
 
 // ── Next question ─────────────────────────────────────────────────────
+// Safe DOM setter — no-op if element missing
+function $set(id, prop, val) { var el = document.getElementById(id); if (el) { if (prop === 'text') el.textContent = val; else if (prop === 'hide') el.classList.add('hidden'); else if (prop === 'show') el.classList.remove('hidden'); else if (prop === 'removeClass') el.classList.remove(val); else if (prop === 'removeAttr') el.removeAttribute(val); } }
+
 function nextQuestion() {
     isListening       = false;
     questionAttempted = false;
@@ -1610,8 +1716,8 @@ function nextQuestion() {
     clearTimeout(advanceTimeout);
     try { recognition.abort(); } catch(e) {}
 
-    document.getElementById('practiceTranslation').classList.add('hidden');
-    document.getElementById('revealDetails').removeAttribute('open');
+    $set('practiceTranslation', 'hide');
+    $set('revealDetails', 'removeAttr', 'open');
 
     // If in drill mode, advance through drill array
     if (drillPhrases.length > 0) {
@@ -1627,23 +1733,19 @@ function nextQuestion() {
             targetQ  = data.q;
             targetA  = data.a;
             targetAH = data.a_hu || '';
-            // Track history — trim future if we navigated back
             questionHistory = questionHistory.slice(0, historyIndex + 1);
             questionHistory.push({ q: data.q, a: data.a, a_hu: data.a_hu || '', category: data.category || '' });
             historyIndex = questionHistory.length - 1;
-            document.getElementById('questionText').textContent = data.q;
-            document.getElementById('answerText').textContent   = data.a_hu || data.a;
-            document.getElementById('resultCard').classList.add('hidden');
-            document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
-            document.getElementById('matchScore').textContent   = '';
-            document.getElementById('transcript').textContent   = '';
-            document.getElementById('playbackBtn').classList.add('hidden');
-            document.getElementById('categoryTag').textContent = data.category || '';
+            $set('questionText', 'text', data.q);
+            $set('answerText', 'text', data.a_hu || data.a);
+            $set('resultCard', 'hide'); $set('resultCard', 'removeClass', 'result-pass'); $set('resultCard', 'removeClass', 'result-fail');
+            $set('matchScore', 'text', ''); $set('transcript', 'text', '');
+            $set('playbackBtn', 'hide');
+            $set('categoryTag', 'text', data.category || '');
             lastRecordingBlob = null;
             if (listenMode) applyListenMode();
-            // Auto-fetch translate/phonetic if toggled on
-            if (translateOn) fetchTranslation(); else { document.getElementById('inlineTranslation').classList.add('hidden'); document.getElementById('inlineTranslation').textContent = ''; }
-            if (phoneticOn) fetchPhonetic(); else { document.getElementById('phoneticHint').classList.add('hidden'); document.getElementById('phoneticHint').textContent = ''; }
+            if (translateOn) fetchTranslation(); else { $set('inlineTranslation', 'hide'); $set('inlineTranslation', 'text', ''); }
+            if (phoneticOn) fetchPhonetic(); else { $set('phoneticHint', 'hide'); $set('phoneticHint', 'text', ''); }
             speak(currentSpeed);
         });
 }
@@ -1661,20 +1763,18 @@ function prevQuestion() {
     clearTimeout(recTimeout);
     clearTimeout(advanceTimeout);
     try { recognition.abort(); } catch(e) {}
-    document.getElementById('questionText').textContent = h.q;
-    document.getElementById('answerText').textContent   = h.a_hu || h.a;
-    document.getElementById('resultCard').classList.add('hidden');
-    document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
-    document.getElementById('matchScore').textContent   = '';
-    document.getElementById('transcript').textContent   = '';
-    document.getElementById('playbackBtn').classList.add('hidden');
-    document.getElementById('categoryTag').textContent  = h.category || '';
-    document.getElementById('revealDetails').removeAttribute('open');
-    document.getElementById('practiceTranslation').classList.add('hidden');
+    $set('questionText', 'text', h.q);
+    $set('answerText', 'text', h.a_hu || h.a);
+    $set('resultCard', 'hide'); $set('resultCard', 'removeClass', 'result-pass'); $set('resultCard', 'removeClass', 'result-fail');
+    $set('matchScore', 'text', ''); $set('transcript', 'text', '');
+    $set('playbackBtn', 'hide');
+    $set('categoryTag', 'text', h.category || '');
+    $set('revealDetails', 'removeAttr', 'open');
+    $set('practiceTranslation', 'hide');
     lastRecordingBlob = null;
     if (listenMode) applyListenMode();
-    if (translateOn) fetchTranslation(); else { document.getElementById('inlineTranslation').classList.add('hidden'); document.getElementById('inlineTranslation').textContent = ''; }
-    if (phoneticOn) fetchPhonetic(); else { document.getElementById('phoneticHint').classList.add('hidden'); document.getElementById('phoneticHint').textContent = ''; }
+    if (translateOn) fetchTranslation(); else { $set('inlineTranslation', 'hide'); $set('inlineTranslation', 'text', ''); }
+    if (phoneticOn) fetchPhonetic(); else { $set('phoneticHint', 'hide'); $set('phoneticHint', 'text', ''); }
     speak(currentSpeed);
 }
 
@@ -1686,8 +1786,8 @@ function shuffleQuestion() {
     clearTimeout(advanceTimeout);
     try { recognition.abort(); } catch(e) {}
 
-    document.getElementById('practiceTranslation').classList.add('hidden');
-    document.getElementById('revealDetails').removeAttribute('open');
+    $set('practiceTranslation', 'hide');
+    $set('revealDetails', 'removeAttr', 'open');
 
     // If in drill mode, shuffle the drill array
     if (drillPhrases.length > 0) {
@@ -1711,18 +1811,16 @@ function shuffleQuestion() {
             questionHistory = questionHistory.slice(0, historyIndex + 1);
             questionHistory.push({ q: data.q, a: data.a, a_hu: data.a_hu || '', category: data.category || '' });
             historyIndex = questionHistory.length - 1;
-            document.getElementById('questionText').textContent = data.q;
-            document.getElementById('answerText').textContent   = data.a_hu || data.a;
-            document.getElementById('resultCard').classList.add('hidden');
-            document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
-            document.getElementById('matchScore').textContent   = '';
-            document.getElementById('transcript').textContent   = '';
-            document.getElementById('playbackBtn').classList.add('hidden');
-            document.getElementById('categoryTag').textContent = data.category || '';
+            $set('questionText', 'text', data.q);
+            $set('answerText', 'text', data.a_hu || data.a);
+            $set('resultCard', 'hide'); $set('resultCard', 'removeClass', 'result-pass'); $set('resultCard', 'removeClass', 'result-fail');
+            $set('matchScore', 'text', ''); $set('transcript', 'text', '');
+            $set('playbackBtn', 'hide');
+            $set('categoryTag', 'text', data.category || '');
             lastRecordingBlob = null;
             if (listenMode) applyListenMode();
-            if (translateOn) fetchTranslation(); else { document.getElementById('inlineTranslation').classList.add('hidden'); document.getElementById('inlineTranslation').textContent = ''; }
-            if (phoneticOn) fetchPhonetic(); else { document.getElementById('phoneticHint').classList.add('hidden'); document.getElementById('phoneticHint').textContent = ''; }
+            if (translateOn) fetchTranslation(); else { $set('inlineTranslation', 'hide'); $set('inlineTranslation', 'text', ''); }
+            if (phoneticOn) fetchPhonetic(); else { $set('phoneticHint', 'hide'); $set('phoneticHint', 'text', ''); }
             speak(currentSpeed);
         });
 }
@@ -2757,9 +2855,23 @@ function renderDrillSummary() {
     controls.appendChild(closeBtn);
 }
 
-// Legacy sub-nav compat
-var studySub = 'grammar';
-function showStudySub(sub) { /* no-op, scenarios replace sub-nav */ }
+// Study tab sub-nav
+var studySub = 'scenarios';
+function showStudySub(sub) {
+    studySub = sub;
+    ['scenarios', 'grammar', 'knowledge', 'resources', 'phrases'].forEach(function(s) {
+        var el = document.getElementById('study-sub-' + s);
+        if (el) el.style.display = s === sub ? 'block' : 'none';
+        var btn = document.getElementById('studySub-' + s);
+        if (btn) btn.className = 'pill ' + (s === sub ? 'pill-active' : 'pill-inactive');
+    });
+    if (sub === 'scenarios') { loadScenarios(); loadMustNail(); loadRecommendedGrammar(); }
+    if (sub === 'grammar') loadGrammarPatterns();
+    if (sub === 'knowledge') loadKnowledgeCards();
+    if (sub === 'resources') loadResources();
+    if (sub === 'phrases') loadStudyPhrases();
+    lucide.createIcons();
+}
 
 // Progress sub-nav
 var progressSub = 'dashboard';
@@ -3417,25 +3529,22 @@ function loadDrillIntoPlayer() {
     targetQ = p.q;
     targetA = p.a;
     targetAH = p.a_hu || '';
-    // Update the main player UI
-    document.getElementById('questionText').textContent = p.q;
-    document.getElementById('answerText').textContent = p.a_hu || p.a;
-    document.getElementById('resultCard').classList.add('hidden');
-    document.getElementById('resultCard').classList.remove('result-pass', 'result-fail');
-    document.getElementById('matchScore').textContent = '';
-    document.getElementById('transcript').textContent = '';
-    document.getElementById('playbackBtn').classList.add('hidden');
-    document.getElementById('categoryTag').textContent = activeDrillName;
-    document.getElementById('revealDetails').removeAttribute('open');
+    $set('questionText', 'text', p.q);
+    $set('answerText', 'text', p.a_hu || p.a);
+    $set('resultCard', 'hide'); $set('resultCard', 'removeClass', 'result-pass'); $set('resultCard', 'removeClass', 'result-fail');
+    $set('matchScore', 'text', ''); $set('transcript', 'text', '');
+    $set('playbackBtn', 'hide');
+    $set('categoryTag', 'text', activeDrillName);
+    $set('revealDetails', 'removeAttr', 'open');
     lastRecordingBlob = null;
     questionAttempted = false;
-    // Update progress for drill
-    var pct = drillPhrases.length > 0 ? Math.min(100, ((drillIdx) / drillPhrases.length) * 100) : 0;
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressLabel').textContent = (drillIdx + 1) + ' / ' + drillPhrases.length;
+    var pf = document.getElementById('progressFill');
+    var pl = document.getElementById('progressLabel');
+    if (pf) { var pct = Math.min(100, ((drillIdx) / drillPhrases.length) * 100); pf.style.width = pct + '%'; }
+    if (pl) pl.textContent = (drillIdx + 1) + ' / ' + drillPhrases.length;
     if (listenMode) applyListenMode();
-    if (translateOn) fetchTranslation(); else { document.getElementById('inlineTranslation').classList.add('hidden'); }
-    if (phoneticOn) fetchPhonetic(); else { document.getElementById('phoneticHint').classList.add('hidden'); }
+    if (translateOn) fetchTranslation(); else { $set('inlineTranslation', 'hide'); }
+    if (phoneticOn) fetchPhonetic(); else { $set('phoneticHint', 'hide'); }
     speak(currentSpeed);
 }
 
