@@ -1920,26 +1920,56 @@ recognition.onresult = function(event) {
     isListening = false;
     indicator.className = 'status-dot dot-off';
     var rbReset = document.getElementById('recordBtn');
-    rbReset.classList.remove('mic-active', 'bg-red-600', 'hover:bg-red-500', 'glow-red');
-    rbReset.classList.add('bg-green-600', 'hover:bg-green-500', 'glow-green');
-    document.getElementById('recordLabel').textContent = 'Mic';
+    if (rbReset) {
+        rbReset.classList.remove('mic-active', 'bg-red-600', 'hover:bg-red-500', 'glow-red');
+        rbReset.classList.add('bg-green-600', 'hover:bg-green-500', 'glow-green');
+    }
+    var rl = document.getElementById('recordLabel'); if (rl) rl.textContent = 'Mic';
 
-    setRecordIcon('mic');
+    if (typeof setRecordIcon === 'function') setRecordIcon('mic');
 
     if (isPractice) {
         isPractice = false;
         var el = document.getElementById('practiceTranslation');
-        el.textContent = 'You said: "' + result + '"';
-        el.classList.remove('hidden');
+        if (el) { el.textContent = 'You said: "' + result + '"'; el.classList.remove('hidden'); }
         return;
     }
 
     var resultCard = document.getElementById('resultCard');
+    if (!resultCard) {
+        // No static result card — create one dynamically in the session content area
+        var sessionContent = document.getElementById('sessionContent') || document.getElementById('scenarioDrillContent');
+        if (sessionContent) {
+            resultCard = document.createElement('div');
+            resultCard.id = 'resultCard';
+            resultCard.className = 'glass rounded-2xl p-4 mt-4 border';
+            var transcriptEl = document.createElement('p');
+            transcriptEl.id = 'transcript';
+            transcriptEl.className = 'text-sm text-slate-300 italic mb-2';
+            resultCard.appendChild(transcriptEl);
+            var scoreEl = document.createElement('div');
+            scoreEl.id = 'matchScore';
+            scoreEl.className = 'text-center';
+            resultCard.appendChild(scoreEl);
+            var playBtn = document.createElement('button');
+            playBtn.id = 'playbackBtn';
+            playBtn.className = 'hidden mt-2 px-3 py-1.5 rounded-lg bg-surface-50 text-[11px] font-semibold text-slate-300 hover:text-white';
+            playBtn.textContent = '🔊 Hear myself';
+            playBtn.onclick = function() { playMyVoice(); };
+            resultCard.appendChild(playBtn);
+            sessionContent.appendChild(resultCard);
+        } else {
+            return; // nowhere to show results
+        }
+    }
     resultCard.classList.remove('hidden', 'result-pass', 'result-fail');
-    document.getElementById('transcript').textContent = '"' + result + '"';
-    document.getElementById('playbackBtn').classList.add('hidden');
+    var transcriptDisp = document.getElementById('transcript');
+    if (transcriptDisp) transcriptDisp.textContent = '"' + result + '"';
+    var pbtn = document.getElementById('playbackBtn');
+    if (pbtn) pbtn.classList.add('hidden');
 
     var scoreDisplay = document.getElementById('matchScore');
+    if (!scoreDisplay) return;
     scoreDisplay.textContent = '';
     var evalSpinner = document.createElement('span');
     evalSpinner.className = 'inline-flex items-center gap-2 text-slate-400 text-xs';
@@ -1989,8 +2019,9 @@ recognition.onresult = function(event) {
             resultCard.classList.add(isPass ? 'result-pass' : 'result-fail');
 
             // Always show playback button so user can hear themselves
-            if (lastRecordingBlob) {
-                document.getElementById('playbackBtn').classList.remove('hidden');
+            var playbackEl = document.getElementById('playbackBtn');
+            if (lastRecordingBlob && playbackEl) {
+                playbackEl.classList.remove('hidden');
             } else {
                 showPlaybackWhenReady = true;
             }
@@ -3325,17 +3356,44 @@ function renderSessionStep() {
 }
 
 function renderAudioStep(step, content, controls) {
+    // Mode label — make clear what's expected
+    var modeLabel = document.createElement('div');
+    var isPron = (step.mode || 'pronunciation') === 'pronunciation';
+    modeLabel.className = 'mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ' +
+        (isPron ? 'bg-blue-500/15 text-blue-400' : 'bg-pink-500/15 text-pink-400');
+    modeLabel.textContent = isPron ? '🎤 Repeat this phrase aloud' : '💬 Answer this question in Hungarian';
+    content.appendChild(modeLabel);
+
     // Question text
     var q = document.createElement('h1');
-    q.className = 'question-text text-white mb-4';
+    q.id = 'questionText';
+    q.className = 'question-text text-white mb-2';
     q.textContent = step.q;
+    if (listenMode) { q.classList.add('listen-blur'); q.onclick = function() { q.classList.remove('listen-blur'); }; }
     content.appendChild(q);
 
     // Translation (small)
     var trans = document.createElement('p');
-    trans.className = 'text-blue-300/70 text-sm italic mb-6';
+    trans.className = 'text-blue-300/70 text-sm italic mb-4';
     trans.textContent = step.a;
     content.appendChild(trans);
+
+    // Reveal answer (for interview mode)
+    if (!isPron && step.a_hu) {
+        var revealWrap = document.createElement('details');
+        revealWrap.id = 'revealDetails';
+        revealWrap.className = 'mb-4';
+        var revealSummary = document.createElement('summary');
+        revealSummary.className = 'text-xs text-slate-500 cursor-pointer hover:text-white transition-colors';
+        revealSummary.textContent = 'Show expected answer';
+        revealWrap.appendChild(revealSummary);
+        var revealText = document.createElement('p');
+        revealText.id = 'answerText';
+        revealText.className = 'text-sm text-accent-light font-semibold mt-1';
+        revealText.textContent = step.a_hu;
+        revealWrap.appendChild(revealText);
+        content.appendChild(revealWrap);
+    }
 
     // Status indicators
     var statusRow = document.createElement('div');
@@ -3343,20 +3401,49 @@ function renderAudioStep(step, content, controls) {
     var readyDot = document.createElement('div');
     readyDot.id = 'readyIndicator';
     readyDot.className = 'status-dot dot-off';
+    indicator = readyDot;
     var volTrack = document.createElement('div');
     volTrack.className = 'vol-track';
     var volFillEl = document.createElement('div');
     volFillEl.id = 'volFill';
     volFillEl.className = 'vol-fill';
+    volFill = volFillEl;
     volTrack.appendChild(volFillEl);
     statusRow.appendChild(readyDot);
     statusRow.appendChild(volTrack);
     content.appendChild(statusRow);
 
+    // Result card (pre-created, hidden until eval completes)
+    var resultCard = document.createElement('div');
+    resultCard.id = 'resultCard';
+    resultCard.className = 'hidden glass rounded-2xl p-4 border mb-4';
+    var transcriptEl = document.createElement('p');
+    transcriptEl.id = 'transcript';
+    transcriptEl.className = 'text-sm text-slate-300 italic mb-2';
+    resultCard.appendChild(transcriptEl);
+    var scoreEl = document.createElement('div');
+    scoreEl.id = 'matchScore';
+    scoreEl.className = 'text-center';
+    resultCard.appendChild(scoreEl);
+    var playBtn = document.createElement('button');
+    playBtn.id = 'playbackBtn';
+    playBtn.className = 'hidden mt-2 px-3 py-1.5 rounded-lg bg-surface-50 text-[11px] font-semibold text-slate-300 hover:text-white';
+    playBtn.textContent = '🔊 Hear myself';
+    playBtn.onclick = function() { playMyVoice(); };
+    resultCard.appendChild(playBtn);
+    content.appendChild(resultCard);
+
     // Listen & Speak button
     var listenBtn = document.createElement('button');
     listenBtn.className = 'w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-5 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98] shadow-lg shadow-accent/5';
-    listenBtn.innerHTML = '<i data-lucide="volume-2" class="w-7 h-7 text-accent-light group-hover:scale-110 transition-transform"></i><span class="text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]">Listen &amp; Speak</span>';
+    var speakerIcon = document.createElement('i');
+    speakerIcon.setAttribute('data-lucide', 'volume-2');
+    speakerIcon.className = 'w-7 h-7 text-accent-light group-hover:scale-110 transition-transform';
+    listenBtn.appendChild(speakerIcon);
+    var btnLabel = document.createElement('span');
+    btnLabel.className = 'text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]';
+    btnLabel.textContent = isPron ? 'Listen & Repeat' : 'Hear Question & Answer';
+    listenBtn.appendChild(btnLabel);
     listenBtn.onclick = function() {
         targetQ = step.q;
         targetA = step.a;
@@ -3366,7 +3453,7 @@ function renderAudioStep(step, content, controls) {
     };
     controls.appendChild(listenBtn);
 
-    // Result area (filled after eval)
+    // Result area (filled after eval — session-aware)
     var resultArea = document.createElement('div');
     resultArea.id = 'sessionResultArea';
     resultArea.className = 'hidden mt-4 text-center';
