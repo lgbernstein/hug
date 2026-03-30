@@ -454,6 +454,43 @@ Give exactly 3 examples and 3 quiz questions. Make them relevant to daily life a
     exit;
 }
 
+// AJAX: grammar breakdown for a sentence
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
+    header('Content-Type: application/json');
+    $sentence = trim($_POST['sentence'] ?? '');
+    $english = trim($_POST['english'] ?? '');
+    if (!$sentence) { echo json_encode(['error' => 'No sentence']); exit; }
+
+    $sentenceEsc = addslashes($sentence);
+    $englishEsc = addslashes($english);
+    $prompt = "You are a Hungarian language tutor. Break down this Hungarian sentence word-by-word for an English speaker.\n\nSentence: **{$sentenceEsc}**" . ($english ? "\nEnglish meaning: {$englishEsc}" : "") . "\n\nFor EACH word or particle, explain:\n1. The base word and its meaning\n2. Any suffixes, cases, or conjugation endings and what they do\n3. Why this form is used here\n\nKeep explanations SHORT and practical. Use this JSON format:\n{\n  \"words\": [\n    {\"word\": \"the Hungarian word\", \"base\": \"dictionary form\", \"meaning\": \"English meaning\", \"suffixes\": \"explanation of endings/suffixes or none\", \"role\": \"its role in the sentence\"}\n  ],\n  \"structure\": \"One sentence explaining the overall sentence structure.\",\n  \"tip\": \"One practical tip for remembering this pattern.\"\n}\n\nBe concise. Focus on suffixes and grammar mechanics.";
+
+    $apiKey = $env['GEMINI_KEY'];
+    $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
+    $payload = json_encode([
+        'contents' => [['parts' => [['text' => $prompt]]]],
+        'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2048, 'responseMimeType' => 'application/json']
+    ]);
+    $ch = curl_init($geminiUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => $payload, CURLOPT_TIMEOUT => 20, CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($httpCode !== 200 || !$resp) { echo json_encode(['error' => 'Gemini API error']); exit; }
+    $data = json_decode($resp, true);
+    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $text = preg_replace('/^```json\s*/i', '', $text);
+    $text = preg_replace('/\s*```$/', '', $text);
+    $parsed = json_decode($text, true);
+    if (!$parsed) { echo json_encode(['error' => 'Parse error', 'raw' => $text]); exit; }
+    echo json_encode($parsed);
+    exit;
+}
+
 // AJAX: list learning resources
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'resources') {
     header('Content-Type: application/json');
@@ -940,7 +977,7 @@ select option { background: #111a2e; color: #e2e8f0; }
 </div>
 
 <!-- MAIN APP -->
-<div class="w-full max-w-6xl px-4 pt-4 md:pt-8 space-y-4">
+<div class="w-full px-4 md:px-8 pt-4 md:pt-8 space-y-4">
 
     <!-- HEADER -->
     <header class="flex items-center justify-between">
@@ -1030,8 +1067,7 @@ select option { background: #111a2e; color: #e2e8f0; }
                     <span id="sessionTitle" class="text-xs text-slate-400 font-medium"></span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="slowBtn" onclick="toggleSlow()" title="Slow playback" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-300 text-slate-200 hover:bg-amber-600 hover:text-white transition-all">🐢 Slow</button>
-                    <button id="listenModeBtn" onclick="toggleListenMode()" title="Blur text — listen only" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-300 text-slate-200 hover:bg-violet-600 hover:text-white transition-all">👁 Blur</button>
+                    <button id="listenModeBtn" onclick="toggleListenMode()" title="Blur text — listen only" class="px-2 py-1 rounded-lg text-[10px] font-bold transition-all"></button>
                     <span id="sessionProgress" class="text-[11px] text-slate-500 font-medium tabular-nums"></span>
                     <button onclick="exitSession()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
                         <i data-lucide="x" class="w-4 h-4"></i>
@@ -1195,8 +1231,7 @@ select option { background: #111a2e; color: #e2e8f0; }
                 <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
                     <h2 id="scenarioDrillTitle" class="text-base font-bold text-white flex items-center gap-2"><span></span></h2>
                     <div class="flex items-center gap-2">
-                        <button onclick="toggleSlow()" title="Slow playback" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-300 text-slate-200 hover:bg-amber-600 hover:text-white transition-all">🐢</button>
-                        <button onclick="toggleListenMode()" title="Blur text" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-surface-300 text-slate-200 hover:bg-violet-600 hover:text-white transition-all">👁</button>
+                            <button onclick="toggleListenMode()" title="Blur text" class="px-2 py-1 rounded-lg text-[10px] font-bold transition-all"></button>
                         <span id="scenarioDrillProgress" class="text-[11px] text-slate-500 font-medium tabular-nums"></span>
                         <button onclick="closeScenarioDrill()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
                             <i data-lucide="x" class="w-4 h-4"></i>
@@ -2741,51 +2776,118 @@ function renderQuizStep() {
     document.getElementById('scenarioDrillFill').style.width = pct + '%';
     document.getElementById('scenarioDrillProgress').textContent = (scenarioDrillIdx + 1) + ' / ' + scenarioDrillTotal;
 
-    // Round 1: Quiz first — show English, ask for Hungarian
+    // Speed selector bar
+    var speedBar = document.createElement('div');
+    speedBar.className = 'flex items-center gap-1 mb-4 justify-center';
+    var speedLabel = document.createElement('span');
+    speedLabel.className = 'text-[10px] text-slate-500 mr-1';
+    speedLabel.textContent = 'Speed:';
+    speedBar.appendChild(speedLabel);
+    [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].forEach(function(s) {
+        var pill = document.createElement('button');
+        pill.className = 'px-2 py-0.5 rounded text-[10px] font-bold transition-all ' + (currentSpeed === s ? 'bg-amber-500 text-white' : 'bg-surface-50 text-slate-400 hover:text-white');
+        pill.textContent = s === 1.0 ? '1.0' : s.toFixed(1);
+        pill.onclick = function(e) { e.stopPropagation(); setSpeed(s); updateSpeedBar(speedBar); };
+        speedBar.appendChild(pill);
+    });
+    content.appendChild(speedBar);
+
+    // Blur toggle
+    var toolRow = document.createElement('div');
+    toolRow.className = 'flex items-center gap-2 mb-4 justify-center';
+    var blurBtn = document.createElement('button');
+    blurBtn.className = 'px-3 py-1 rounded-lg text-[10px] font-bold transition-all ' + (listenMode ? 'bg-violet-600 text-white' : 'bg-surface-50 text-slate-400');
+    blurBtn.textContent = listenMode ? '👁 Blur ON' : '👁 Blur OFF';
+    blurBtn.onclick = function(e) {
+        e.stopPropagation();
+        listenMode = !listenMode;
+        localStorage.setItem('hugListen', listenMode ? '1' : '0');
+        renderQuizStep(); // re-render with new blur state
+    };
+    toolRow.appendChild(blurBtn);
+    content.appendChild(toolRow);
+
+    // Mode label — clear what we're asking
     var prompt = document.createElement('p');
-    prompt.className = 'text-xs text-slate-500 uppercase tracking-wider font-bold mb-3';
-    prompt.textContent = 'Say this in Hungarian:';
+    prompt.className = 'text-xs uppercase tracking-wider font-bold mb-3 ' + (item.a_hu ? 'text-pink-400' : 'text-blue-400');
+    prompt.textContent = item.a_hu ? '💬 Answer in Hungarian' : '🎤 Say this phrase';
     content.appendChild(prompt);
 
-    var english = document.createElement('h2');
-    english.className = 'text-lg font-bold text-white mb-2';
-    english.textContent = item.a || '(translate)';
-    content.appendChild(english);
+    // Show English prompt (or Hungarian phrase for pronunciation)
+    var mainText = document.createElement('h2');
+    mainText.className = 'text-lg font-bold text-white mb-2';
+    if (item.a_hu) {
+        // Interview mode: show English, blur Hungarian answer
+        mainText.textContent = item.a || '(translate)';
+    } else {
+        // Pronunciation mode: show Hungarian (blurred if listen mode)
+        mainText.textContent = item.q;
+        if (listenMode) mainText.classList.add('listen-blur');
+        mainText.onclick = function() { mainText.classList.remove('listen-blur'); };
+    }
+    content.appendChild(mainText);
 
-    // Hidden answer
+    // Listen button
+    var listenBtn = document.createElement('button');
+    listenBtn.className = 'mb-4 px-4 py-2 rounded-xl bg-surface-50 border border-white/10 text-sm text-slate-300 hover:text-white hover:bg-surface-200 transition-all';
+    listenBtn.textContent = '🔊 Listen';
+    listenBtn.onclick = function(e) { e.stopPropagation(); speakHu(item.q); };
+    content.appendChild(listenBtn);
+
+    // Hidden answer + breakdown
     var answerWrap = document.createElement('div');
     answerWrap.id = 'quizAnswer';
-    answerWrap.className = 'hidden mt-4 space-y-3 w-full max-w-md';
+    answerWrap.className = 'hidden mt-4 space-y-3 w-full max-w-lg';
 
     var hunText = document.createElement('div');
     hunText.className = 'bg-accent/10 rounded-xl p-4 border border-accent/20 text-center';
     var hunLabel = document.createElement('p');
     hunLabel.className = 'text-xs text-accent-light/60 uppercase tracking-wider font-bold mb-1';
-    hunLabel.textContent = 'Answer';
+    hunLabel.textContent = item.a_hu ? 'Expected answer' : 'Correct pronunciation';
     hunText.appendChild(hunLabel);
     var hunPhrase = document.createElement('p');
     hunPhrase.className = 'text-base font-bold text-accent-light';
-    hunPhrase.textContent = item.q;
+    hunPhrase.textContent = item.a_hu || item.q;
     hunText.appendChild(hunPhrase);
     if (item.a_hu && item.a_hu !== item.q) {
-        var altAnswer = document.createElement('p');
-        altAnswer.className = 'text-xs text-slate-400 mt-1';
-        altAnswer.textContent = 'Full answer: ' + item.a_hu;
-        hunText.appendChild(altAnswer);
+        var altLine = document.createElement('p');
+        altLine.className = 'text-xs text-slate-400 mt-1';
+        altLine.textContent = 'Question: ' + item.q;
+        hunText.appendChild(altLine);
     }
     answerWrap.appendChild(hunText);
+
+    // Breakdown button
+    var breakdownBtn = document.createElement('button');
+    breakdownBtn.className = 'w-full py-2 rounded-xl bg-yellow-400/10 border border-yellow-400/15 text-xs font-bold text-yellow-300 hover:bg-yellow-400/20 transition-all';
+    breakdownBtn.textContent = '📖 Break it down — explain grammar & suffixes';
+    breakdownBtn.onclick = function(e) {
+        e.stopPropagation();
+        breakdownBtn.textContent = '📖 Loading...';
+        breakdownBtn.disabled = true;
+        var fd = new FormData();
+        fd.append('sentence', item.a_hu || item.q);
+        fd.append('english', item.a || '');
+        fetch('?ajax=1&action=breakdown', { method: 'POST', body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                breakdownBtn.classList.add('hidden');
+                renderBreakdown(data, answerWrap);
+            })
+            .catch(function() { breakdownBtn.textContent = '📖 Error — try again'; breakdownBtn.disabled = false; });
+    };
+    answerWrap.appendChild(breakdownBtn);
+
     content.appendChild(answerWrap);
 
     // Controls: Reveal button
     var revealBtn = document.createElement('button');
-    revealBtn.id = 'quizRevealBtn';
     revealBtn.className = 'w-full py-3 bg-accent hover:bg-accent-dark rounded-xl text-sm font-bold text-white transition-all';
     revealBtn.textContent = 'Show Answer';
     revealBtn.onclick = function() {
         document.getElementById('quizAnswer').classList.remove('hidden');
         revealBtn.classList.add('hidden');
-        speakHu(item.q);
-        // Show pass/fail buttons
+        speakHu(item.a_hu || item.q);
         gradeRow.classList.remove('hidden');
     };
     controls.appendChild(revealBtn);
@@ -2807,6 +2909,73 @@ function renderQuizStep() {
     gradeRow.appendChild(passBtn);
 
     controls.appendChild(gradeRow);
+}
+
+function updateSpeedBar(bar) {
+    if (!bar) return;
+    var pills = bar.querySelectorAll('button');
+    pills.forEach(function(p) {
+        var s = parseFloat(p.textContent);
+        if (s === currentSpeed) { p.className = 'px-2 py-0.5 rounded text-[10px] font-bold transition-all bg-amber-500 text-white'; }
+        else { p.className = 'px-2 py-0.5 rounded text-[10px] font-bold transition-all bg-surface-50 text-slate-400 hover:text-white'; }
+    });
+}
+
+function renderBreakdown(data, container) {
+    var panel = document.createElement('div');
+    panel.className = 'bg-yellow-400/5 rounded-xl p-4 border border-yellow-400/15 text-left space-y-3';
+
+    if (data.words && data.words.length) {
+        data.words.forEach(function(w) {
+            var wordDiv = document.createElement('div');
+            wordDiv.className = 'border-b border-white/5 pb-2';
+            var wordTitle = document.createElement('div');
+            wordTitle.className = 'flex items-baseline gap-2';
+            var hu = document.createElement('span');
+            hu.className = 'text-sm font-bold text-yellow-300';
+            hu.textContent = w.word;
+            wordTitle.appendChild(hu);
+            if (w.base && w.base !== w.word) {
+                var base = document.createElement('span');
+                base.className = 'text-xs text-slate-400';
+                base.textContent = '← ' + w.base;
+                wordTitle.appendChild(base);
+            }
+            var meaning = document.createElement('span');
+            meaning.className = 'text-xs text-slate-300';
+            meaning.textContent = '"' + w.meaning + '"';
+            wordTitle.appendChild(meaning);
+            wordDiv.appendChild(wordTitle);
+
+            if (w.suffixes && w.suffixes !== 'none') {
+                var suf = document.createElement('p');
+                suf.className = 'text-[11px] text-amber-200/80 mt-1';
+                suf.textContent = w.suffixes;
+                wordDiv.appendChild(suf);
+            }
+            if (w.role) {
+                var role = document.createElement('span');
+                role.className = 'inline-block mt-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-slate-500';
+                role.textContent = w.role;
+                wordDiv.appendChild(role);
+            }
+            panel.appendChild(wordDiv);
+        });
+    }
+
+    if (data.structure) {
+        var struct = document.createElement('p');
+        struct.className = 'text-xs text-slate-300 italic';
+        struct.textContent = data.structure;
+        panel.appendChild(struct);
+    }
+    if (data.tip) {
+        var tip = document.createElement('p');
+        tip.className = 'text-xs text-yellow-200/70';
+        tip.textContent = '💡 ' + data.tip;
+        panel.appendChild(tip);
+    }
+    container.appendChild(panel);
 }
 
 function scoreQuizItem(item, passed) {
