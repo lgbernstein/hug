@@ -3019,10 +3019,18 @@ function renderGrammarPatterns(patterns) {
 
 function buildPatternCard(p) {
     var tile = document.createElement('button');
-    tile.className = 'grammar-card text-left flex flex-col gap-1 p-3 active:scale-95 cursor-pointer';
+    tile.className = 'grammar-card text-left flex flex-col gap-1 p-3 active:scale-95 cursor-pointer relative';
+
+    // Speaker icon top-right
+    var speaker = document.createElement('span');
+    speaker.className = 'absolute top-2 right-2 text-slate-600 hover:text-accent-light transition-colors';
+    speaker.textContent = '🔊';
+    speaker.style.fontSize = '12px';
+    speaker.onclick = function(e) { e.stopPropagation(); speakHu(p.suffix_words || p.pattern); };
+    tile.appendChild(speaker);
 
     var title = document.createElement('h3');
-    title.className = 'text-[11px] font-bold text-white leading-snug';
+    title.className = 'text-[11px] font-bold text-white leading-snug pr-5';
     title.textContent = p.pattern;
     tile.appendChild(title);
 
@@ -3303,10 +3311,18 @@ function renderKnowledgeCards(cards) {
     var catColors = { history: 'border-amber-500/20 text-amber-400', geography: 'border-blue-500/20 text-blue-400', family: 'border-pink-500/20 text-pink-400', culture: 'border-purple-500/20 text-purple-400' };
     cards.forEach(function(c) {
         var tile = document.createElement('button');
-        tile.className = 'grammar-card text-left flex flex-col gap-1 p-3 active:scale-95 cursor-pointer ' + (catColors[c.category] || '');
+        tile.className = 'grammar-card text-left flex flex-col gap-1 p-3 active:scale-95 cursor-pointer relative ' + (catColors[c.category] || '');
+
+        // Speaker icon top-right
+        var speaker = document.createElement('span');
+        speaker.className = 'absolute top-2 right-2 text-slate-600 hover:text-accent-light transition-colors';
+        speaker.textContent = '🔊';
+        speaker.style.fontSize = '12px';
+        (function(text) { speaker.onclick = function(e) { e.stopPropagation(); speakHu(text); }; })(c.title_hu + '. ' + (c.content_hu || ''));
+        tile.appendChild(speaker);
 
         var title = document.createElement('h3');
-        title.className = 'text-[11px] font-bold text-white leading-snug';
+        title.className = 'text-[11px] font-bold text-white leading-snug pr-5';
         title.textContent = c.title_hu;
         tile.appendChild(title);
 
