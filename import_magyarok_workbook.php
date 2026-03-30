@@ -196,10 +196,175 @@ $ch3 = [
     ['Nem vagytok jól?', 'Are you (pl.) not well?', '', 'prep', 'All', 'magyarok-ch3,negation,van,beginner,level-1'],
 ];
 
+// ============================================================
+// CHAPTER 5: Hány/Mennyi, object -t, -s/-sz/-z verbs, transitive/intransitive, ik-verbs
+// ============================================================
+
+$ch5 = [
+    // --- Hány? Mennyi? ---
+    ['Hány tojás kell a palacsintába?', 'How many eggs for the pancake?', 'Kettő.', 'prep', 'All', 'magyarok-ch5,hany-mennyi,beginner,level-2'],
+    ['Mennyi liszt kell a palacsintába?', 'How much flour for the pancake?', 'Húsz deka.', 'prep', 'All', 'magyarok-ch5,hany-mennyi,beginner,level-2'],
+    ['Hány kiló liszt van itthon?', 'How many kilos of flour are at home?', '', 'prep', 'All', 'magyarok-ch5,hany-mennyi,beginner,level-2'],
+
+    // --- A tárgyrag: -t (object marker) ---
+    ['kávét', 'coffee (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
+    ['szilvát', 'plum (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
+    ['barackot', 'peach (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
+    ['halat', 'fish (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
+    ['mézet', 'honey (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
+    ['gyümölcsöt', 'fruit (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
+    ['házat', 'house (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
+    ['könyvet', 'book (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
+    ['Jó reggelt kívánok!', 'Good morning!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
+    ['Jó napot kívánok!', 'Good day!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
+    ['Jó estét kívánok!', 'Good evening!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
+    ['Jó éjszakát kívánok!', 'Good night!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
+    ['Jó étvágyat kívánok!', 'Bon appétit!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
+
+    // --- Transitive vs intransitive ---
+    ['A könyvtárban vagyok.', 'I am in the library. (intransitive)', '', 'prep', 'All', 'magyarok-ch5,transitive,beginner,level-2'],
+    ['Évával beszélgetek.', 'I am chatting with Éva. (intransitive)', '', 'prep', 'All', 'magyarok-ch5,transitive,val-vel,beginner,level-2'],
+    ['Múzeumba megyek.', 'I am going to the museum. (intransitive)', '', 'prep', 'All', 'magyarok-ch5,transitive,beginner,level-2'],
+    ['Gulyáslevest főzök.', 'I am cooking goulash soup. (transitive)', '', 'prep', 'All', 'magyarok-ch5,transitive,targyrag-t,beginner,level-2'],
+    ['Lecsót csinálok.', 'I am making lecso. (transitive)', '', 'prep', 'All', 'magyarok-ch5,transitive,targyrag-t,beginner,level-2'],
+    ['Csokoládét veszek.', 'I am buying chocolate. (transitive)', '', 'prep', 'All', 'magyarok-ch5,transitive,targyrag-t,beginner,level-2'],
+    ['Paprikát teszek a lecsóba.', 'I put paprika in the lecso. (transitive)', '', 'prep', 'All', 'magyarok-ch5,transitive,targyrag-t,beginner,level-2'],
+    ['Egy magas házat látok.', 'I see a tall house. (transitive)', '', 'prep', 'All', 'magyarok-ch5,transitive,targyrag-t,beginner,level-2'],
+
+    // --- -s, -sz, -z végű igék (mos, vesz, főz) ---
+    ['Mosok.', 'I wash.', '', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Mosol.', 'You wash.', '', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Veszek.', 'I buy.', '', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Veszel.', 'You buy.', '', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Főzök.', 'I cook.', '', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Főzöl.', 'You cook.', '', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Mit főzöl?', 'What are you cooking?', 'Vacsorát.', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Mit vesz a piacon?', 'What do you buy at the market?', 'Friss zöldséget.', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Mit hoz a boltból?', 'What do you bring from the shop?', 'Gyümölcsöt.', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Mit tesz a levesbe?', 'What do you put in the soup?', 'Sárgarépát.', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+    ['Mit keres?', 'What are you looking for?', 'A piacot.', 'prep', 'All', 'magyarok-ch5,s-sz-z-verbs,beginner,level-2'],
+
+    // --- Ik-verbs: iszik, eszik, sörözik ---
+    ['Iszom.', 'I drink.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,beginner,level-2'],
+    ['Iszol.', 'You drink.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,beginner,level-2'],
+    ['Iszik.', 'He/she drinks.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,beginner,level-2'],
+    ['Eszem.', 'I eat.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,beginner,level-2'],
+    ['Eszel.', 'You eat.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,beginner,level-2'],
+    ['Eszik.', 'He/she eats.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,beginner,level-2'],
+    ['A moziban filmet nézek.', 'I watch a movie at the cinema.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,ban-ben,beginner,level-2'],
+    ['A kávézóban süteményt eszem és kávét iszom.', 'I eat pastry and drink coffee at the café.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,ban-ben,beginner,level-2'],
+    ['Az étteremben ebédelek.', 'I have lunch at the restaurant.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,ban-ben,beginner,level-2'],
+    ['A piacon zöldséget és gyümölcsöt veszek.', 'I buy vegetables and fruit at the market.', '', 'prep', 'All', 'magyarok-ch5,ik-verbs,targyrag-t,beginner,level-2'],
+
+    // --- Number suffixes: egyet, kettőből, háromba ---
+    ['Hány tojást veszel?', 'How many eggs do you buy?', 'Hatot.', 'prep', 'All', 'magyarok-ch5,number-suffix,beginner,level-2'],
+    ['Hány almát kér?', 'How many apples would you like?', 'Hármat.', 'prep', 'All', 'magyarok-ch5,number-suffix,beginner,level-2'],
+    ['Két csokoládét kérek.', 'I\'d like two chocolates.', '', 'prep', 'All', 'magyarok-ch5,number-suffix,targyrag-t,beginner,level-2'],
+    ['Bocsánat, hány csokoládét kér?', 'Excuse me, how many chocolates would you like?', 'Kettőt.', 'prep', 'All', 'magyarok-ch5,number-suffix,beginner,level-2'],
+
+    // --- Demonstrative pronoun suffixes: ebbe, abból ---
+    ['Ebből a krumpliból kérek.', 'I\'d like some of this potato.', '', 'prep', 'All', 'magyarok-ch5,demonstrative-suffix,beginner,level-2'],
+    ['Abból a salátából veszek.', 'I\'ll buy some of that salad.', '', 'prep', 'All', 'magyarok-ch5,demonstrative-suffix,beginner,level-2'],
+    ['Erre a piacra megyek.', 'I\'m going to this market.', '', 'prep', 'All', 'magyarok-ch5,demonstrative-suffix,beginner,level-2'],
+    ['Abba a boltba megyek.', 'I\'m going into that shop.', '', 'prep', 'All', 'magyarok-ch5,demonstrative-suffix,beginner,level-2'],
+    ['Ezt a mézet kérem.', 'I\'d like this honey.', '', 'prep', 'All', 'magyarok-ch5,demonstrative-suffix,beginner,level-2'],
+    ['Azt a mézet kérem.', 'I\'d like that honey.', '', 'prep', 'All', 'magyarok-ch5,demonstrative-suffix,beginner,level-2'],
+
+    // --- Practice: intransitive sentences ---
+    ['Budapesten lakom.', 'I live in Budapest.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,beginner,level-2'],
+    ['Magyarországon élek.', 'I live in Hungary.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,beginner,level-2'],
+    ['Ma este moziba megyek.', 'I\'m going to the cinema tonight.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,beginner,level-2'],
+    ['Délután nyelviskolában vagyok.', 'I\'m at the language school in the afternoon.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,beginner,level-2'],
+
+    // --- Practice: transitive sentences ---
+    ['Virágot veszek.', 'I buy flowers.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,targyrag-t,beginner,level-2'],
+    ['Egy csésze kávét kérek.', 'I\'d like a cup of coffee.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,targyrag-t,beginner,level-2'],
+    ['Levest főzök.', 'I\'m cooking soup.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,targyrag-t,beginner,level-2'],
+    ['Egy hosszú e-mailt írok.', 'I\'m writing a long email.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,targyrag-t,beginner,level-2'],
+    ['Gulyást főzök.', 'I\'m cooking goulash.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,targyrag-t,beginner,level-2'],
+    ['Szendvicset eszem.', 'I\'m eating a sandwich.', '', 'prep', 'All', 'magyarok-ch5,transitive-practice,ik-verbs,beginner,level-2'],
+];
+
+// ============================================================
+// CHAPTER 7: verb prefixes, definite/indefinite conjugation, definite conjugation table
+// ============================================================
+
+$ch7 = [
+    // --- Verb prefixes: fel-, le-, be-, ki- ---
+    ['Felmegyek az emeletre.', 'I go up to the floor.', '', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+    ['Lejövök az emeletről.', 'I come down from the floor.', '', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+    ['Bemegyek az irodába.', 'I go into the office.', '', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+    ['Kijövök az irodából.', 'I come out of the office.', '', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+    ['Kijövök a házból.', 'I come out of the house.', '', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+    ['Bemegy Ági a könyvtárba?', 'Is Ági going into the library?', 'Be. / Igen, bemegy.', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+    ['Felmész az emeletre?', 'Are you going up?', 'Fel. / Igen, felmegyek.', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+    ['Kimegyünk a kertbe?', 'Shall we go out to the garden?', 'Ki. / Igen, kimegyünk.', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+    ['Lefekszel aludni?', 'Are you going to lie down to sleep?', 'Le. / Igen, lefekszem.', 'prep', 'All', 'magyarok-ch7,verb-prefix,beginner,level-3'],
+
+    // --- Indefinite object types (határozatlan tárgy → indefinite conjugation) ---
+    ['Házi feladatot írok.', 'I\'m writing homework. (indefinite — no article)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Szavakat tanulok.', 'I\'m learning words. (indefinite)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Egy érdekes könyvet olvasok.', 'I\'m reading an interesting book. (indefinite — egy)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Mennyi sajtot kér?', 'How much cheese do you want? (indefinite — mennyi)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Három sört kérek.', 'I\'d like three beers. (indefinite — number)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Sok e-mailt írok.', 'I write a lot of emails. (indefinite — sok)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Kit szeretsz?', 'Who do you like? (indefinite — kit question)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Mit írsz?', 'What are you writing? (indefinite — mit question)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Szeretek valakit.', 'I like someone. (indefinite — valaki)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+    ['Nem látok senkit.', 'I don\'t see anyone. (indefinite — senki)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,negation,beginner,level-3'],
+    ['Mindent tudok.', 'I know everything. (indefinite — mindent)', '', 'prep', 'All', 'magyarok-ch7,indefinite-conj,beginner,level-3'],
+
+    // --- Definite object types (határozott tárgy → definite conjugation) ---
+    ['A szomszéd fiút szeretem.', 'I like the neighbor boy. (definite — a/az article)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,beginner,level-3'],
+    ['Ezt a fiút szeretem.', 'I like this boy. (definite — ezt)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,beginner,level-3'],
+    ['Azt a fiút szeretem.', 'I like that boy. (definite — azt)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,beginner,level-3'],
+    ['A barátomat várom.', 'I\'m waiting for my friend. (definite — possessive on object)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,possessive,beginner,level-3'],
+    ['Ismerem a lányodat.', 'I know your daughter. (definite — possessive)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,possessive,beginner,level-3'],
+    ['Ezt kérem.', 'I\'d like this. (definite — ezt)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,beginner,level-3'],
+    ['Ezeket kérem.', 'I\'d like these. (definite — ezeket)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,beginner,level-3'],
+    ['Azt nem szeretem.', 'I don\'t like that. (definite — azt)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,negation,beginner,level-3'],
+    ['Dénest szeretem.', 'I like Dénes. (definite — proper name)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,beginner,level-3'],
+    ['Jól ismerem Pécset.', 'I know Pécs well. (definite — proper name)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,beginner,level-3'],
+    ['Melyik fiút szereted?', 'Which boy do you like? (definite — melyik)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,beginner,level-3'],
+
+    // --- Definite conjugation table: tanul, szeret, süt ---
+    ['Tanulom ezt a nyelvet.', 'I\'m learning this language. (definite)', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+    ['Tanulod a szavakat?', 'Are you learning the words?', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+    ['Tanulja a ragozást.', 'He/she is learning the conjugation.', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+    ['Tanuljuk a magyar nyelvet.', 'We are learning Hungarian.', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+    ['Szeretem Budapestet.', 'I love Budapest.', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+    ['Szereted a gulyáslevest?', 'Do you like goulash soup?', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+    ['Szereti az őszt?', 'Does he/she like autumn?', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+    ['Szeretjük a magyar nyelvet.', 'We love the Hungarian language.', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+    ['Ismered a magyar konyhát?', 'Do you know Hungarian cuisine?', '', 'prep', 'All', 'magyarok-ch7,definite-conj,conjugation,beginner,level-3'],
+
+    // --- Practice: definite vs indefinite ---
+    ['A házi feladatot írom.', 'I\'m writing the homework. (definite)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Ezt a szót nem értjük.', 'We don\'t understand this word.', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,negation,beginner,level-3'],
+    ['A magyartanárt várom.', 'I\'m waiting for the Hungarian teacher.', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Jól ismerem Magyarországot.', 'I know Hungary well.', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Az új szavakat tanulom.', 'I\'m learning the new words.', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Látod azt az éttermet?', 'Do you see that restaurant?', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Melyik süteményt kéred?', 'Which cake do you want?', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Melyik múzeumot akarja látni?', 'Which museum do you want to see? (formal)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Ismeri Sopront?', 'Do you know Sopron? (formal, definite)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Magyarul tanulok.', 'I\'m learning Hungarian. (indefinite — no object)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['A magyar nyelvet tanulom.', 'I\'m learning the Hungarian language. (definite)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Valamit mindig tanulunk.', 'We always learn something. (indefinite — valamit)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Hanna most tanulja a ragozást.', 'Hanna is now learning the conjugation. (definite)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Ezt nem értem.', 'I don\'t understand this.', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,negation,beginner,level-3'],
+    ['Semmit nem értem.', 'I don\'t understand anything. (indefinite — semmit)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,negation,beginner,level-3'],
+    ['Mindent értek.', 'I understand everything. (indefinite — mindent)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Zenét hallgatok.', 'I\'m listening to music. (indefinite)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['A hétvégét otthon töltöm.', 'I\'m spending the weekend at home. (definite)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Kit keresel?', 'Who are you looking for? (indefinite — kit)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+    ['Egy e-mailt küldök Gábornak.', 'I\'m sending an email to Gábor. (indefinite — egy)', '', 'prep', 'All', 'magyarok-ch7,def-vs-indef,beginner,level-3'],
+];
+
 // Insert all phrases
 $stmt = $conn->prepare("INSERT INTO hungarian_prep (question_hu, answer_en, answer_hu, category, `who`, tags, import_batch) VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE answer_en=VALUES(answer_en), answer_hu=VALUES(answer_hu), tags=VALUES(tags)");
 
-foreach (array_merge($ch2, $ch3) as $r) {
+foreach (array_merge($ch2, $ch3, $ch5, $ch7) as $r) {
     $stmt->bind_param('sssssss', $r[0], $r[1], $r[2], $r[3], $r[4], $r[5], $batch);
     $stmt->execute();
     $counts['phrases']++;
@@ -241,7 +406,9 @@ echo "<ul>";
 echo "<li>Phrases imported: {$counts['phrases']}</li>";
 echo "<li>Grammar patterns tagged: {$counts['grammar']}</li>";
 echo "</ul>";
-echo "<p><strong>Chapters 2-3: " . count($ch2) . " + " . count($ch3) . " = " . (count($ch2) + count($ch3)) . " phrases</strong></p>";
-echo "<p>All tagged with <code>magyarok-ch2</code> / <code>magyarok-ch3</code> + grammar topic + <code>beginner</code> + <code>level-1</code> or <code>level-2</code>.</p>";
+$allCount = count($ch2) + count($ch3) + count($ch5) + count($ch7);
+echo "<p><strong>Ch2: " . count($ch2) . " | Ch3: " . count($ch3) . " | Ch5: " . count($ch5) . " | Ch7: " . count($ch7) . " | Total: $allCount phrases</strong></p>";
+echo "<p>Tagged: <code>magyarok-chN</code> + grammar topic + <code>beginner</code> + <code>level-1/2/3</code></p>";
+echo "<p>Level 1 = basics (van, locations, questions) | Level 2 = intermediate (objects, ik-verbs) | Level 3 = definite/indefinite conjugation</p>";
 echo "<p>Safe to re-run.</p>";
 ?>
