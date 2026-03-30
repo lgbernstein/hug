@@ -776,7 +776,7 @@ select option { background: #111a2e; color: #e2e8f0; }
 </div>
 
 <!-- MAIN APP -->
-<div class="w-full max-w-2xl px-4 pt-4 md:pt-8 space-y-4">
+<div class="w-full max-w-6xl px-4 pt-4 md:pt-8 space-y-4">
 
     <!-- HEADER -->
     <header class="flex items-center justify-between">
@@ -849,7 +849,7 @@ select option { background: #111a2e; color: #e2e8f0; }
     </div>
 
     <!-- Block grid -->
-    <div id="planBlockList" class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+    <div id="planBlockList" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
         <div class="col-span-3 flex flex-col items-center py-8 gap-3">
             <div class="w-8 h-8 border-2 border-accent-light border-t-transparent rounded-full animate-spin"></div>
             <p class="text-slate-400 text-sm">Building your study plan...</p>
@@ -951,7 +951,7 @@ select option { background: #111a2e; color: #e2e8f0; }
                         class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
                 </div>
                 <div id="grammarTagFilter" class="flex flex-wrap gap-1.5"></div>
-                <div id="grammarList" class="grid grid-cols-2 gap-2">
+                <div id="grammarList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     <p class="col-span-2 text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
                 </div>
             </div>
@@ -1017,7 +1017,7 @@ select option { background: #111a2e; color: #e2e8f0; }
         </div>
 
         <!-- Card grid -->
-        <div id="knowledgeList" class="grid grid-cols-2 gap-2">
+        <div id="knowledgeList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             <p class="col-span-2 text-slate-500 text-sm text-center py-4">Loading knowledge cards...</p>
         </div>
 
