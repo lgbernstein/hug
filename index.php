@@ -1461,6 +1461,15 @@ function loadVoices() {
 }
 window.speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
+// Ensure voices load on first user tap (Safari/Chrome requirement)
+document.addEventListener('click', function initVoices() {
+    loadVoices();
+    // Warm up speechSynthesis with silent utterance
+    var warmup = new SpeechSynthesisUtterance('');
+    warmup.volume = 0;
+    window.speechSynthesis.speak(warmup);
+    document.removeEventListener('click', initVoices);
+}, { once: true });
 
 function speak(rate, autoRecord) {
     if (autoRecord === undefined) autoRecord = true;
@@ -3679,11 +3688,22 @@ function closeLesson() {
 }
 
 function speakHu(text) {
+    if (!text) return;
+    // Chrome bug: speechSynthesis can get stuck. Cancel + resume.
     window.speechSynthesis.cancel();
+    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+
+    // Reload voices if not found yet
+    if (!huVoice) loadVoices();
+
     var msg = new SpeechSynthesisUtterance(text);
     msg.lang = 'hu-HU'; msg.rate = 0.8;
     if (huVoice) msg.voice = huVoice;
-    window.speechSynthesis.speak(msg);
+
+    // Chrome workaround: short delay after cancel
+    setTimeout(function() {
+        window.speechSynthesis.speak(msg);
+    }, 50);
 }
 
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
