@@ -797,11 +797,18 @@ $shuffle = isset($_GET['shuffle']) && $_GET['shuffle'] === '1';
 if ($shuffle) {
     $result = $conn->query("SELECT q, a, a_hu, category FROM ($union) AS phrases ORDER BY RAND() LIMIT 1");
 } else {
-    // SRS-weighted query
+    // SRS-weighted query — prioritize essential phrases, deprioritize skipped/advanced
     $srs_sql = "SELECT phrases.q, phrases.a, phrases.a_hu, phrases.category
                 FROM ($union) AS phrases
                 LEFT JOIN study_history sh ON sh.phrase = phrases.q AND sh.who = '$who_safe'
-                ORDER BY CASE WHEN sh.next_review IS NULL OR sh.next_review <= NOW() THEN 0 ELSE 1 END ASC, RAND()
+                LEFT JOIN hungarian_prep hp ON hp.question_hu = phrases.q
+                ORDER BY
+                    CASE WHEN sh.next_review IS NULL OR sh.next_review <= NOW() THEN 0 ELSE 1 END ASC,
+                    CASE WHEN hp.tags LIKE '%essential%' THEN 0
+                         WHEN hp.tags LIKE '%interview%' THEN 1
+                         WHEN hp.tags LIKE '%tana-vocab%' THEN 2
+                         ELSE 3 END ASC,
+                    RAND()
                 LIMIT 1";
     $result = $conn->query($srs_sql);
     if (!$result) {
@@ -3506,6 +3513,31 @@ function renderAudioStep(step, content, controls) {
         speak(currentSpeed);
     };
     controls.appendChild(listenBtn);
+
+    // Too Hard — skip button
+    var skipRow = document.createElement('div');
+    skipRow.className = 'flex items-center justify-center mt-3';
+    var skipBtn = document.createElement('button');
+    skipBtn.className = 'text-[11px] text-slate-500 hover:text-white transition-colors underline decoration-dotted underline-offset-2';
+    skipBtn.textContent = 'Too hard — skip for now';
+    skipBtn.onclick = function() {
+        // Push review out 7 days
+        var fd = new FormData();
+        fd.append('phrase', step.q);
+        fd.append('pass', '0');
+        fd.append('who', who);
+        fetch('record.php', { method: 'POST', body: fd });
+        // Advance to next
+        if (activeSession && sessionSteps.length > 0) {
+            sessionIdx++;
+            sessionTotalCount++;
+            renderSessionStep();
+        } else {
+            nextQuestion();
+        }
+    };
+    skipRow.appendChild(skipBtn);
+    controls.appendChild(skipRow);
 
     // Result area (filled after eval — session-aware)
     var resultArea = document.createElement('div');
