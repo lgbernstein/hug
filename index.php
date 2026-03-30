@@ -688,8 +688,9 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .view-section.active { animation: fadeIn 0.2s ease-out; }
 .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.grammar-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 16px; transition: all 0.2s; }
+.grammar-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; transition: all 0.2s; }
 .grammar-card:hover { border-color: rgba(99, 102, 241, 0.15); background: rgba(17, 26, 46, 0.8); }
+.line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .drill-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px 20px; transition: all 0.2s; cursor: pointer; }
 .drill-card:hover { border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05); transform: translateY(-1px); }
 .tag-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.15); }
@@ -950,8 +951,8 @@ select option { background: #111a2e; color: #e2e8f0; }
                         class="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none">
                 </div>
                 <div id="grammarTagFilter" class="flex flex-wrap gap-1.5"></div>
-                <div id="grammarList" class="space-y-3">
-                    <p class="text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
+                <div id="grammarList" class="grid grid-cols-2 gap-2">
+                    <p class="col-span-2 text-slate-500 text-sm text-center py-4">Loading grammar patterns...</p>
                 </div>
             </div>
         </div>
@@ -1016,8 +1017,8 @@ select option { background: #111a2e; color: #e2e8f0; }
         </div>
 
         <!-- Card grid -->
-        <div id="knowledgeList" class="space-y-3">
-            <p class="text-slate-500 text-sm text-center py-4">Loading knowledge cards...</p>
+        <div id="knowledgeList" class="grid grid-cols-2 gap-2">
+            <p class="col-span-2 text-slate-500 text-sm text-center py-4">Loading knowledge cards...</p>
         </div>
 
         <!-- AI Knowledge Lesson Panel -->
@@ -3017,96 +3018,30 @@ function renderGrammarPatterns(patterns) {
 }
 
 function buildPatternCard(p) {
-    var card = document.createElement('div');
-    card.className = 'grammar-card';
-
-    // Header row: part of speech badge + pattern name
-    var header = document.createElement('div');
-    header.className = 'flex items-start gap-3 mb-2';
-
-    var titleCol = document.createElement('div');
-    titleCol.className = 'flex-1 min-w-0';
+    var tile = document.createElement('button');
+    tile.className = 'grammar-card text-left flex flex-col gap-1 p-3 active:scale-95 cursor-pointer';
 
     var title = document.createElement('h3');
-    title.className = 'text-sm font-bold text-white leading-snug';
+    title.className = 'text-[11px] font-bold text-white leading-snug';
     title.textContent = p.pattern;
-    titleCol.appendChild(title);
+    tile.appendChild(title);
 
-    // Suffix examples — formatted clearly
-    if (p.suffix_words && p.suffix_words !== '—') {
-        var suffixRow = document.createElement('div');
-        suffixRow.className = 'mt-1.5 flex flex-wrap gap-1';
-        p.suffix_words.split(/[;,]/).forEach(function(s) {
-            s = s.trim();
-            if (!s) return;
-            var chip = document.createElement('span');
-            chip.className = 'inline-block px-2 py-0.5 rounded bg-accent/10 text-[11px] font-mono text-accent-light border border-accent/15';
-            chip.textContent = s;
-            suffixRow.appendChild(chip);
-        });
-        titleCol.appendChild(suffixRow);
-    }
-
-    header.appendChild(titleCol);
-
-    // Part of speech badge (top-right)
     if (p.part_of_speech && p.part_of_speech !== 'Other') {
         var posBadge = document.createElement('span');
-        posBadge.className = 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/5 text-slate-500 flex-shrink-0 mt-0.5';
+        posBadge.className = 'text-[9px] font-bold uppercase tracking-wider text-slate-500';
         posBadge.textContent = p.part_of_speech;
-        header.appendChild(posBadge);
+        tile.appendChild(posBadge);
     }
 
-    card.appendChild(header);
-
-    // Explanation — always visible
     if (p.explanation) {
         var expl = document.createElement('p');
-        expl.className = 'text-xs text-slate-400 leading-relaxed mb-3';
+        expl.className = 'text-[10px] text-slate-500 leading-snug line-clamp-2';
         expl.textContent = p.explanation;
-        card.appendChild(expl);
+        tile.appendChild(expl);
     }
 
-    // Action buttons — always visible
-    var actions = document.createElement('div');
-    actions.className = 'flex items-center gap-2 flex-wrap';
-
-    // Listen button
-    var listenBtn = document.createElement('button');
-    listenBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-50 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-surface-200 transition-all';
-    listenBtn.innerHTML = '<i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Listen';
-    listenBtn.onclick = function(e) {
-        e.stopPropagation();
-        speakHu(p.suffix_words || p.pattern);
-    };
-    actions.appendChild(listenBtn);
-
-    // Practice button — start a drill with matching tag
-    var primaryTag = (p.tags || '').split(',')[0].trim();
-    if (primaryTag) {
-        var practiceBtn = document.createElement('button');
-        practiceBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-green-500/10 text-[11px] font-semibold text-green-400 hover:bg-green-500/20 transition-all border border-green-500/15';
-        practiceBtn.innerHTML = '<i data-lucide="dumbbell" class="w-3.5 h-3.5"></i> Practice';
-        practiceBtn.onclick = function(e) {
-            e.stopPropagation();
-            goHome();
-            startDrill(primaryTag);
-        };
-        actions.appendChild(practiceBtn);
-    }
-
-    // Teach Me button — AI deep-dive
-    var teachBtn = document.createElement('button');
-    teachBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-yellow-400/10 text-[11px] font-semibold text-yellow-300 hover:bg-yellow-400/20 transition-all border border-yellow-400/15';
-    teachBtn.innerHTML = '<i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Teach Me';
-    teachBtn.onclick = function(e) {
-        e.stopPropagation();
-        teachMe(p);
-    };
-    actions.appendChild(teachBtn);
-
-    card.appendChild(actions);
-    return card;
+    tile.onclick = function() { teachMe(p); };
+    return tile;
 }
 
 function buildGrammarTagFilter(patterns) {
@@ -3365,63 +3300,30 @@ function renderKnowledgeCards(cards) {
         list.appendChild(empty);
         return;
     }
-    var catColors = { history: 'bg-amber-500/10 text-amber-400 border-amber-500/15', geography: 'bg-blue-500/10 text-blue-400 border-blue-500/15', family: 'bg-pink-500/10 text-pink-400 border-pink-500/15', culture: 'bg-purple-500/10 text-purple-400 border-purple-500/15' };
+    var catColors = { history: 'border-amber-500/20 text-amber-400', geography: 'border-blue-500/20 text-blue-400', family: 'border-pink-500/20 text-pink-400', culture: 'border-purple-500/20 text-purple-400' };
     cards.forEach(function(c) {
-        var card = document.createElement('div');
-        card.className = 'grammar-card';
+        var tile = document.createElement('button');
+        tile.className = 'grammar-card text-left flex flex-col gap-1 p-3 active:scale-95 cursor-pointer ' + (catColors[c.category] || '');
 
-        // Header: badge + title
-        var header = document.createElement('div');
-        header.className = 'flex items-start gap-2 mb-2';
-        var badge = document.createElement('span');
-        badge.className = 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border flex-shrink-0 ' + (catColors[c.category] || 'bg-white/5 text-slate-500');
-        badge.textContent = c.category;
-        var titleCol = document.createElement('div');
-        titleCol.className = 'flex-1 min-w-0';
         var title = document.createElement('h3');
-        title.className = 'text-sm font-bold text-white leading-snug';
+        title.className = 'text-[11px] font-bold text-white leading-snug';
         title.textContent = c.title_hu;
-        titleCol.appendChild(title);
+        tile.appendChild(title);
+
         if (c.title_en) {
-            var sub = document.createElement('p');
-            sub.className = 'text-xs text-slate-400 mt-0.5';
+            var sub = document.createElement('span');
+            sub.className = 'text-[10px] text-slate-500 leading-snug';
             sub.textContent = c.title_en;
-            titleCol.appendChild(sub);
-        }
-        header.appendChild(badge);
-        header.appendChild(titleCol);
-        card.appendChild(header);
-
-        if (c.content_en) {
-            var desc = document.createElement('p');
-            desc.className = 'text-xs text-slate-400 leading-relaxed mb-2';
-            desc.textContent = c.content_en;
-            card.appendChild(desc);
-        }
-        if (c.key_fact) {
-            var fact = document.createElement('div');
-            fact.className = 'inline-block px-2 py-0.5 rounded bg-accent/10 text-[11px] font-mono text-accent-light border border-accent/15 mb-2';
-            fact.textContent = c.key_fact;
-            card.appendChild(fact);
+            tile.appendChild(sub);
         }
 
-        // Actions
-        var actions = document.createElement('div');
-        actions.className = 'flex items-center gap-2';
-        var listenBtn = document.createElement('button');
-        listenBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-50 text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-surface-200 transition-all';
-        listenBtn.textContent = 'Listen';
-        (function(text) { listenBtn.onclick = function(e) { e.stopPropagation(); speakHu(text); }; })(c.title_hu + '. ' + (c.content_hu || ''));
-        actions.appendChild(listenBtn);
+        var badge = document.createElement('span');
+        badge.className = 'text-[9px] font-bold uppercase tracking-wider text-slate-500 mt-auto';
+        badge.textContent = c.category;
+        tile.appendChild(badge);
 
-        var teachBtn = document.createElement('button');
-        teachBtn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-yellow-400/10 text-[11px] font-semibold text-yellow-300 hover:bg-yellow-400/20 transition-all border border-yellow-400/15';
-        teachBtn.textContent = 'Study';
-        (function(kc) { teachBtn.onclick = function(e) { e.stopPropagation(); knowledgeTeachMe(kc); }; })(c);
-        actions.appendChild(teachBtn);
-
-        card.appendChild(actions);
-        list.appendChild(card);
+        (function(kc) { tile.onclick = function() { knowledgeTeachMe(kc); }; })(c);
+        list.appendChild(tile);
     });
     lucide.createIcons();
 }
@@ -3838,19 +3740,19 @@ function renderProgressDashboard(data) {
         weakLabel.className = 'text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
         weakLabel.textContent = 'Needs Practice';
         weakSection.appendChild(weakLabel);
+        var weakGrid = document.createElement('div');
+        weakGrid.className = 'flex flex-wrap gap-1.5';
         data.weak.forEach(function(w) {
-            var row = document.createElement('div');
-            row.className = 'flex items-center justify-between p-2.5 rounded-lg bg-surface-50 mb-1';
-            var phrase = document.createElement('span');
-            phrase.className = 'text-sm text-white truncate flex-1 mr-3';
-            phrase.textContent = w.phrase;
-            var fails = document.createElement('span');
-            fails.className = 'text-xs text-red-400 whitespace-nowrap';
-            fails.textContent = w.fail_count + ' fails';
-            row.appendChild(phrase);
-            row.appendChild(fails);
-            weakSection.appendChild(row);
+            var chip = document.createElement('span');
+            chip.className = 'inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/15 text-[11px] text-white cursor-pointer hover:bg-red-500/20 transition-all';
+            chip.textContent = w.phrase;
+            var badge = document.createElement('span');
+            badge.className = 'text-[9px] text-red-400 font-bold';
+            badge.textContent = w.fail_count;
+            chip.appendChild(badge);
+            weakGrid.appendChild(chip);
         });
+        weakSection.appendChild(weakGrid);
         container.appendChild(weakSection);
     }
 
@@ -3862,19 +3764,19 @@ function renderProgressDashboard(data) {
         recentLabel.className = 'text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2';
         recentLabel.textContent = 'Recent Activity';
         recentSection.appendChild(recentLabel);
+        var recentGrid = document.createElement('div');
+        recentGrid.className = 'flex flex-wrap gap-1.5';
         data.recent.forEach(function(r) {
-            var row = document.createElement('div');
-            row.className = 'flex items-center justify-between p-2.5 rounded-lg bg-surface-50 mb-1';
-            var phrase = document.createElement('span');
-            phrase.className = 'text-sm text-white truncate flex-1 mr-3';
-            phrase.textContent = r.phrase;
+            var chip = document.createElement('span');
+            chip.className = 'inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-50 border border-white/5 text-[11px] text-white';
+            chip.textContent = r.phrase;
             var date = document.createElement('span');
-            date.className = 'text-[10px] text-slate-500';
+            date.className = 'text-[9px] text-slate-500';
             date.textContent = (r.last_seen || '').substring(0, 10);
-            row.appendChild(phrase);
-            row.appendChild(date);
-            recentSection.appendChild(row);
+            chip.appendChild(date);
+            recentGrid.appendChild(chip);
         });
+        recentSection.appendChild(recentGrid);
         container.appendChild(recentSection);
     }
 }
