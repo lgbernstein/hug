@@ -285,7 +285,8 @@ $knowledge = [
     ['culture', 'Rubik-kocka', 'Rubik\'s Cube', 'A Rubik-kockát Rubik Ernő magyar építész találta fel 1974-ben. Ez a világ legtöbbet eladott kirakójátéka.', 'The Rubik\'s Cube was invented by Hungarian architect Ernő Rubik in 1974. It is the world\'s best-selling puzzle toy.', 'Invented 1974 by Ernő Rubik', 'facts,culture', 'All'],
 ];
 
-// Ensure knowledge_cards has tags + who columns
+// Ensure knowledge_cards has tags + who columns and category supports all values
+$conn->query("ALTER TABLE knowledge_cards MODIFY COLUMN category VARCHAR(50) DEFAULT 'culture'");
 $conn->query("ALTER TABLE knowledge_cards ADD COLUMN IF NOT EXISTS tags TEXT AFTER key_fact");
 $conn->query("ALTER TABLE knowledge_cards ADD COLUMN IF NOT EXISTS `who` VARCHAR(10) DEFAULT 'All' AFTER tags");
 
