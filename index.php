@@ -847,9 +847,9 @@ select option { background: #111a2e; color: #e2e8f0; }
         <span id="dayProgressLabel" class="text-[11px] text-slate-500 font-medium tabular-nums">0 / 0 blocks</span>
     </div>
 
-    <!-- Block list -->
-    <div id="planBlockList" class="space-y-2">
-        <div class="flex flex-col items-center py-8 gap-3">
+    <!-- Block grid -->
+    <div id="planBlockList" class="grid grid-cols-3 gap-2">
+        <div class="col-span-3 flex flex-col items-center py-8 gap-3">
             <div class="w-8 h-8 border-2 border-accent-light border-t-transparent rounded-full animate-spin"></div>
             <p class="text-slate-400 text-sm">Building your study plan...</p>
         </div>
@@ -2397,7 +2397,7 @@ function renderDailyPlan(data) {
     list.textContent = '';
     if (!data.blocks || !data.blocks.length) {
         var empty = document.createElement('p');
-        empty.className = 'text-green-400 text-sm text-center py-8 font-semibold';
+        empty.className = 'col-span-3 text-green-400 text-sm text-center py-8 font-semibold';
         empty.textContent = 'All done for today! Great work.';
         list.appendChild(empty);
         return;
@@ -2424,62 +2424,48 @@ function renderDailyPlan(data) {
 
     data.blocks.forEach(function(block, idx) {
         var isDone = completedTypes[block.block_type];
-        var card = document.createElement('div');
-        card.className = 'rounded-xl border p-4 transition-all ' + (isDone ? 'opacity-50 border-white/5 bg-surface-50' : (blockColors[block.block_type] || 'border-white/5 bg-surface-100'));
+        var tile = document.createElement('button');
+        tile.className = 'rounded-xl border p-3 transition-all flex flex-col items-center gap-1.5 text-center min-h-[80px] justify-center active:scale-95 '
+            + (isDone ? 'opacity-40 border-white/5 bg-surface-50' : (blockColors[block.block_type] || 'border-white/5 bg-surface-100 hover:border-accent/30'));
 
-        var top = document.createElement('div');
-        top.className = 'flex items-center gap-3';
-
-        // Icon
+        // Icon / emoji
         var iconWrap = document.createElement('div');
-        iconWrap.className = 'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ' + (blockBadgeColors[block.block_type] || 'bg-white/5 text-slate-400');
+        iconWrap.className = 'w-9 h-9 rounded-lg flex items-center justify-center ' + (blockBadgeColors[block.block_type] || 'bg-white/5 text-slate-400');
         if (block.emoji) {
             iconWrap.textContent = block.emoji;
-            iconWrap.className = 'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-xl ' + (blockBadgeColors[block.block_type] || 'bg-white/5');
+            iconWrap.className = 'w-9 h-9 rounded-lg flex items-center justify-center text-lg ' + (blockBadgeColors[block.block_type] || 'bg-white/5');
         } else {
-            iconWrap.innerHTML = '<i data-lucide="' + (block.icon || 'circle') + '" class="w-5 h-5"></i>';
+            var lucideIcon = document.createElement('i');
+            lucideIcon.setAttribute('data-lucide', block.icon || 'circle');
+            lucideIcon.className = 'w-4 h-4';
+            iconWrap.appendChild(lucideIcon);
         }
-        top.appendChild(iconWrap);
+        tile.appendChild(iconWrap);
 
-        // Text
-        var textCol = document.createElement('div');
-        textCol.className = 'flex-1 min-w-0';
-        var title = document.createElement('h3');
-        title.className = 'text-sm font-bold ' + (isDone ? 'text-slate-500 line-through' : 'text-white');
+        // Title
+        var title = document.createElement('span');
+        title.className = 'text-[11px] font-bold leading-tight ' + (isDone ? 'text-slate-500 line-through' : 'text-white');
         title.textContent = block.title;
-        textCol.appendChild(title);
-        var sub = document.createElement('p');
-        sub.className = 'text-[11px] text-slate-400 mt-0.5';
-        sub.textContent = block.subtitle + ' · ' + block.duration + ' min';
-        textCol.appendChild(sub);
-        top.appendChild(textCol);
+        tile.appendChild(title);
 
-        // Action button
+        // Duration
+        var dur = document.createElement('span');
+        dur.className = 'text-[10px] text-slate-500';
+        dur.textContent = isDone ? '✓' : block.duration + 'm';
+        tile.appendChild(dur);
+
+        // Click handler
         if (!isDone) {
-            var btn = document.createElement('button');
             if (block.type === 'external') {
-                btn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition-all bg-accent/20 text-accent-light hover:bg-accent/30';
-                btn.textContent = 'Open';
-                (function(b, i) { btn.onclick = function() { openExternalBlock(b); }; })(block, idx);
+                (function(b) { tile.onclick = function() { openExternalBlock(b); }; })(block);
             } else if (block.type === 'break') {
-                btn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition-all bg-surface-300 text-slate-300 hover:bg-surface-400';
-                btn.textContent = 'Done';
-                (function(b) { btn.onclick = function() { logBlock(b.block_type, b.title, b.duration, 0, 0); }; })(block);
+                (function(b) { tile.onclick = function() { logBlock(b.block_type, b.title, b.duration, 0, 0); }; })(block);
             } else {
-                btn.className = 'px-3 py-2 rounded-xl text-xs font-bold transition-all bg-accent text-white hover:bg-accent-dark';
-                btn.textContent = 'Start';
-                (function(b, i) { btn.onclick = function() { startSessionBlock(b, i); }; })(block, idx);
+                (function(b, i) { tile.onclick = function() { startSessionBlock(b, i); }; })(block, idx);
             }
-            top.appendChild(btn);
-        } else {
-            var check = document.createElement('span');
-            check.className = 'text-green-400 text-xs font-bold';
-            check.textContent = '✓ Done';
-            top.appendChild(check);
         }
 
-        card.appendChild(top);
-        list.appendChild(card);
+        list.appendChild(tile);
     });
     lucide.createIcons();
 }
