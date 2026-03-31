@@ -999,8 +999,8 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 .tag-pill-active { background: rgba(99,102,241,0.35); border-color: rgba(99,102,241,0.5); color: #fff; }
 select option { background: #4a525a; color: #e8e6df; }
 /* Flashcard flip */
-.fc-card { perspective: 800px; cursor: pointer; width: 100%; max-width: 400px; }
-.fc-inner { position: relative; width: 100%; min-height: 220px; transition: transform 0.45s ease; transform-style: preserve-3d; }
+.fc-card { perspective: 800px; cursor: pointer; width: 100%; max-width: 480px; }
+.fc-inner { position: relative; width: 100%; min-height: 280px; transition: transform 0.45s ease; transform-style: preserve-3d; }
 .fc-card.flipped .fc-inner { transform: rotateY(180deg); }
 .fc-front, .fc-back { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
 .fc-front { background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(217,119,6,0.06)); border: 1px solid rgba(245,158,11,0.25); }
@@ -5700,50 +5700,114 @@ function renderFcCard() {
     var card = fcCards[fcIdx];
     fcFlipped = false;
 
-    // Build flip card
-    var wrapper = document.createElement('div');
-    wrapper.className = 'fc-card';
-    wrapper.id = 'fcFlipCard';
-    wrapper.onclick = function() { flipFc(); };
+    // Extract stem and suffix from card.front (uppercase letters = suffix)
+    var frontText = card.front;
+    var suffixMatch = frontText.match(/[A-ZÁÉÍÓÖŐÚÜŰ]{2,}/);
+    var stem = suffixMatch ? frontText.substring(0, suffixMatch.index) : frontText;
+    var suffix = suffixMatch ? suffixMatch[0].toLowerCase() : '';
 
-    var inner = document.createElement('div');
-    inner.className = 'fc-inner';
+    if (fcQuizMode && suffix) {
+        // Quiz mode — show stem + ___ and suffix choices
+        var quizCard = document.createElement('div');
+        quizCard.style.cssText = 'width:100%;max-width:480px;min-height:280px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(217,119,6,0.06));border:1px solid rgba(245,158,11,0.25)';
 
-    // Front
-    var front = document.createElement('div');
-    front.className = 'fc-front';
-    var fText = document.createElement('div');
-    fText.className = 'text-xl font-bold text-white text-center leading-relaxed';
-    fText.appendChild(highlightSuffix(card.front));
-    front.appendChild(fText);
-    var tapHint = document.createElement('div');
-    tapHint.className = 'text-[10px] text-slate-500 mt-4';
-    tapHint.textContent = 'Tap to flip';
-    front.appendChild(tapHint);
+        // English meaning hint
+        var hint = document.createElement('div');
+        hint.className = 'text-sm text-amber-300/70 mb-3';
+        hint.textContent = card.back;
+        quizCard.appendChild(hint);
 
-    // Back
-    var back = document.createElement('div');
-    back.className = 'fc-back';
-    var bTrans = document.createElement('div');
-    bTrans.className = 'text-lg font-bold text-indigo-300 text-center mb-2';
-    bTrans.textContent = card.back;
-    back.appendChild(bTrans);
-    if (card.note) {
-        var bNote = document.createElement('div');
-        bNote.className = 'text-xs text-slate-300 text-center leading-relaxed mt-1 px-2';
-        bNote.textContent = card.note;
-        back.appendChild(bNote);
+        // Stem + blank
+        var stemEl = document.createElement('div');
+        stemEl.className = 'text-2xl font-bold text-white text-center mb-5';
+        stemEl.textContent = stem + '____';
+        quizCard.appendChild(stemEl);
+
+        // Generate suffix choices from same group
+        var activeDeck = fcDecks.find(function(d) { return d.cards === fcCards; }) || fcDecks.find(function(d) {
+            return d.cards.some(function(c) { return c.front === fcCards[0].front; });
+        });
+        var allSuffixes = [];
+        if (activeDeck) {
+            activeDeck.cards.forEach(function(c) {
+                var m = c.front.match(/[A-ZÁÉÍÓÖŐÚÜŰ]{2,}/);
+                if (m) { var s = m[0].toLowerCase(); if (allSuffixes.indexOf(s) === -1) allSuffixes.push(s); }
+            });
+        }
+        // Pick 3 wrong + 1 correct, shuffle
+        var wrongs = allSuffixes.filter(function(s) { return s !== suffix; }).sort(function() { return Math.random() - 0.5; }).slice(0, 3);
+        var choices = wrongs.concat([suffix]).sort(function() { return Math.random() - 0.5; });
+
+        var choiceGrid = document.createElement('div');
+        choiceGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:300px';
+        var quizAnswered = false;
+        choices.forEach(function(ch) {
+            var btn = document.createElement('button');
+            btn.style.cssText = 'padding:12px;border-radius:10px;font-size:16px;font-weight:700;border:2px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:#fef3c7;cursor:pointer;transition:all 0.15s';
+            btn.textContent = '-' + ch;
+            btn.onclick = function() {
+                if (quizAnswered) return;
+                quizAnswered = true;
+                var correct = ch === suffix;
+                var btns = choiceGrid.querySelectorAll('button');
+                btns.forEach(function(b) {
+                    b.style.cursor = 'default';
+                    if (b.textContent === '-' + suffix) { b.style.background = '#166534'; b.style.borderColor = '#22c55e'; b.style.color = '#fff'; }
+                    else if (b === btn && !correct) { b.style.background = '#7f1d1d'; b.style.borderColor = '#ef4444'; b.style.color = '#fca5a5'; }
+                    else { b.style.opacity = '0.3'; }
+                });
+                stemEl.textContent = frontText.replace(/[A-ZÁÉÍÓÖŐÚÜŰ]{2,}/, suffix);
+                elevenSpeak(frontText.replace(/[A-ZÁÉÍÓÖŐÚÜŰ]+/g, function(m) { return m.toLowerCase(); }));
+                if (correct) fcGot++; else { fcMiss++; fcMissedPile.push(card); }
+                setTimeout(function() { fcIdx++; renderFcCard(); }, correct ? 1200 : 2500);
+            };
+            choiceGrid.appendChild(btn);
+        });
+        quizCard.appendChild(choiceGrid);
+        area.appendChild(quizCard);
+    } else {
+        // Normal flip card mode
+        var wrapper = document.createElement('div');
+        wrapper.className = 'fc-card';
+        wrapper.id = 'fcFlipCard';
+        wrapper.onclick = function() { flipFc(); };
+
+        var inner = document.createElement('div');
+        inner.className = 'fc-inner';
+
+        var front = document.createElement('div');
+        front.className = 'fc-front';
+        var fText = document.createElement('div');
+        fText.className = 'text-2xl font-bold text-white text-center leading-relaxed';
+        fText.appendChild(highlightSuffix(card.front));
+        front.appendChild(fText);
+        var tapHint = document.createElement('div');
+        tapHint.className = 'text-[10px] text-slate-500 mt-4';
+        tapHint.textContent = 'Tap to flip';
+        front.appendChild(tapHint);
+
+        var back = document.createElement('div');
+        back.className = 'fc-back';
+        var bTrans = document.createElement('div');
+        bTrans.className = 'text-lg font-bold text-indigo-300 text-center mb-2';
+        bTrans.textContent = card.back;
+        back.appendChild(bTrans);
+        if (card.note) {
+            var bNote = document.createElement('div');
+            bNote.className = 'text-xs text-slate-300 text-center leading-relaxed mt-1 px-2';
+            bNote.textContent = card.note;
+            back.appendChild(bNote);
+        }
+        var bOrig = document.createElement('div');
+        bOrig.className = 'text-sm text-white/40 text-center mt-3';
+        bOrig.appendChild(highlightSuffix(card.front));
+        back.appendChild(bOrig);
+
+        inner.appendChild(front);
+        inner.appendChild(back);
+        wrapper.appendChild(inner);
+        area.appendChild(wrapper);
     }
-    // Show original Hungarian on back too
-    var bOrig = document.createElement('div');
-    bOrig.className = 'text-sm text-white/40 text-center mt-3';
-    bOrig.appendChild(highlightSuffix(card.front));
-    back.appendChild(bOrig);
-
-    inner.appendChild(front);
-    inner.appendChild(back);
-    wrapper.appendChild(inner);
-    area.appendChild(wrapper);
 
     // Speaker button below card
     var speakBtn = document.createElement('button');
@@ -5773,9 +5837,19 @@ function renderFcCard() {
         showAllBtn.textContent = fcShowAllOpen ? 'Hide All' : 'Show All';
     };
 
-    controls.appendChild(gotBtn);
-    controls.appendChild(missBtn);
+    var quizBtn = document.createElement('button');
+    quizBtn.className = 'w-full py-2.5 rounded-xl text-xs font-bold transition-all border ' +
+        (fcQuizMode ? 'text-green-300 border-green-500/30 bg-green-500/10' : 'text-purple-300 border-purple-500/30 hover:bg-purple-500/10');
+    quizBtn.textContent = fcQuizMode ? 'Quiz: ON' : 'Quiz Me';
+    quizBtn.onclick = function(e) {
+        e.stopPropagation();
+        fcQuizMode = !fcQuizMode;
+        renderFcCard();
+    };
+
+    if (!fcQuizMode) { controls.appendChild(gotBtn); controls.appendChild(missBtn); }
     controls.appendChild(showAllBtn);
+    controls.appendChild(quizBtn);
 
     // Render show-all if open
     renderFcShowAll();
@@ -5797,6 +5871,7 @@ document.addEventListener('touchend', function(e) {
 });
 
 var fcShowAllOpen = false;
+var fcQuizMode = false;
 
 function renderFcShowAll() {
     var area = document.getElementById('fcShowAllArea');
