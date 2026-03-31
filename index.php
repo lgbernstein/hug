@@ -861,7 +861,6 @@ tailwind.config = {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, sans-serif; }
-html { -webkit-font-smoothing: auto !important; -moz-osx-font-smoothing: auto !important; }
 body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -944,7 +943,7 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 select option { background: #4a525a; color: #e8e6df; }
 </style>
 </head>
-<body class="min-h-screen flex flex-col items-center pb-6">
+<body class="min-h-screen flex flex-col items-center pb-6" style="-webkit-font-smoothing:auto;-moz-osx-font-smoothing:auto">
 
 <!-- SESSION SUMMARY MODAL -->
 <div id="summaryModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50 p-4">
@@ -1648,7 +1647,7 @@ function startVolume() {
                 lastRecordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 // Enable grid Hear Me button
                 var ghm = document.getElementById('gridHearMe');
-                if (ghm) { ghm.disabled = false; ghm.style.background = '#7c3aed'; ghm.style.color = '#ffffff'; ghm.style.opacity = '1'; ghm.style.cursor = 'pointer'; }
+                if (ghm) { ghm.disabled = false; ghm.style.background = '#7c3aed'; ghm.style.color = '#fff'; ghm.style.cursor = 'pointer'; }
                 if (showPlaybackWhenReady) {
                     showPlaybackWhenReady = false;
                     var pb = document.getElementById('playbackBtn');
@@ -2197,7 +2196,7 @@ function processSpeechResult() {
 
             // Enable Hear Me button
             var ghm = document.getElementById('gridHearMe');
-            if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.style.background = '#7c3aed'; ghm.style.color = '#ffffff'; ghm.style.opacity = '1'; ghm.style.cursor = 'pointer'; }
+            if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.style.background = '#7c3aed'; ghm.style.color = '#fff'; ghm.style.cursor = 'pointer'; }
 
             // Hands-free auto-flow — no clicking needed
             if (activeSession) {
@@ -3775,7 +3774,7 @@ function renderAudioStep(step, content, controls) {
     var b2 = document.createElement('button'); b2.className = 'btn-next'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
     var b4 = document.createElement('button'); b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice;
-    b4.style.cssText = 'padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:default;background:#7c3aed;color:#ffffff;opacity:0.45';
+    b4.style.cssText = 'padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:default;background:#a78bfa;color:#4c1d95';
     grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
     var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 English';
