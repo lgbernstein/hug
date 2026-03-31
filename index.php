@@ -963,7 +963,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     // Due phrases
     $whoFilter = ($who !== 'All') ? " AND (hp.`who` = 'All' OR hp.`who` = '$who_safe')" : "";
     $r = $conn->query("SELECT sh.phrase AS q, hp.answer_en AS a, COALESCE(hp.answer_hu,'') AS a_hu, hp.category,
-            'phrase' AS item_type, sh.item_id, sh.is_leech, sh.recall_count
+            'phrase' AS item_type, sh.item_id, sh.is_leech, sh.recall_count, sh.pass_count
             FROM study_history sh
             LEFT JOIN hungarian_prep hp ON sh.phrase = hp.question_hu
             WHERE sh.who='$who_safe' AND sh.item_type='phrase' AND sh.next_review <= NOW()
@@ -1020,6 +1020,49 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
 
     shuffle($newPool);
 
+    // ── 4b. Build Phrase Drill block (first block of the day) ──
+    $phraseDrillBlock = null;
+    $newUsedForDrill = 0;
+    $phraseDrillDone = !empty($todayBlocks['phrase_drill']);
+    if (!$phraseDrillDone) {
+        $pdReview = [];
+        $pdRemoveIdx = [];
+        foreach ($reviewPool as $ri => $item) {
+            if ($item['item_type'] === 'phrase' && count($pdReview) < 12) {
+                $pdReview[] = $item;
+                $pdRemoveIdx[] = $ri;
+            }
+        }
+        foreach (array_reverse($pdRemoveIdx) as $ri) {
+            array_splice($reviewPool, $ri, 1);
+        }
+        $pdNew = [];
+        $pdNewRemoveIdx = [];
+        foreach ($newPool as $ni => $item) {
+            if ($item['item_type'] === 'phrase' && count($pdNew) < 3) {
+                $pdNew[] = $item;
+                $pdNewRemoveIdx[] = $ni;
+            }
+        }
+        foreach (array_reverse($pdNewRemoveIdx) as $ni) {
+            array_splice($newPool, $ni, 1);
+        }
+        $newUsedForDrill = count($pdNew);
+        $pdItems = array_merge($pdReview, $pdNew);
+        shuffle($pdItems);
+        if (count($pdItems) >= 5) {
+            $phraseDrillBlock = [
+                'type' => 'in_app',
+                'block_type' => 'phrase_drill',
+                'title' => 'Phrase Drill',
+                'subtitle' => count($pdItems) . ' phrases (' . count($pdNew) . ' new)',
+                'duration' => 10,
+                'icon' => 'mic',
+                'session' => ['mode' => 'phrase_drill', 'items' => $pdItems]
+            ];
+        }
+    }
+
     // ── 5. Check review load — if heavy, throttle new items ──
     if (count($reviewPool) > 30) {
         $newRemaining = min($newRemaining, 5); // heavy review day: limit new items
@@ -1061,7 +1104,15 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     $activeStreak = 0;
     $reviewIdx = 0;
     $newIdx = 0;
-    $newUsed = 0;
+    $newUsed = $newUsedForDrill;
+
+    // Inject phrase drill as first block
+    if ($phraseDrillBlock) {
+        $blocks[] = $phraseDrillBlock;
+        $availableMin -= $phraseDrillBlock['duration'];
+        $blockNum++;
+        $activeStreak++;
+    }
 
     while ($availableMin >= $blockDuration && ($reviewIdx < count($reviewPool) || ($newIdx < count($newPool) && $newUsed < $newRemaining))) {
         $items = [];
@@ -2820,16 +2871,17 @@ function processSpeechResult() {
             }
 
             // Hands-free auto-flow — no clicking needed (paused when breakdown is open)
-            if (activeSession) {
+            var isPdSession = activeSession && sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
+            if (isPdSession) {
+                handlePhraseDrillResult(isPass, data);
+            } else if (activeSession) {
                 if (isPass) {
-                    // Pass: green flash 1.5s → next phrase
                     setTimeout(function() {
                         if (breakdownOpen) return;
                         var t = document.getElementById('evalToast'); if (t) t.remove();
                         sessionIdx++; renderSessionStep();
                     }, 1500);
                 } else {
-                    // Fail: show feedback 3s → auto re-speak → auto-listen
                     setTimeout(function() {
                         if (breakdownOpen) return;
                         var t = document.getElementById('evalToast'); if (t) t.remove();
@@ -2873,10 +2925,12 @@ function processSpeechResult() {
                 setTimeout(function() { elevenSpeak(correctAnswer); }, 1500);
             }
 
-            // SRS tracking
+            // SRS tracking — phrase drill handles its own SRS in handlePhraseDrillResult
             if (!questionAttempted) {
                 questionAttempted = true;
-                if (activeSession && sessionSteps.length > 0) {
+                if (isPdSession) {
+                    // Phrase drill: SRS recorded by handlePhraseDrillResult / checkPhraseDrillEnd
+                } else if (activeSession && sessionSteps.length > 0) {
                     sessionTotalCount++;
                     if (data.pass) sessionPassCount++;
                     recordSRSUnified(targetQ, 'phrase', null, data.pass);
@@ -4134,6 +4188,7 @@ function renderDailyPlan(data) {
         var m = { 'phrase_review': 'border-blue-500/30 bg-blue-500/10', 'grammar_lesson': 'border-purple-500/30 bg-purple-500/10',
             'interview_sim': 'border-pink-500/30 bg-pink-500/10', 'mock_interview': 'border-pink-500/30 bg-pink-500/10',
             'knowledge_review': 'border-teal-500/30 bg-teal-500/10',
+            'phrase_drill': 'border-sky-500/30 bg-sky-500/10',
             'phrase_practice': 'border-green-500/30 bg-green-500/10', 'free_practice': 'border-accent/30 bg-accent/10' };
         return m[bt] || 'border-white/10 bg-surface-100 hover:border-accent/40';
     }
@@ -4143,6 +4198,7 @@ function renderDailyPlan(data) {
         var m = { 'phrase_review': 'bg-blue-500/25 text-blue-300', 'grammar_lesson': 'bg-purple-500/25 text-purple-300',
             'interview_sim': 'bg-pink-500/25 text-pink-300', 'mock_interview': 'bg-pink-500/25 text-pink-300',
             'knowledge_review': 'bg-teal-500/25 text-teal-300',
+            'phrase_drill': 'bg-sky-500/25 text-sky-300',
             'phrase_practice': 'bg-green-500/25 text-green-300' };
         return m[bt] || 'bg-white/10 text-slate-300';
     }
@@ -4151,6 +4207,7 @@ function renderDailyPlan(data) {
         'grammar_lesson': 'border-purple-500/30 bg-purple-500/10',
         'interview_sim': 'border-pink-500/30 bg-pink-500/10',
         'knowledge_review': 'border-teal-500/30 bg-teal-500/10',
+        'phrase_drill': 'border-sky-500/30 bg-sky-500/10',
         'phrase_practice': 'border-green-500/30 bg-green-500/10',
         'free_practice': 'border-accent/30 bg-accent/10',
         'break': 'border-slate-500/25 bg-slate-500/8'
@@ -4160,6 +4217,7 @@ function renderDailyPlan(data) {
         'grammar_lesson': 'bg-purple-500/25 text-purple-300',
         'interview_sim': 'bg-pink-500/25 text-pink-300',
         'knowledge_review': 'bg-teal-500/25 text-teal-300',
+        'phrase_drill': 'bg-sky-500/25 text-sky-300',
         'phrase_practice': 'bg-green-500/25 text-green-300',
         'free_practice': 'bg-accent/25 text-accent-light',
         'break': 'bg-slate-500/20 text-slate-300'
@@ -4247,6 +4305,12 @@ var sessionPassCount = 0;
 var sessionTotalCount = 0;
 var sessionBlockInfo = null;
 
+// Phrase Drill state
+var pdFailMap = {};
+var pdRetryQueue = [];
+var pdDotResults = [];
+var pdOriginalCount = 0;
+
 function startSessionBlock(block, blockIdx) {
     activeSession = true;
     sessionBlockInfo = block;
@@ -4265,7 +4329,8 @@ function startSessionBlock(block, blockIdx) {
     var badge = document.getElementById('sessionBadge');
     badge.textContent = block.title;
     badge.className = 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ' +
-        (block.block_type.indexOf('grammar') !== -1 ? 'bg-purple-500/20 text-purple-400' :
+        (block.block_type === 'phrase_drill' ? 'bg-sky-500/20 text-sky-400' :
+         block.block_type.indexOf('grammar') !== -1 ? 'bg-purple-500/20 text-purple-400' :
          block.block_type.indexOf('knowledge') !== -1 ? 'bg-teal-500/15 text-teal-400' :
          block.block_type.indexOf('interview') !== -1 ? 'bg-pink-500/20 text-pink-400' :
          'bg-accent/20 text-accent-light');
@@ -4278,7 +4343,8 @@ function startSessionBlock(block, blockIdx) {
         'interview': { emoji: '💬', title: 'Interview Practice', desc: 'Answer each question in Hungarian.' },
         'grammar': { emoji: '📖', title: 'Grammar Lesson', desc: 'Review this grammar pattern and examples.' },
         'knowledge': { emoji: '🧠', title: 'Knowledge Quiz', desc: 'Test your knowledge of Hungarian facts and culture.' },
-        'interleaved': { emoji: '🔀', title: 'Mixed Practice', desc: 'Interleaved review — phrases, grammar, flashcards.' }
+        'interleaved': { emoji: '🔀', title: 'Mixed Practice', desc: 'Interleaved review — phrases, grammar, flashcards.' },
+        'phrase_drill': { emoji: '🎤', title: 'Phrase Drill', desc: 'Listen, repeat, nail it. Focused pronunciation practice.' }
     };
     var intro = introMessages[mode] || { emoji: '📚', title: block.title, desc: 'Get ready!' };
     var content = document.getElementById('sessionContent');
@@ -4361,6 +4427,27 @@ function startSessionBlock(block, blockIdx) {
             return { type: 'audio', q: item.q || '?', a: item.a || '', a_hu: '', category: '', mode: 'pronunciation' };
         });
         setTimeout(renderSessionStep, 1800);
+    } else if (mode === 'phrase_drill') {
+        var rawItems = block.session.items || [];
+        pdFailMap = {};
+        pdRetryQueue = [];
+        pdDotResults = [];
+        pdOriginalCount = rawItems.length;
+        sessionSteps = rawItems.map(function(item, si) {
+            var pc = parseInt(item.pass_count) || 0;
+            pdDotResults.push(null);
+            return {
+                type: 'audio',
+                q: item.q,
+                a: item.a || '',
+                a_hu: item.a_hu || '',
+                category: item.category || '',
+                mode: 'pronunciation',
+                pass_count: pc,
+                pd_index: si
+            };
+        });
+        setTimeout(renderSessionStep, 1800);
     }
 }
 
@@ -4374,8 +4461,139 @@ function findFcCardByFront(frontText) {
     return null;
 }
 
+// ── Phrase Drill: fail-handling, re-queue, progress dots, summary ──
+
+function handlePhraseDrillResult(isPass, evalData) {
+    var step = sessionSteps[sessionIdx];
+    var pdIdx = step.pd_index;
+
+    if (isPass) {
+        pdDotResults[pdIdx] = (pdFailMap[pdIdx] ? 'retry' : 'pass');
+        sessionTotalCount++;
+        sessionPassCount++;
+        recordSRSUnified(step.q, 'phrase', null, true);
+        setTimeout(function() {
+            if (breakdownOpen) return;
+            var t = document.getElementById('evalToast'); if (t) t.remove();
+            sessionIdx++;
+            renderSessionStep();
+        }, 1500);
+    } else {
+        var fails = (pdFailMap[pdIdx] || 0) + 1;
+        pdFailMap[pdIdx] = fails;
+
+        if (fails === 1) {
+            // First fail: replay, let user try again
+            setTimeout(function() {
+                if (breakdownOpen) return;
+                var t = document.getElementById('evalToast'); if (t) t.remove();
+                questionAttempted = false;
+                speak(currentSpeed);
+            }, 3000);
+        } else {
+            // Second fail: move on, queue for retry round
+            pdDotResults[pdIdx] = 'fail';
+            sessionTotalCount++;
+            pdRetryQueue.push(step);
+            setTimeout(function() {
+                if (breakdownOpen) return;
+                var t = document.getElementById('evalToast'); if (t) t.remove();
+                sessionIdx++;
+                renderSessionStep();
+            }, 2000);
+        }
+    }
+}
+
+function checkPhraseDrillEnd() {
+    if (sessionIdx < sessionSteps.length) {
+        renderSessionStep();
+        return;
+    }
+    if (pdRetryQueue.length > 0) {
+        var retries = pdRetryQueue.slice();
+        pdRetryQueue = [];
+        retries.forEach(function(step) {
+            pdFailMap[step.pd_index] = 1; // one more fail = final
+        });
+        sessionSteps = sessionSteps.concat(retries);
+        renderSessionStep();
+        return;
+    }
+    // Record SRS fail for anything still red
+    for (var i = 0; i < pdOriginalCount; i++) {
+        if (pdDotResults[i] === 'fail') {
+            for (var j = 0; j < sessionSteps.length; j++) {
+                if (sessionSteps[j].pd_index === i) {
+                    recordSRSUnified(sessionSteps[j].q, 'phrase', null, false);
+                    break;
+                }
+            }
+        }
+    }
+    showPhraseDrillSummary();
+}
+
+function renderPdProgressDots() {
+    var existing = document.getElementById('pdProgressDots');
+    if (existing) existing.remove();
+
+    var dotsRow = document.createElement('div');
+    dotsRow.id = 'pdProgressDots';
+    dotsRow.className = 'flex gap-1 justify-center flex-wrap px-5 pb-2 pt-1';
+
+    for (var i = 0; i < pdOriginalCount; i++) {
+        var dot = document.createElement('div');
+        var result = pdDotResults[i];
+        var cls = 'w-2.5 h-2.5 rounded-full transition-all ';
+        if (result === 'pass') cls += 'bg-green-400';
+        else if (result === 'fail') cls += 'bg-red-400';
+        else if (result === 'retry') cls += 'bg-amber-400';
+        else if (i === sessionIdx || (sessionIdx >= pdOriginalCount && i === (sessionSteps[sessionIdx] ? sessionSteps[sessionIdx].pd_index : -1))) cls += 'bg-white ring-2 ring-white/50 scale-125';
+        else cls += 'bg-slate-600';
+        dot.className = cls;
+        dotsRow.appendChild(dot);
+    }
+
+    if (sessionIdx >= pdOriginalCount && pdRetryQueue.length > 0 || (sessionSteps.length > pdOriginalCount && sessionIdx >= pdOriginalCount)) {
+        var retryLabel = document.createElement('div');
+        retryLabel.className = 'text-[10px] text-amber-400 font-bold mt-1 w-full text-center';
+        retryLabel.textContent = 'Retry Round';
+        dotsRow.appendChild(retryLabel);
+    }
+
+    var progressTrack = document.getElementById('sessionProgressFill');
+    if (progressTrack && progressTrack.parentNode) {
+        progressTrack.parentNode.after(dotsRow);
+    }
+}
+
+function showPhraseDrillSummary() {
+    var passed = 0, retried = 0, failed = 0;
+    for (var i = 0; i < pdOriginalCount; i++) {
+        if (pdDotResults[i] === 'pass') passed++;
+        else if (pdDotResults[i] === 'retry') { retried++; passed++; }
+        else if (pdDotResults[i] === 'fail') failed++;
+    }
+    document.getElementById('sessionCard').classList.add('hidden');
+    document.getElementById('sessionSummary').classList.remove('hidden');
+    var elapsed = Math.round((new Date() - sessionStartTime) / 60000);
+    document.getElementById('summaryScore').textContent = passed + '/' + pdOriginalCount;
+    document.getElementById('summaryItems').textContent = pdOriginalCount;
+    document.getElementById('summaryTime').textContent = elapsed + 'm';
+    var subtitle = pdOriginalCount + ' phrases done';
+    if (retried > 0) subtitle += ' — ' + retried + ' retried';
+    if (failed > 0) subtitle += (retried > 0 ? ', ' : ' — ') + failed + ' still tricky';
+    document.getElementById('summarySubtitle').textContent = subtitle;
+    if (sessionBlockInfo) {
+        logBlock(sessionBlockInfo.block_type, sessionBlockInfo.title, elapsed || sessionBlockInfo.duration, pdOriginalCount, passed);
+    }
+}
+
 function renderSessionStep() {
+    var isPhraseDrill = sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
     if (sessionIdx >= sessionSteps.length) {
+        if (isPhraseDrill) { checkPhraseDrillEnd(); return; }
         showBlockSummary();
         return;
     }
@@ -4387,7 +4605,12 @@ function renderSessionStep() {
 
     var pct = sessionSteps.length > 0 ? Math.round((sessionIdx / sessionSteps.length) * 100) : 0;
     document.getElementById('sessionProgressFill').style.width = pct + '%';
-    document.getElementById('sessionProgress').textContent = (sessionIdx + 1) + ' / ' + sessionSteps.length;
+    if (isPhraseDrill) {
+        document.getElementById('sessionProgress').textContent = (Math.min(sessionIdx, pdOriginalCount) + 1) + ' / ' + pdOriginalCount;
+        renderPdProgressDots();
+    } else {
+        document.getElementById('sessionProgress').textContent = (sessionIdx + 1) + ' / ' + sessionSteps.length;
+    }
 
     // Show current item type indicator
     var itemTypeEl = document.getElementById('sessionItemType');
@@ -4429,10 +4652,30 @@ function renderAudioStep(step, content, controls) {
     transText.id = 'sessionTranslation';
     transText.className = 'text-sky-300 text-sm italic';
     transText.textContent = step.a;
-    transText.style.cssText = 'filter:blur(5px);cursor:pointer;transition:filter 0.2s';
+    var pdMode = sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
+    var isNewPhrase = pdMode && (!step.pass_count || step.pass_count === 0);
+    if (pdMode && isNewPhrase) {
+        transText.style.cssText = 'cursor:pointer;transition:filter 0.2s';
+    } else {
+        transText.style.cssText = 'filter:blur(5px);cursor:pointer;transition:filter 0.2s';
+    }
     transText.onclick = function() { transText.style.filter = transText.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)'; };
     transRow.appendChild(transText);
     content.appendChild(transRow);
+
+    // Auto-show phonetic for new phrases in phrase drill
+    if (pdMode && isNewPhrase) {
+        var pdPhonetic = document.createElement('div');
+        pdPhonetic.className = 'text-xs text-slate-400 italic text-center mb-2';
+        pdPhonetic.textContent = '';
+        content.appendChild(pdPhonetic);
+        var phFd = new FormData();
+        phFd.append('sentence', step.q);
+        fetch('phonetic.php', { method: 'POST', body: phFd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) { pdPhonetic.textContent = data.phonetic || ''; })
+            .catch(function() {});
+    }
 
     // Status indicator (mic dot + volume bar)
     var statusRow = document.createElement('div');
