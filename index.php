@@ -2740,14 +2740,14 @@ function processSpeechResult() {
     fd.append('strictness', strictness);
     if (targetAH) fd.append('expected_hu', targetAH);
 
-    // Send audio to Gemini for direct eval (bypasses unreliable Web Speech API transcription)
+    // Send audio to Gemini for direct eval — skip for pronunciation mode (transcript is sufficient, saves 5-10s)
     var audioPromise = Promise.resolve();
-    if (lastRecordingBlob) {
+    if (lastRecordingBlob && currentMode !== 'pronunciation') {
         audioPromise = new Promise(function(resolve) {
             var reader = new FileReader();
             reader.onload = function() {
                 var b64 = reader.result.split(',')[1];
-                if (b64 && b64.length < 250000) fd.append('audio', b64);
+                if (b64 && b64.length < 150000) fd.append('audio', b64);
                 resolve();
             };
             reader.onerror = function() { resolve(); };
@@ -2755,7 +2755,8 @@ function processSpeechResult() {
         });
     }
     var evalController = new AbortController();
-    var evalTimeout = setTimeout(function() { evalController.abort(); }, 20000);
+    var evalTimeoutMs = currentMode === 'pronunciation' ? 10000 : 20000;
+    var evalTimeout = setTimeout(function() { evalController.abort(); }, evalTimeoutMs);
     audioPromise.then(function() { return fetch('eval.php', { method: 'POST', body: fd, signal: evalController.signal }); })
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -2811,6 +2812,12 @@ function processSpeechResult() {
             // Enable Hear Me button
             var ghm = document.getElementById('gridHearMe');
             if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.style.background = '#7c3aed'; ghm.style.color = '#fff'; ghm.style.cursor = 'pointer'; }
+
+            // Unblur translation on pass so user sees what they got right
+            if (isPass) {
+                var trans = document.getElementById('sessionTranslation');
+                if (trans) trans.style.filter = 'none';
+            }
 
             // Hands-free auto-flow — no clicking needed (paused when breakdown is open)
             if (activeSession) {
