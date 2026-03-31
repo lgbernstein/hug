@@ -5382,9 +5382,9 @@ var fcDecks = [
   { id: 'conjugation', emoji: '🔄', title: 'Verb Conjugation', desc: 'Present tense for all 6 persons', color: 'amber',
     groups: [
       { label: 'Indefinite — lakni (to live)', start: 0, count: 6 },
-      { label: 'Indefinite — dolgozni (to work)', start: 6, count: 3 },
-      { label: 'Indefinite — beszélni (to speak)', start: 9, count: 6 },
-      { label: 'Definite — szeretni (to love)', start: 15, count: 6 }
+      { label: 'Indefinite — dolgozni (to work)', start: 6, count: 6 },
+      { label: 'Indefinite — beszélni (to speak)', start: 12, count: 6 },
+      { label: 'Definite — szeretni (to love)', start: 18, count: 6 }
     ],
     cards: [
     { front: 'Én lakOK', back: 'I live', note: '-ok/-ek/-ök = I (back/front/rounded vowel)' },
@@ -5393,9 +5393,12 @@ var fcDecks = [
     { front: 'Mi lakUNK', back: 'We live', note: '-unk/-ünk = we' },
     { front: 'Ti lakTOK', back: 'You all live', note: '-tok/-tek/-tök = you (plural)' },
     { front: 'Ők lakNAK', back: 'They live', note: '-nak/-nek = they' },
-    { front: 'Én dolgozOM', back: 'I work', note: 'Definite conjugation: -om/-em/-öm' },
-    { front: 'Te dolgozOL', back: 'You work', note: '-ol/-el/-öl = you (indefinite)' },
+    { front: 'Én dolgozOM', back: 'I work', note: '-om for back vowel verbs' },
+    { front: 'Te dolgozOL', back: 'You work', note: '-ol = you (indefinite)' },
     { front: 'Ő dolgozIK', back: 'He/She works', note: '-ik verbs: 3rd person ends in -ik' },
+    { front: 'Mi dolgozUNK', back: 'We work', note: '-unk = we (back vowel)' },
+    { front: 'Ti dolgozTOK', back: 'You all work', note: '-tok = you plural (back vowel)' },
+    { front: 'Ők dolgozNAK', back: 'They work', note: '-nak = they (back vowel)' },
     { front: 'Én beszélEK', back: 'I speak', note: 'Front vowel verb → -ek' },
     { front: 'Te beszélSZ', back: 'You speak', note: '-sz for you, same all verbs' },
     { front: 'Ő beszél', back: 'He/She speaks', note: '3rd person indefinite = bare stem (no suffix)' },
