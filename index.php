@@ -473,7 +473,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
 
     $sentenceEsc = addslashes($sentence);
     $englishEsc = addslashes($english);
-    $prompt = "Break down this Hungarian phrase for a beginner American English speaker.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"base\": \"dictionary form\",\n      \"meaning\": \"English (2-3 words)\",\n      \"suffixes\": \"-suffix = meaning (e.g. -ban = in, -om = my). Skip if none.\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. MAH-sseer)\"\n    }\n  ],\n  \"type\": \"person/place/thing/action/greeting\",\n  \"grammar_note\": \"Show the practical pattern with EXAMPLES, not technical terms. Like:\\nHova? – Budapestre (to Budapest)\\nHol? – Budapesten (in Budapest)\\nHonnan? – Budapestről (from Budapest)\\nUse real words from the phrase, not grammar terminology.\",\n  \"tip\": \"One memory trick, under 15 words\"\n}\n\nIMPORTANT: The grammar_note must show EXAMPLES with the actual words, not linguistic terms like 'locative' or 'possessive locative'. Write it like a cheat sheet a student would tape to their wall.";
+    $prompt = "You are a friendly Hungarian tutor. Break down this phrase word by word for an American beginner.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"meaning\": \"simple English meaning\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. OHR-vosh)\",\n      \"note\": \"One helpful thing to know. Like: 'Hungarian doesn't distinguish he/she' or 'Comes AFTER the word it emphasizes' or '-ban = in (think: banned inside)'. Skip if the word is obvious.\"\n    }\n  ],\n  \"tip\": \"One memory trick for the whole phrase, under 15 words\"\n}\n\nRules:\n- Keep meanings to 2-4 words max\n- Notes should be conversational, like a tutor talking, not grammar textbook\n- Skip the note field entirely for simple words (a, the, and, etc)\n- For suffixes: show the suffix, what it means, and a mini example\n- Never use terms like 'locative', 'accusative', 'possessive' — just explain what it DOES";
 
     $apiKey = $env['GEMINI_KEY'];
     $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
@@ -3174,7 +3174,7 @@ function renderBreakdown(data, container) {
 
         var drawer = document.createElement('div');
         drawer.id = 'breakdownDrawer';
-        drawer.className = 'w-80 max-w-[85vw] h-full overflow-y-auto p-5 space-y-3';
+        drawer.className = 'w-[420px] max-w-[90vw] h-full overflow-y-auto p-5 space-y-3';
         drawer.style.background = '#f5f5f5';
         drawer.style.borderLeft = '1px solid rgba(99,102,241,0.15)';
         drawer.style.transform = 'translateX(100%)';
@@ -3197,82 +3197,50 @@ function renderBreakdown(data, container) {
     drawer.style.position = 'relative';
     drawer.appendChild(closeBtn);
 
-    // Word breakdown
+    // Word breakdown — card style, horizontal
     if (data.words && data.words.length) {
         data.words.forEach(function(w) {
-            var row = document.createElement('div');
-            row.className = 'py-2.5 border-b border-slate-200';
+            var card = document.createElement('div');
+            card.style.cssText = 'background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;margin-bottom:8px';
 
-            // Word + base + meaning
-            var line1 = document.createElement('div');
-            line1.className = 'flex items-baseline gap-2 flex-wrap';
+            // Top row: speaker + word + meaning on one line
+            var top = document.createElement('div');
+            top.style.cssText = 'display:flex;align-items:baseline;gap:8px;flex-wrap:wrap';
             var speakBtn = document.createElement('button');
-            speakBtn.className = 'text-indigo-500 hover:text-indigo-700 transition-colors';
-            speakBtn.textContent = '🔊';
-            speakBtn.style.cssText = 'font-size:14px;cursor:pointer;border:none;background:none;padding:0';
+            speakBtn.style.cssText = 'font-size:13px;cursor:pointer;border:none;background:none;padding:0;color:#6366f1;flex-shrink:0';
             (function(word) { speakBtn.onclick = function(e) { e.stopPropagation(); elevenSpeak(word); }; })(w.word);
-            line1.appendChild(speakBtn);
+            speakBtn.textContent = '🔊';
+            top.appendChild(speakBtn);
             var hu = document.createElement('span');
-            hu.className = 'text-base font-bold text-indigo-700';
+            hu.style.cssText = 'font-size:16px;font-weight:800;color:#312e81';
             hu.textContent = w.word;
-            line1.appendChild(hu);
-            if (w.base && w.base !== w.word) {
-                var base = document.createElement('span');
-                base.className = 'text-xs text-slate-600';
-                base.textContent = '← ' + w.base;
-                line1.appendChild(base);
-            }
-            var meaning = document.createElement('span');
-            meaning.className = 'text-xs text-slate-700';
-            meaning.textContent = '= ' + w.meaning;
-            line1.appendChild(meaning);
-            row.appendChild(line1);
-
-            // Pronunciation
+            top.appendChild(hu);
+            var eq = document.createElement('span');
+            eq.style.cssText = 'font-size:14px;color:#374151';
+            eq.textContent = '= ' + w.meaning;
+            top.appendChild(eq);
             if (w.pronunciation) {
-                var pron = document.createElement('div');
-                pron.className = 'text-[11px] text-teal-700 mt-1 font-mono';
+                var pron = document.createElement('span');
+                pron.style.cssText = 'font-size:11px;color:#0f766e;font-family:monospace;margin-left:auto';
                 pron.textContent = w.pronunciation;
-                row.appendChild(pron);
+                top.appendChild(pron);
             }
+            card.appendChild(top);
 
-            // Suffixes
-            if (w.suffixes && w.suffixes !== 'none' && w.suffixes !== 'N/A') {
-                var suf = document.createElement('div');
-                suf.className = 'text-[11px] text-indigo-600 mt-1';
-                suf.textContent = w.suffixes;
-                row.appendChild(suf);
+            // Note line (if present)
+            if (w.note) {
+                var note = document.createElement('div');
+                note.style.cssText = 'font-size:12px;color:#4338ca;margin-top:4px;line-height:1.4';
+                note.textContent = w.note;
+                card.appendChild(note);
             }
-            drawer.appendChild(row);
+            drawer.appendChild(card);
         });
     }
-    // Type badge
-    if (data.type) {
-        var typeBadge = document.createElement('div');
-        typeBadge.className = 'mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-100 text-teal-800';
-        typeBadge.textContent = data.type;
-        drawer.appendChild(typeBadge);
-    }
-
-    // Grammar note
-    if (data.grammar_note) {
-        var gn = document.createElement('div');
-        gn.className = 'mt-3 p-3 rounded-lg bg-white border border-slate-200';
-        var gnLabel = document.createElement('div');
-        gnLabel.className = 'text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1';
-        gnLabel.textContent = 'Grammar';
-        gn.appendChild(gnLabel);
-        var gnText = document.createElement('p');
-        gnText.className = 'text-xs text-slate-700 leading-relaxed';
-        gnText.textContent = data.grammar_note;
-        gn.appendChild(gnText);
-        drawer.appendChild(gn);
-    }
-
     // Tip
     if (data.tip) {
-        var tip = document.createElement('p');
-        tip.className = 'text-xs text-teal-700 mt-3 italic';
+        var tip = document.createElement('div');
+        tip.style.cssText = 'margin-top:16px;padding:10px 12px;background:#fff;border-radius:8px;border:1px solid #e5e7eb;font-size:13px;color:#374151;line-height:1.5';
         tip.textContent = '💡 ' + data.tip;
         drawer.appendChild(tip);
     }
