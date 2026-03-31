@@ -862,6 +862,23 @@ tailwind.config = {
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, sans-serif; }
 body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
+body.light { background: #f8fafc; color: #1e293b; }
+body.light .glass { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.08); }
+body.light .glass-strong { background: rgba(255,255,255,0.95); border-color: rgba(0,0,0,0.1); }
+body.light .pill-inactive { color: #475569; border-color: rgba(0,0,0,0.15); }
+body.light .pill-inactive:hover { color: #1e293b; background: rgba(0,0,0,0.05); }
+body.light .grammar-card, body.light .drill-card { background: rgba(255,255,255,0.8); border-color: rgba(0,0,0,0.08); }
+body.light .grammar-card:hover, body.light .drill-card:hover { border-color: rgba(99,102,241,0.3); background: white; }
+body.light .phrase-item:hover { background: rgba(0,0,0,0.03); }
+body.light .question-text { color: #0f172a; }
+body.light .progress-track { background: rgba(99,102,241,0.1); }
+body.light .result-pass { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); }
+body.light .result-fail { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); }
+body.light [class*="bg-surface"] { background: rgba(241,245,249,0.8); }
+body.light [class*="text-slate-3"], body.light [class*="text-slate-4"], body.light [class*="text-slate-5"] { color: #475569; }
+body.light [class*="text-white"] { color: #0f172a; }
+body.light [class*="border-white"] { border-color: rgba(0,0,0,0.08); }
+body.light select option { background: white; color: #1e293b; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
@@ -1010,6 +1027,9 @@ select option { background: #111a2e; color: #e2e8f0; }
             </div>
         </div>
         <div class="flex items-center gap-2">
+        <button onclick="toggleTheme()" title="Toggle light/dark" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="sun" class="w-4 h-4" id="themeIcon"></i>
+        </button>
         <a href="admin.php" title="Admin" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all">
             <i data-lucide="settings" class="w-4 h-4"></i>
         </a>
@@ -1093,14 +1113,12 @@ select option { background: #111a2e; color: #e2e8f0; }
                     </button>
                 </div>
             </div>
-            <!-- Session toolbar: speed + strictness + blur -->
-            <div class="flex items-center gap-4 px-5 py-2 border-b border-white/5 bg-surface-50/50 flex-wrap">
-                <!-- Speed -->
+            <!-- Session toolbar: collapsed by default, tap gear to expand -->
+            <div id="sessionToolbar" class="hidden flex items-center gap-4 px-5 py-2 border-b border-white/5 bg-surface-50/50 flex-wrap">
                 <div class="flex items-center gap-1">
                     <span class="text-[10px] text-slate-500">Speech</span>
                     <div id="sessionSpeedBar" class="flex gap-0.5"></div>
                 </div>
-                <!-- Strictness -->
                 <div class="flex items-center gap-1.5">
                     <span class="text-[10px] text-slate-500">Grading</span>
                     <input id="strictSlider" type="range" min="1" max="5" step="1" class="w-20 h-1 accent-accent cursor-pointer">
@@ -1731,6 +1749,22 @@ function setSpeed(speed) {
     });
 }
 
+// ── Theme toggle ─────────────────────────────────────────────────────
+function toggleTheme() {
+    var isLight = document.body.classList.toggle('light');
+    localStorage.setItem('hugTheme', isLight ? 'light' : 'dark');
+    var icon = document.getElementById('themeIcon');
+    if (icon) icon.setAttribute('data-lucide', isLight ? 'moon' : 'sun');
+    lucide.createIcons();
+}
+(function() {
+    if (localStorage.getItem('hugTheme') === 'light') {
+        document.body.classList.add('light');
+        var icon = document.getElementById('themeIcon');
+        if (icon) icon.setAttribute('data-lucide', 'moon');
+    }
+})();
+
 // ── Category filter ───────────────────────────────────────────────────
 function setCat(c, skipFetch) {
     cat = c;
@@ -2062,113 +2096,124 @@ recognition.onresult = function(event) {
     fetch('eval.php', { method: 'POST', body: fd })
         .then(function(r) { return r.json(); })
         .then(function(data) {
-            scoreDisplay.textContent = '';
             var isPass = data.pass;
-
-            // Row 1: badge + short feedback (truncated to first sentence)
-            var topRow = document.createElement('div');
-            topRow.className = 'flex items-center gap-2 justify-center flex-wrap';
-            var badge = document.createElement('span');
-            badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ' +
-                (isPass ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
-            badge.textContent = isPass ? 'Pass' : 'Retry';
+            var correctAnswer = targetAH || data.correct || targetQ;
             var fb = (data.feedback || '').split(/\.\s/)[0];
-            if (fb.length > 60) fb = fb.substring(0, 57) + '...';
-            var hint = document.createElement('span');
-            hint.className = 'text-xs ' + (isPass ? 'text-green-400/70' : 'text-red-400/70');
-            hint.textContent = fb;
-            topRow.appendChild(badge);
-            topRow.appendChild(hint);
-            scoreDisplay.appendChild(topRow);
+            if (fb.length > 80) fb = fb.substring(0, 77) + '...';
 
-            // Row 2: correct answer — DB answer takes priority, then Gemini's, then fallback
-            var correctAnswer = targetAH || data.correct || (currentMode === 'pronunciation' ? targetQ : targetQ);
-            if (correctAnswer) {
-                var correctEl = document.createElement('p');
-                correctEl.className = 'text-base mt-2 font-semibold ' + (isPass ? 'text-green-300' : 'text-white');
-                correctEl.textContent = correctAnswer;
-                scoreDisplay.appendChild(correctEl);
-            }
+            // Replace content area with clean result panel at eye level
+            var content = document.getElementById('sessionContent');
+            var controls = document.getElementById('sessionControls');
+            if (content && activeSession) {
+                content.textContent = '';
+                controls.textContent = '';
 
-            resultCard.classList.add(isPass ? 'result-pass' : 'result-fail');
+                // Pass/Fail badge — big and centered
+                var badge = document.createElement('div');
+                badge.className = 'text-center mb-3';
+                var badgeSpan = document.createElement('span');
+                badgeSpan.className = 'inline-flex items-center px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider ' +
+                    (isPass ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
+                badgeSpan.textContent = isPass ? '✓ Pass' : '✗ Try Again';
+                badge.appendChild(badgeSpan);
+                content.appendChild(badge);
 
-            // Always show playback button so user can hear themselves
-            var playbackEl = document.getElementById('playbackBtn');
-            if (lastRecordingBlob && playbackEl) {
-                playbackEl.classList.remove('hidden');
+                // The phrase
+                var phrase = document.createElement('h1');
+                phrase.className = 'question-text text-white mb-1 text-center';
+                phrase.textContent = targetQ;
+                content.appendChild(phrase);
+
+                // Short feedback
+                if (fb) {
+                    var fbEl = document.createElement('p');
+                    fbEl.className = 'text-xs text-center mb-3 ' + (isPass ? 'text-green-400/70' : 'text-red-400/70');
+                    fbEl.textContent = fb;
+                    content.appendChild(fbEl);
+                }
+
+                // What you said (small)
+                var said = document.createElement('p');
+                said.className = 'text-xs text-slate-500 text-center italic mb-4';
+                said.textContent = 'You said: "' + result + '"';
+                content.appendChild(said);
+
+                // Action buttons — one row
+                var btnRow = document.createElement('div');
+                btnRow.className = 'flex items-center justify-center gap-3';
+
+                var listenBtn = document.createElement('button');
+                listenBtn.className = 'px-5 py-2.5 rounded-xl text-sm font-bold transition-all bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
+                listenBtn.textContent = '🔊 Listen Again';
+                listenBtn.onclick = function() { speak(currentSpeed, false); };
+                btnRow.appendChild(listenBtn);
+
+                if (lastRecordingBlob) {
+                    var hearBtn = document.createElement('button');
+                    hearBtn.className = 'px-4 py-2.5 rounded-xl text-sm font-bold transition-all bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
+                    hearBtn.textContent = '🎤 Hear Myself';
+                    hearBtn.onclick = playMyVoice;
+                    btnRow.appendChild(hearBtn);
+                }
+
+                var nextBtn = document.createElement('button');
+                nextBtn.className = 'px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all ' +
+                    (isPass ? 'bg-accent hover:bg-accent-dark' : 'bg-red-500/80 hover:bg-red-500');
+                nextBtn.textContent = isPass ? 'Next →' : '🎤 Retry';
+                nextBtn.onclick = function() {
+                    if (isPass) { sessionIdx++; renderSessionStep(); }
+                    else { renderSessionStep(); }
+                };
+                btnRow.appendChild(nextBtn);
+                controls.appendChild(btnRow);
             } else {
-                showPlaybackWhenReady = true;
+                // Non-session fallback — use existing resultCard
+                scoreDisplay.textContent = '';
+                var topRow = document.createElement('div');
+                topRow.className = 'flex items-center gap-2 justify-center flex-wrap';
+                var badgeLegacy = document.createElement('span');
+                badgeLegacy.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ' +
+                    (isPass ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
+                badgeLegacy.textContent = isPass ? 'Pass' : 'Retry';
+                var hintLegacy = document.createElement('span');
+                hintLegacy.className = 'text-xs ' + (isPass ? 'text-green-400/70' : 'text-red-400/70');
+                hintLegacy.textContent = fb;
+                topRow.appendChild(badgeLegacy);
+                topRow.appendChild(hintLegacy);
+                scoreDisplay.appendChild(topRow);
+                if (correctAnswer) {
+                    var correctEl = document.createElement('p');
+                    correctEl.className = 'text-base mt-2 font-semibold text-white';
+                    correctEl.textContent = correctAnswer;
+                    scoreDisplay.appendChild(correctEl);
+                }
+                resultCard.classList.add(isPass ? 'result-pass' : 'result-fail');
+                var playbackEl = document.getElementById('playbackBtn');
+                if (lastRecordingBlob && playbackEl) playbackEl.classList.remove('hidden');
+                else showPlaybackWhenReady = true;
             }
 
-            // Repeat correct answer on fail
+            // Repeat correct on fail
             if (!isPass && repeatOnFail && correctAnswer) {
                 setTimeout(function() {
                     var msg = new SpeechSynthesisUtterance(correctAnswer);
-                    msg.lang = 'hu-HU';
-                    msg.rate = 0.8;
+                    msg.lang = 'hu-HU'; msg.rate = 0.8;
                     window.speechSynthesis.speak(msg);
                 }, 1500);
             }
 
-            if (isPass && autoAdvance) {
-                var pauseRow = document.createElement('div');
-                pauseRow.className = 'flex items-center justify-center gap-2 mt-2';
-                var countdown = document.createElement('span');
-                countdown.className = 'text-[10px] text-slate-400';
-                countdown.textContent = 'Next in 3s...';
-                var pauseBtn = document.createElement('button');
-                pauseBtn.className = 'text-[10px] px-2 py-0.5 rounded border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 font-semibold';
-                pauseBtn.textContent = 'Pause';
-                pauseBtn.onclick = function() {
-                    clearTimeout(advanceTimeout);
-                    clearInterval(countdownInterval);
-                    pauseRow.remove();
-                };
-                pauseRow.appendChild(countdown);
-                pauseRow.appendChild(pauseBtn);
-                scoreDisplay.appendChild(pauseRow);
-                var secsLeft = 2;
-                var countdownInterval = setInterval(function() {
-                    if (secsLeft <= 0) { clearInterval(countdownInterval); countdown.textContent = 'Moving on...'; return; }
-                    countdown.textContent = 'Next in ' + secsLeft + 's...';
-                    secsLeft--;
-                }, 1000);
-                advanceTimeout = setTimeout(function() { clearInterval(countdownInterval); nextQuestion(); }, 3000);
-            }
+            // SRS tracking
             if (!questionAttempted) {
                 questionAttempted = true;
-                // If in guided session, handle via session engine
                 if (activeSession && sessionSteps.length > 0) {
                     sessionTotalCount++;
                     if (data.pass) sessionPassCount++;
                     recordSRSUnified(targetQ, 'phrase', null, data.pass);
-                    // Show Next button in session
-                    var resultArea = document.getElementById('sessionResultArea');
-                    if (resultArea) {
-                        resultArea.classList.remove('hidden');
-                        resultArea.textContent = '';
-                        var badge = document.createElement('span');
-                        badge.className = data.pass ? 'inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-500/20 text-green-400' : 'inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400';
-                        badge.textContent = data.pass ? 'Pass' : 'Retry';
-                        resultArea.appendChild(badge);
-                        if (data.feedback) {
-                            var fb = document.createElement('p');
-                            fb.className = 'text-xs text-slate-400 mt-1';
-                            fb.textContent = data.feedback;
-                            resultArea.appendChild(fb);
-                        }
-                        var nextBtn = document.createElement('button');
-                        nextBtn.className = 'mt-3 px-6 py-2.5 bg-accent hover:bg-accent-dark rounded-xl text-sm font-bold text-white transition-all';
-                        nextBtn.textContent = 'Next →';
-                        nextBtn.onclick = function() { sessionIdx++; renderSessionStep(); };
-                        resultArea.appendChild(nextBtn);
-                    }
                 } else {
                     updateSession(data.pass);
                     recordSRS(targetQ, data.pass);
                 }
             }
-            lucide.createIcons();
         })
         .catch(function() {
             scoreDisplay.textContent = '';
