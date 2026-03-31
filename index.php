@@ -4313,9 +4313,7 @@ function startSessionBlock(block, blockIdx) {
                 var card = findFcCardByFront(item.q);
                 return { type: 'flashcard', front: item.q, back: card ? card.back : '(flip to see)', note: card ? card.note : '', item_type: 'flashcard' };
             } else if (item.item_type === 'phrase') {
-                // Questions with answers → interview mode; standalone phrases → pronunciation
-                var phraseMode = item.a_hu ? 'interview' : 'pronunciation';
-                return { type: 'audio', q: item.q, a: item.a || '', a_hu: item.a_hu || '', category: item.category || '', mode: phraseMode };
+                return { type: 'audio', q: item.q, a: item.a || '', a_hu: item.a_hu || '', category: item.category || '', mode: 'pronunciation' };
             } else if (item.item_type === 'grammar') {
                 return { type: 'grammar_teach', pattern_id: item.item_id, pattern_name: item.q, explanation: item.a || '', suffix_words: item.a_hu || '' };
             } else if (item.item_type === 'knowledge') {
