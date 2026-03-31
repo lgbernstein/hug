@@ -943,7 +943,7 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 select option { background: #4a525a; color: #e8e6df; }
 </style>
 </head>
-<body class="min-h-screen flex flex-col items-center pb-6" style="-webkit-font-smoothing:auto;-moz-osx-font-smoothing:auto">
+<body class="min-h-screen flex flex-col items-center pb-6" style="-webkit-font-smoothing:subpixel-antialiased;-moz-osx-font-smoothing:auto">
 
 <!-- SESSION SUMMARY MODAL -->
 <div id="summaryModal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center z-50 p-4">
