@@ -2028,7 +2028,10 @@ function setRecordIcon(iconName) {
 recognition.onstart = function() {
     isListening     = true;
     listenStartTime = Date.now();
-    indicator.className = 'status-dot dot-live';
+    // Always get fresh element (indicator var can be stale after re-render)
+    var liveInd = document.getElementById('readyIndicator') || indicator;
+    liveInd.className = 'status-dot dot-live';
+    indicator = liveInd;
     var rb = document.getElementById('recordBtn');
     if (rb) {
         rb.classList.add('mic-active');
@@ -2272,7 +2275,7 @@ function processSpeechResult() {
 recognition.onend = function() {
     clearTimeout(recTimeout);
     isListening = false;
-    indicator.className = 'status-dot dot-off';
+    var offInd = document.getElementById('readyIndicator') || indicator; offInd.className = 'status-dot dot-off'; indicator = offInd;
     var rbReset = document.getElementById('recordBtn');
     if (rbReset) {
         rbReset.classList.remove('mic-active', 'bg-red-600', 'hover:bg-red-500', 'glow-red');
@@ -2290,7 +2293,7 @@ recognition.onend = function() {
 
 function toggleMic() {
     if (!isListening) {
-        indicator.className = 'status-dot dot-warmup';
+        var warmInd = document.getElementById('readyIndicator') || indicator; warmInd.className = 'status-dot dot-warmup'; indicator = warmInd;
         try { recognition.start(); } catch(e) { console.log('rec start error:', e); }
     } else {
         clearTimeout(recTimeout);
