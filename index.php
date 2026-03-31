@@ -3263,11 +3263,11 @@ function renderBreakdown(data, container) {
     drawer.style.position = 'relative';
     drawer.appendChild(closeBtn);
 
-    // Full sentence at top with speaker
     if (data.words && data.words.length) {
+        // Full sentence bar — sticky at top
         var fullSentence = data.words.map(function(w) { return w.word; }).join(' ');
         var sentenceBar = document.createElement('div');
-        sentenceBar.style.cssText = 'background:#312e81;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px';
+        sentenceBar.style.cssText = 'background:#312e81;border-radius:10px;padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px';
         var sentenceSpeak = document.createElement('button');
         sentenceSpeak.style.cssText = 'font-size:16px;cursor:pointer;border:none;background:none;padding:0;color:#a5b4fc;flex-shrink:0';
         sentenceSpeak.textContent = '🔊';
@@ -3279,12 +3279,20 @@ function renderBreakdown(data, container) {
         sentenceBar.appendChild(sentenceText);
         drawer.appendChild(sentenceBar);
 
-        // Word table — compact rows instead of stacked cards
+        // Tip right under sentence (if present)
+        if (data.tip) {
+            var tip = document.createElement('div');
+            tip.style.cssText = 'padding:8px 12px;background:#fef9c3;border-radius:8px;border:1px solid #fde68a;font-size:13px;color:#92400e;line-height:1.4;margin-bottom:12px';
+            tip.textContent = '💡 ' + data.tip;
+            drawer.appendChild(tip);
+        }
+
+        // Compact word list — one line per word, tap row for note
         var table = document.createElement('div');
         table.style.cssText = 'background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden';
         data.words.forEach(function(w, i) {
             var row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:baseline;gap:8px;padding:8px 12px;flex-wrap:wrap' + (i > 0 ? ';border-top:1px solid #f3f4f6' : '');
+            row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:7px 12px' + (i > 0 ? ';border-top:1px solid #f3f4f6' : '') + (w.note ? ';cursor:pointer' : '');
 
             var speakBtn = document.createElement('button');
             speakBtn.style.cssText = 'font-size:12px;cursor:pointer;border:none;background:none;padding:0;color:#6366f1;flex-shrink:0';
@@ -3293,40 +3301,39 @@ function renderBreakdown(data, container) {
             row.appendChild(speakBtn);
 
             var hu = document.createElement('span');
-            hu.style.cssText = 'font-size:15px;font-weight:700;color:#312e81;min-width:80px';
+            hu.style.cssText = 'font-size:14px;font-weight:700;color:#312e81;width:100px;flex-shrink:0';
             hu.textContent = w.word;
             row.appendChild(hu);
 
             var eq = document.createElement('span');
             eq.style.cssText = 'font-size:13px;color:#374151;flex:1';
-            eq.textContent = '= ' + w.meaning;
+            eq.textContent = w.meaning;
             row.appendChild(eq);
 
             if (w.pronunciation) {
                 var pron = document.createElement('span');
-                pron.style.cssText = 'font-size:11px;color:#0f766e;font-family:monospace';
+                pron.style.cssText = 'font-size:10px;color:#0f766e;font-family:monospace;flex-shrink:0';
                 pron.textContent = w.pronunciation;
                 row.appendChild(pron);
             }
 
             table.appendChild(row);
 
-            // Note as sub-row if present
+            // Note hidden — tap row to toggle
             if (w.note) {
                 var noteRow = document.createElement('div');
-                noteRow.style.cssText = 'padding:0 12px 8px 34px;font-size:11px;color:#4338ca;line-height:1.3';
+                noteRow.style.cssText = 'padding:0 12px 6px 30px;font-size:11px;color:#4338ca;line-height:1.3;display:none';
                 noteRow.textContent = w.note;
                 table.appendChild(noteRow);
+                (function(nr) {
+                    row.onclick = function(e) {
+                        if (e.target.tagName === 'BUTTON') return;
+                        nr.style.display = nr.style.display === 'none' ? 'block' : 'none';
+                    };
+                })(noteRow);
             }
         });
         drawer.appendChild(table);
-    }
-    // Tip
-    if (data.tip) {
-        var tip = document.createElement('div');
-        tip.style.cssText = 'margin-top:12px;padding:10px 12px;background:#fff;border-radius:8px;border:1px solid #e5e7eb;font-size:13px;color:#374151;line-height:1.5';
-        tip.textContent = '💡 ' + data.tip;
-        drawer.appendChild(tip);
     }
 
     // Open the drawer
