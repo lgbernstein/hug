@@ -908,7 +908,7 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 .btn-purple { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #7c3aed; color: #fff; transition: all 0.15s; cursor: pointer; }
 .btn-purple:hover { background: #6d28d9; }
 .btn-purple:active { transform: scale(0.97); }
-.btn-purple:disabled { background: #5b21b6; color: #c4b5fd; opacity: 0.5; cursor: default; }
+.btn-purple:disabled { background: #4c1d95; color: #8b5cf6; cursor: default; }
 .btn-sky { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0369a1; color: #bae6fd; transition: all 0.15s; cursor: pointer; }
 .btn-sky:hover { background: #075985; }
 .btn-sky:active { transform: scale(0.97); }
@@ -1055,11 +1055,11 @@ select option { background: #4a525a; color: #e8e6df; }
             <i data-lucide="sun" class="w-5 h-5"></i>
             <span class="text-[10px] font-semibold">Today</span>
         </button>
-        <button onclick="showView('study')" id="nav-study" class="flex flex-col items-center gap-0.5 px-4 py-2 text-slate-500 hover:text-accent-light transition-all">
+        <button onclick="showView('study')" id="nav-study" class="flex flex-col items-center gap-0.5 px-4 py-2 text-slate-300 hover:text-white transition-all">
             <i data-lucide="book-open" class="w-5 h-5"></i>
             <span class="text-[10px] font-semibold">Study</span>
         </button>
-        <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 px-4 py-2 text-slate-500 hover:text-accent-light transition-all">
+        <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 px-4 py-2 text-slate-300 hover:text-white transition-all">
             <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
             <span class="text-[10px] font-semibold">Progress</span>
         </button>
@@ -1154,7 +1154,7 @@ select option { background: #4a525a; color: #e8e6df; }
     </div>
 
     <!-- Quick actions -->
-    <div class="flex items-center gap-2">
+    <div id="quickActions" class="flex items-center gap-2">
         <button onclick="quickReview()" class="flex-1 flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 transition-all">
             <i data-lucide="zap" class="w-4 h-4 text-teal-400"></i>
             <div><span class="text-xs font-semibold text-white block">Quick Review</span><span class="text-[10px] text-slate-500">5 due phrases</span></div>
@@ -3594,6 +3594,7 @@ function startSessionBlock(block, blockIdx) {
     sessionIdx = 0;
 
     document.getElementById('planBlockList').classList.add('hidden');
+    var qa = document.getElementById('quickActions'); if (qa) qa.classList.add('hidden');
     document.getElementById('sessionCard').classList.remove('hidden');
     document.getElementById('sessionSummary').classList.add('hidden');
     initSessionToolbar();
@@ -3774,8 +3775,15 @@ function renderAudioStep(step, content, controls) {
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
     var b4 = document.createElement('button'); b4.className = 'btn-purple'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice; grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
-    var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 Show English';
-    enBtn.onclick = function() { var t = document.getElementById('sessionTranslation'); if (t) { t.style.filter = t.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)'; } };
+    var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 English';
+    enBtn.onclick = function() {
+        var t = document.getElementById('sessionTranslation');
+        if (t) {
+            var showing = t.style.filter.indexOf('blur') > -1;
+            t.style.filter = showing ? 'none' : 'blur(5px)';
+            enBtn.textContent = showing ? '🇬🇧 Blur English' : '🇬🇧 English';
+        }
+    };
     grid.appendChild(enBtn);
 
     wrap.appendChild(grid); controls.appendChild(wrap);
@@ -4039,6 +4047,7 @@ function exitSession() {
     activeSession = false;
     document.getElementById('sessionCard').classList.add('hidden');
     document.getElementById('planBlockList').classList.remove('hidden');
+    var qa = document.getElementById('quickActions'); if (qa) qa.classList.remove('hidden');
     var btn = document.getElementById('pauseSessionBtn');
     if (btn) { btn.textContent = 'Pause'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500/15 text-teal-400 hover:bg-teal-500/25 transition-all'; }
     // Log partial progress
