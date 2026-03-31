@@ -473,7 +473,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
 
     $sentenceEsc = addslashes($sentence);
     $englishEsc = addslashes($english);
-    $prompt = "Break down this Hungarian sentence for a beginner. Be ULTRA BRIEF — max 5 words per field.\n\nSentence: {$sentenceEsc}" . ($english ? " ({$englishEsc})" : "") . "\n\nJSON format:\n{\"words\":[{\"word\":\"hungarian\",\"base\":\"dict form\",\"meaning\":\"english\",\"suffixes\":\"suffix info or none\"}],\"tip\":\"one short tip\"}\n\nRules: suffixes field = just the suffix and what it does (e.g. \"-ban = in\"). No role field. No structure field. Keep meaning to 1-2 words. Keep tip under 10 words.";
+    $prompt = "Break down this Hungarian phrase for an American English speaker learning Hungarian for a citizenship interview.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON with this structure:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"base\": \"dictionary form\",\n      \"meaning\": \"English meaning (2-3 words)\",\n      \"suffixes\": \"-suffix = what it means (e.g. -ban = in, -om = my)\",\n      \"pronunciation\": \"English phonetic guide in CAPS (e.g. MAH-sseer)\"\n    }\n  ],\n  \"type\": \"What type: person/place/thing/action/greeting (one word)\",\n  \"grammar_note\": \"One key grammar pattern this uses, with example. E.g.: Person + -nál/-nél = at someone's. A masszőrömnél = at my massage therapist's.\",\n  \"tip\": \"One practical memory tip, under 15 words\"\n}\n\nKeep it concise but educational. Focus on suffixes and pronunciation.";
 
     $apiKey = $env['GEMINI_KEY'];
     $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
@@ -3194,40 +3194,76 @@ function renderBreakdown(data, container) {
     drawer.style.position = 'relative';
     drawer.appendChild(closeBtn);
 
-    // Compact word list
+    // Word breakdown
     if (data.words && data.words.length) {
         data.words.forEach(function(w) {
             var row = document.createElement('div');
-            row.className = 'py-2 border-b border-white/5';
+            row.className = 'py-2.5 border-b border-white/5';
+
+            // Word + base + meaning
             var line1 = document.createElement('div');
-            line1.className = 'flex items-baseline gap-1.5';
+            line1.className = 'flex items-baseline gap-2 flex-wrap';
             var hu = document.createElement('span');
-            hu.className = 'text-sm font-bold text-sky-300';
+            hu.className = 'text-base font-bold text-sky-300';
             hu.textContent = w.word;
             line1.appendChild(hu);
             if (w.base && w.base !== w.word) {
                 var base = document.createElement('span');
-                base.className = 'text-[11px] text-slate-500';
+                base.className = 'text-xs text-slate-500';
                 base.textContent = '← ' + w.base;
                 line1.appendChild(base);
             }
             var meaning = document.createElement('span');
-            meaning.className = 'text-[11px] text-slate-300';
-            meaning.textContent = w.meaning;
+            meaning.className = 'text-xs text-slate-300';
+            meaning.textContent = '= ' + w.meaning;
             line1.appendChild(meaning);
             row.appendChild(line1);
+
+            // Pronunciation
+            if (w.pronunciation) {
+                var pron = document.createElement('div');
+                pron.className = 'text-[11px] text-teal-400 mt-1 font-mono';
+                pron.textContent = '🔊 ' + w.pronunciation;
+                row.appendChild(pron);
+            }
+
+            // Suffixes
             if (w.suffixes && w.suffixes !== 'none' && w.suffixes !== 'N/A') {
                 var suf = document.createElement('div');
-                suf.className = 'text-[10px] text-sky-300/80 mt-0.5';
+                suf.className = 'text-[11px] text-sky-200/80 mt-1';
                 suf.textContent = w.suffixes;
                 row.appendChild(suf);
             }
             drawer.appendChild(row);
         });
     }
+    // Type badge
+    if (data.type) {
+        var typeBadge = document.createElement('div');
+        typeBadge.className = 'mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-400';
+        typeBadge.textContent = data.type;
+        drawer.appendChild(typeBadge);
+    }
+
+    // Grammar note
+    if (data.grammar_note) {
+        var gn = document.createElement('div');
+        gn.className = 'mt-3 p-3 rounded-lg bg-sky-500/5 border border-sky-400/15';
+        var gnLabel = document.createElement('div');
+        gnLabel.className = 'text-[10px] font-bold text-sky-400 uppercase tracking-wider mb-1';
+        gnLabel.textContent = 'Grammar';
+        gn.appendChild(gnLabel);
+        var gnText = document.createElement('p');
+        gnText.className = 'text-xs text-slate-300 leading-relaxed';
+        gnText.textContent = data.grammar_note;
+        gn.appendChild(gnText);
+        drawer.appendChild(gn);
+    }
+
+    // Tip
     if (data.tip) {
         var tip = document.createElement('p');
-        tip.className = 'text-[11px] text-sky-200/70 mt-3 italic';
+        tip.className = 'text-xs text-teal-300/80 mt-3 italic';
         tip.textContent = '💡 ' + data.tip;
         drawer.appendChild(tip);
     }
