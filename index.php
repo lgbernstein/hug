@@ -861,29 +861,33 @@ tailwind.config = {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, sans-serif; }
-body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
-body.light { background: #f8fafc; color: #1e293b; }
-body.light .glass { background: rgba(255,255,255,0.9); border-color: rgba(0,0,0,0.08); }
-body.light .glass-strong { background: rgba(255,255,255,0.95); border-color: rgba(0,0,0,0.1); }
-body.light .pill-inactive { color: #475569; border-color: rgba(0,0,0,0.15); }
-body.light .pill-inactive:hover { color: #1e293b; background: rgba(0,0,0,0.05); }
-body.light .grammar-card, body.light .drill-card { background: rgba(255,255,255,0.8); border-color: rgba(0,0,0,0.08); }
-body.light .grammar-card:hover, body.light .drill-card:hover { border-color: rgba(99,102,241,0.3); background: white; }
-body.light .phrase-item:hover { background: rgba(0,0,0,0.03); }
+body { background: #0f172a; color: #e2e8f0; overflow-x: hidden; }
+body.light { background: #f1f5f9; color: #1e293b; }
+body.light .glass { background: #fff; border-color: #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+body.light .glass-strong { background: #fff; border-color: #cbd5e1; }
+body.light .pill-inactive { color: #334155; border-color: #cbd5e1; }
+body.light .pill-inactive:hover { color: #0f172a; background: #e2e8f0; }
+body.light .grammar-card, body.light .drill-card { background: #fff; border-color: #e2e8f0; }
+body.light .grammar-card:hover, body.light .drill-card:hover { border-color: #6366f1; }
+body.light .phrase-item:hover { background: #f1f5f9; }
 body.light .question-text { color: #0f172a; }
-body.light .progress-track { background: rgba(99,102,241,0.1); }
-body.light .result-pass { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25); }
-body.light .result-fail { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); }
-body.light [class*="bg-surface"] { background: rgba(241,245,249,0.8); }
-body.light [class*="text-slate-3"], body.light [class*="text-slate-4"], body.light [class*="text-slate-5"] { color: #475569; }
+body.light .progress-track { background: #e2e8f0; }
+body.light .result-pass { background: #f0fdf4; border-color: #86efac; }
+body.light .result-fail { background: #fef2f2; border-color: #fca5a5; }
+body.light [class*="bg-surface"] { background: #f1f5f9; }
+body.light [class*="text-slate-3"] { color: #475569; }
+body.light [class*="text-slate-4"] { color: #334155; }
+body.light [class*="text-slate-5"] { color: #1e293b; }
 body.light [class*="text-white"] { color: #0f172a; }
-body.light [class*="border-white"] { border-color: rgba(0,0,0,0.08); }
+body.light [class*="border-white"] { border-color: #e2e8f0; }
+body.light .quick-bar { background: #fff; border-color: #e2e8f0; }
+body.light .modal-backdrop { background: rgba(0,0,0,0.4); }
 body.light select option { background: white; color: #1e293b; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-.glass { background: rgba(17, 26, 46, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(99, 102, 241, 0.08); }
-.glass-strong { background: rgba(17, 26, 46, 0.95); backdrop-filter: blur(30px); border: 1px solid rgba(99, 102, 241, 0.15); }
+.glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(99, 102, 241, 0.1); }
+.glass-strong { background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(30px); border: 1px solid rgba(99, 102, 241, 0.15); }
 .glow-accent { box-shadow: 0 0 30px rgba(99, 102, 241, 0.15), 0 0 60px rgba(99, 102, 241, 0.05); }
 .glow-red { box-shadow: 0 0 25px rgba(239, 68, 68, 0.3); }
 .glow-green { box-shadow: 0 0 25px rgba(34, 197, 94, 0.3); }
@@ -1099,32 +1103,23 @@ select option { background: #111a2e; color: #e2e8f0; }
     <!-- Active session card (hidden until a block is started) -->
     <div id="sessionCard" class="hidden">
         <div class="glass rounded-3xl overflow-hidden glow-accent">
-            <!-- Session header -->
-            <div class="flex items-center justify-between px-5 py-3 border-b border-white/5">
+            <!-- Session header: badge + speed + grading + progress + close -->
+            <div class="flex items-center justify-between px-4 py-2 border-b border-white/5 flex-wrap gap-y-1">
                 <div class="flex items-center gap-2">
-                    <span id="sessionBadge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
-                    <span id="sessionTitle" class="text-xs text-slate-400 font-medium"></span>
+                    <span id="sessionBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
+                    <div id="sessionSpeedBar" class="flex gap-0.5"></div>
+                    <input id="strictSlider" type="range" min="1" max="5" step="1" class="w-14 h-1 accent-accent cursor-pointer" title="Grading strictness">
+                    <span id="strictLabel" class="text-[9px] font-bold text-accent-light w-12"></span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button id="listenModeBtn" onclick="toggleListenMode()" title="Blur text — listen only" class="px-2 py-1 rounded-lg text-[10px] font-bold transition-all"></button>
-                    <span id="sessionProgress" class="text-[11px] text-slate-500 font-medium tabular-nums"></span>
-                    <button onclick="exitSession()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
-                        <i data-lucide="x" class="w-4 h-4"></i>
+                    <button id="listenModeBtn" onclick="toggleListenMode()" title="Blur text" class="px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all"></button>
+                    <span id="sessionProgress" class="text-[10px] text-slate-500 font-medium tabular-nums"></span>
+                    <button onclick="exitSession()" class="p-1 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
                     </button>
                 </div>
             </div>
-            <!-- Session toolbar: collapsed by default, tap gear to expand -->
-            <div id="sessionToolbar" class="hidden flex items-center gap-4 px-5 py-2 border-b border-white/5 bg-surface-50/50 flex-wrap">
-                <div class="flex items-center gap-1">
-                    <span class="text-[10px] text-slate-500">Speech</span>
-                    <div id="sessionSpeedBar" class="flex gap-0.5"></div>
-                </div>
-                <div class="flex items-center gap-1.5">
-                    <span class="text-[10px] text-slate-500">Grading</span>
-                    <input id="strictSlider" type="range" min="1" max="5" step="1" class="w-20 h-1 accent-accent cursor-pointer">
-                    <span id="strictLabel" class="text-[10px] font-bold text-accent-light w-16"></span>
-                </div>
-            </div>
+            <div id="sessionToolbar" class="hidden"></div>
             <!-- Session progress -->
             <div class="px-5 pt-2">
                 <div class="h-1.5 progress-track rounded-full overflow-hidden">
@@ -1132,7 +1127,7 @@ select option { background: #111a2e; color: #e2e8f0; }
                 </div>
             </div>
             <!-- Session content (rendered dynamically) -->
-            <div id="sessionContent" class="px-5 py-6 text-center min-h-[300px] flex flex-col items-center justify-center">
+            <div id="sessionContent" class="px-5 py-4 text-center min-h-[200px] flex flex-col items-center justify-center">
             </div>
             <!-- Session controls -->
             <div id="sessionControls" class="px-5 pb-5">
@@ -3645,13 +3640,13 @@ function renderAudioStep(step, content, controls) {
 
     // Listen & Speak button (above result card so it's always visible)
     var listenBtn = document.createElement('button');
-    listenBtn.className = 'w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-5 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98] shadow-lg shadow-accent/5';
+    listenBtn.className = 'w-full bg-accent/10 border border-accent/30 rounded-xl py-3 flex items-center justify-center gap-2 hover:bg-accent/20 hover:border-accent/50 transition-all active:scale-[0.98]';
     var speakerIcon = document.createElement('i');
     speakerIcon.setAttribute('data-lucide', 'volume-2');
-    speakerIcon.className = 'w-7 h-7 text-accent-light group-hover:scale-110 transition-transform';
+    speakerIcon.className = 'w-4 h-4 text-accent-light';
     listenBtn.appendChild(speakerIcon);
     var btnLabel = document.createElement('span');
-    btnLabel.className = 'text-[11px] font-bold text-accent-light uppercase tracking-[0.25em]';
+    btnLabel.className = 'text-xs font-bold text-accent-light';
     btnLabel.textContent = isPron ? 'Listen & Repeat' : 'Hear Question & Answer';
     listenBtn.appendChild(btnLabel);
     listenBtn.onclick = function() {
