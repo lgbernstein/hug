@@ -464,6 +464,63 @@ Give exactly 3 examples and 3 quiz questions. Make them relevant to daily life a
     exit;
 }
 
+// AJAX: suffix conjugation quiz — pick the correct form
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'suffix_quiz') {
+    header('Content-Type: application/json');
+    $count = min(8, max(3, (int)($_GET['count'] ?? 6)));
+    $apiKey = $env['GEMINI_KEY'];
+    $prompt = "Generate a Hungarian suffix/conjugation quiz for an American learner preparing for the naturalization interview.
+
+Create {$count} questions. Mix these types:
+1. Verb conjugation: give a verb infinitive + pronoun, ask for the correct conjugated form
+2. Noun suffixes: give a noun + meaning hint (like 'in', 'from', 'to', 'on'), ask for the correct suffixed form
+3. Possessive: give a noun + possessor, ask for the correct possessive form
+
+Return JSON:
+{
+  \"questions\": [
+    {
+      \"type\": \"conjugation|suffix|possessive\",
+      \"prompt\": \"Short prompt, e.g. 'lakni (en)' or 'Budapest (in)' or 'haz (my)'\",
+      \"answer\": \"the correct form, e.g. 'lakom' or 'Budapesten' or 'hazam'\",
+      \"choices\": [\"correct answer\", \"wrong1\", \"wrong2\", \"wrong3\"],
+      \"explanation\": \"Very brief: why this is correct, 8 words max\"
+    }
+  ]
+}
+
+Rules:
+- Shuffle the choices array so the correct answer is NOT always first
+- Use common interview-relevant words: lakni, dolgozni, tanulni, szuletni, utazni, Budapest, Magyarorszag, csalad, gyerek, feleseg, ferj, munka, haz, nev
+- Wrong choices should be plausible (real Hungarian forms, just wrong person/suffix)
+- Keep prompts very short
+- Mix pronoun persons: en, te, o, mi, ti, ok";
+
+    $url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=$apiKey";
+    $payload = json_encode([
+        'contents' => [['parts' => [['text' => $prompt]]]],
+        'generationConfig' => ['temperature' => 0.7, 'maxOutputTokens' => 2048]
+    ]);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => $payload, CURLOPT_TIMEOUT => 20, CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($httpCode !== 200 || !$resp) { echo json_encode(['error' => 'API error']); exit; }
+    $data = json_decode($resp, true);
+    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $text = preg_replace('/^```json\s*/i', '', $text);
+    $text = preg_replace('/\s*```$/', '', $text);
+    $parsed = json_decode($text, true);
+    if (!$parsed || !isset($parsed['questions'])) { echo json_encode(['error' => 'Parse error']); exit; }
+    echo json_encode($parsed);
+    exit;
+}
+
 // AJAX: grammar breakdown for a sentence
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
     header('Content-Type: application/json');
@@ -1224,7 +1281,10 @@ select option { background: #4a525a; color: #e8e6df; }
                 <h2 class="text-sm font-bold text-white flex items-center gap-2">
                     <i data-lucide="lightbulb" class="w-4 h-4 text-sky-400"></i> Work On These
                 </h2>
-                <button onclick="toggleAllGrammar()" id="showAllGrammarBtn" class="text-[11px] text-slate-500 hover:text-white transition-colors">See all ▸</button>
+                <div class="flex gap-2">
+                    <button onclick="launchSuffixQuiz()" class="px-3 py-1.5 rounded-lg bg-indigo-500/15 text-indigo-400 text-[11px] font-bold border border-indigo-500/20 hover:bg-indigo-500/25 transition-all">Suffix Quiz</button>
+                    <button onclick="toggleAllGrammar()" id="showAllGrammarBtn" class="text-[11px] text-slate-500 hover:text-white transition-colors">See all ▸</button>
+                </div>
             </div>
             <div id="recGrammarGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                 <p class="col-span-full text-slate-500 text-sm text-center py-4">Loading...</p>
@@ -3788,6 +3848,8 @@ function renderSessionStep() {
         renderKnowledgeStep(step, content, controls);
     } else if (step.type === 'grammar_teach') {
         renderGrammarTeachStep(step, content, controls);
+    } else if (step.type === 'suffix_quiz') {
+        renderSuffixQuizStep(step, content, controls);
     }
     lucide.createIcons();
 }
@@ -4013,6 +4075,110 @@ function renderKnowledgeStep(step, content, controls) {
     actionRow.appendChild(gotIt);
     actionRow.appendChild(again);
     controls.appendChild(actionRow);
+}
+
+function renderSuffixQuizStep(step, content, controls) {
+    var q = step.quizData;
+    content.textContent = '';
+
+    // Type badge
+    var typeBadge = document.createElement('div');
+    typeBadge.style.cssText = 'text-align:center;margin-bottom:8px';
+    var badge = document.createElement('span');
+    badge.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:3px 10px;border-radius:99px;' +
+        (q.type === 'conjugation' ? 'background:#4338ca22;color:#a5b4fc' : q.type === 'possessive' ? 'background:#0f766e22;color:#5eead4' : 'background:#b4530022;color:#fbbf24');
+    badge.textContent = q.type;
+    typeBadge.appendChild(badge);
+    content.appendChild(typeBadge);
+
+    // Prompt
+    var prompt = document.createElement('h1');
+    prompt.style.cssText = 'font-size:24px;font-weight:800;color:#fff;text-align:center;margin-bottom:20px;line-height:1.3';
+    prompt.textContent = q.prompt;
+    content.appendChild(prompt);
+
+    // Choice buttons — 2x2 grid
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:360px;margin:0 auto';
+    var answered = false;
+    q.choices.forEach(function(choice) {
+        var btn = document.createElement('button');
+        btn.style.cssText = 'padding:14px 8px;border-radius:12px;font-size:17px;font-weight:700;border:2px solid rgba(99,102,241,0.3);background:rgba(99,102,241,0.08);color:#e0e7ff;cursor:pointer;transition:all 0.15s';
+        btn.textContent = choice;
+        btn.onmouseenter = function() { if (!answered) btn.style.background = 'rgba(99,102,241,0.2)'; };
+        btn.onmouseleave = function() { if (!answered) btn.style.background = 'rgba(99,102,241,0.08)'; };
+        btn.onclick = function() {
+            if (answered) return;
+            answered = true;
+            var correct = choice === q.answer;
+            // Highlight all buttons
+            var btns = grid.querySelectorAll('button');
+            btns.forEach(function(b) {
+                b.style.cursor = 'default';
+                if (b.textContent === q.answer) {
+                    b.style.background = '#166534'; b.style.borderColor = '#22c55e'; b.style.color = '#fff';
+                } else if (b === btn && !correct) {
+                    b.style.background = '#7f1d1d'; b.style.borderColor = '#ef4444'; b.style.color = '#fca5a5';
+                } else {
+                    b.style.opacity = '0.3';
+                }
+            });
+            // Show explanation
+            var expl = document.createElement('div');
+            expl.style.cssText = 'text-align:center;margin-top:12px;font-size:13px;color:#94a3b8';
+            expl.textContent = q.explanation || '';
+            content.appendChild(expl);
+            // Speak the correct answer
+            elevenSpeak(q.answer);
+            // Track
+            sessionTotalCount++;
+            if (correct) sessionPassCount++;
+            recordSRSUnified(q.prompt, 'grammar', null, correct);
+            // Auto-advance after delay
+            setTimeout(function() {
+                if (breakdownOpen) return;
+                sessionIdx++;
+                renderSessionStep();
+            }, correct ? 1500 : 3000);
+        };
+        grid.appendChild(btn);
+    });
+    content.appendChild(grid);
+}
+
+function launchSuffixQuiz() {
+    // Load quiz from API, convert to session steps
+    activeSession = true;
+    sessionIdx = 0;
+    sessionTotalCount = 0;
+    sessionPassCount = 0;
+    sessionStartTime = new Date();
+    sessionBlockInfo = { title: 'Suffix Quiz', block_type: 'grammar', duration: 5 };
+    document.getElementById('sessionCard').classList.remove('hidden');
+    document.getElementById('sessionTitle').textContent = 'Suffix Quiz';
+    var content = document.getElementById('sessionContent');
+    content.textContent = '';
+    var loading = document.createElement('div');
+    loading.className = 'flex flex-col items-center py-8 gap-3';
+    var spinner = document.createElement('div');
+    spinner.className = 'w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin';
+    loading.appendChild(spinner);
+    var txt = document.createElement('p');
+    txt.className = 'text-slate-400 text-sm';
+    txt.textContent = 'Generating quiz...';
+    loading.appendChild(txt);
+    content.appendChild(loading);
+
+    fetch('?ajax=1&action=suffix_quiz&count=6')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error || !data.questions) { content.textContent = 'Error loading quiz'; return; }
+            sessionSteps = data.questions.map(function(q) {
+                return { type: 'suffix_quiz', quizData: q };
+            });
+            renderSessionStep();
+        })
+        .catch(function() { content.textContent = 'Error loading quiz'; });
 }
 
 function renderGrammarTeachStep(step, content, controls) {
