@@ -305,8 +305,8 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'scenario_phrases') {
 // AJAX: must-nail phrases (essential interview questions)
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'must_nail') {
     header('Content-Type: application/json');
-    $ahuCol = $hasAnswerHu ? "COALESCE(answer_hu,'')" : "''";
-    $whoFilter = ($who !== 'All') ? " AND (`who` = 'All' OR `who` = '$who_safe')" : "";
+    $ahuCol = $hasAnswerHu ? "COALESCE(hp.answer_hu,'')" : "''";
+    $whoFilter = ($who !== 'All') ? " AND (hp.`who` = 'All' OR hp.`who` = '$who_safe')" : "";
     $sql = "SELECT hp.question_hu AS q, hp.answer_en AS a, $ahuCol AS a_hu, hp.category, hp.tags,
                    COALESCE(sh.pass_count, 0) AS pass_count, COALESCE(sh.fail_count, 0) AS fail_count
             FROM hungarian_prep hp
@@ -882,6 +882,8 @@ body { background: #060b18; color: #e2e8f0; overflow-x: hidden; }
 .vol-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #4ade80); border-radius: 2px; transition: width 0.05s; }
 .listen-blur { filter: blur(16px); cursor: pointer; transition: filter 0.4s ease; user-select: none; }
 .modal-backdrop { background: rgba(6, 11, 24, 0.9); backdrop-filter: blur(8px); }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; transition: all 0.2s; cursor: pointer; user-select: none; }
 .pill-active { background: #6366f1; color: white; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2); }
 .pill-inactive { color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); }
@@ -1063,7 +1065,7 @@ select option { background: #111a2e; color: #e2e8f0; }
         <div class="flex-1 h-2 progress-track rounded-full overflow-hidden">
             <div id="dayProgressFill" class="h-full progress-fill rounded-full" style="width: 0%"></div>
         </div>
-        <span id="dayProgressLabel" class="text-[11px] text-slate-500 font-medium tabular-nums">0 / 0 blocks</span>
+        <span id="dayProgressLabel" class="text-[11px] text-slate-500 font-medium tabular-nums">0 of 0 completed</span>
     </div>
 
     <!-- Block grid -->
@@ -1095,7 +1097,7 @@ select option { background: #111a2e; color: #e2e8f0; }
             <div class="flex items-center gap-4 px-5 py-2 border-b border-white/5 bg-surface-50/50 flex-wrap">
                 <!-- Speed -->
                 <div class="flex items-center gap-1">
-                    <span class="text-[10px] text-slate-500">Speed</span>
+                    <span class="text-[10px] text-slate-500">Speech</span>
                     <div id="sessionSpeedBar" class="flex gap-0.5"></div>
                 </div>
                 <!-- Strictness -->
@@ -1143,11 +1145,11 @@ select option { background: #111a2e; color: #e2e8f0; }
     <div class="flex items-center gap-2">
         <button onclick="quickReview()" class="flex-1 flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 transition-all">
             <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
-            <span class="text-xs font-semibold text-white">Quick Review</span>
+            <div><span class="text-xs font-semibold text-white block">Quick Review</span><span class="text-[10px] text-slate-500">5 due phrases</span></div>
         </button>
         <button onclick="switchItUp()" class="flex-1 flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 transition-all">
             <i data-lucide="shuffle" class="w-4 h-4 text-accent-light"></i>
-            <span class="text-xs font-semibold text-white">Switch It Up</span>
+            <div><span class="text-xs font-semibold text-white block">Switch It Up</span><span class="text-[10px] text-slate-500">Shuffle today's plan</span></div>
         </button>
     </div>
 
@@ -1159,12 +1161,12 @@ select option { background: #111a2e; color: #e2e8f0; }
     <div id="view-study" class="view-section hidden space-y-4">
 
         <!-- Sub-nav -->
-        <div class="flex items-center gap-1.5 flex-wrap">
-            <button onclick="showStudySub('scenarios')" id="studySub-scenarios" class="pill pill-active">Scenarios</button>
-            <button onclick="showStudySub('grammar')" id="studySub-grammar" class="pill pill-inactive">Grammar</button>
-            <button onclick="showStudySub('knowledge')" id="studySub-knowledge" class="pill pill-inactive">Knowledge</button>
-            <button onclick="showStudySub('resources')" id="studySub-resources" class="pill pill-inactive">Resources</button>
-            <button onclick="showStudySub('phrases')" id="studySub-phrases" class="pill pill-inactive">Phrases</button>
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+            <button onclick="showStudySub('scenarios')" id="studySub-scenarios" class="pill pill-active whitespace-nowrap">Scenarios</button>
+            <button onclick="showStudySub('grammar')" id="studySub-grammar" class="pill pill-inactive whitespace-nowrap">Grammar</button>
+            <button onclick="showStudySub('knowledge')" id="studySub-knowledge" class="pill pill-inactive whitespace-nowrap">Knowledge</button>
+            <button onclick="showStudySub('resources')" id="studySub-resources" class="pill pill-inactive whitespace-nowrap">Resources</button>
+            <button onclick="showStudySub('phrases')" id="studySub-phrases" class="pill pill-inactive whitespace-nowrap">Phrases</button>
         </div>
 
         <!-- ═══ Scenarios sub-view (NEW default) ═══ -->
@@ -1343,6 +1345,7 @@ select option { background: #111a2e; color: #e2e8f0; }
                     <button onclick="addKnowledgeCard()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-100 text-slate-300 text-xs font-semibold border border-white/10 hover:border-accent/30 transition-all">
                         <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Card
                     </button>
+                    <span id="knowledgeCount" class="text-xs text-slate-500 ml-auto"></span>
                 </div>
                 <div id="knowledgeList" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     <p class="col-span-2 text-slate-500 text-sm text-center py-4">Loading...</p>
@@ -3228,7 +3231,7 @@ function renderDailyPlan(data) {
     var totalBlocks = (data.blocks || []).length;
     var pct = totalBlocks > 0 ? Math.round((completedCount / totalBlocks) * 100) : 0;
     document.getElementById('dayProgressFill').style.width = pct + '%';
-    document.getElementById('dayProgressLabel').textContent = completedCount + ' / ' + totalBlocks + ' blocks';
+    document.getElementById('dayProgressLabel').textContent = completedCount + ' of ' + totalBlocks + ' completed';
 
     var list = document.getElementById('planBlockList');
     list.textContent = '';
@@ -3564,13 +3567,14 @@ function renderAudioStep(step, content, controls) {
         fetch('?ajax=1&action=breakdown', { method: 'POST', body: fd })
             .then(function(r) { return r.json(); })
             .then(function(data) {
+                if (data.error) { breakdownBtn.textContent = '📖 ' + data.error + ' — tap to retry'; breakdownBtn.disabled = false; return; }
                 breakdownBtn.classList.add('hidden');
                 var bdContainer = document.createElement('div');
                 bdContainer.className = 'mt-3';
                 skipRow.parentNode.insertBefore(bdContainer, skipRow.nextSibling);
                 renderBreakdown(data, bdContainer);
             })
-            .catch(function() { breakdownBtn.textContent = '📖 Error — try again'; breakdownBtn.disabled = false; });
+            .catch(function() { breakdownBtn.textContent = '📖 Connection error — tap to retry'; breakdownBtn.disabled = false; });
     };
     skipRow.appendChild(breakdownBtn);
 
@@ -3947,16 +3951,19 @@ function loadGrammarPatterns() {
 }
 
 function renderGrammarPatterns(patterns) {
-    var list = document.getElementById('grammarList');
-    list.textContent = '';
-    if (!patterns.length) {
-        var empty = document.createElement('p');
-        empty.className = 'text-slate-500 text-sm text-center py-4';
-        empty.textContent = 'No patterns found.';
-        list.appendChild(empty);
-        return;
-    }
-    patterns.forEach(function(p) { list.appendChild(buildPatternCard(p)); });
+    ['grammarList', 'grammarList2'].forEach(function(id) {
+        var list = document.getElementById(id);
+        if (!list) return;
+        list.textContent = '';
+        if (!patterns.length) {
+            var empty = document.createElement('p');
+            empty.className = 'col-span-2 text-slate-500 text-sm text-center py-4';
+            empty.textContent = 'No grammar patterns yet. Import content to get started.';
+            list.appendChild(empty);
+            return;
+        }
+        patterns.forEach(function(p) { list.appendChild(buildPatternCard(p)); });
+    });
     lucide.createIcons();
 }
 
@@ -4217,7 +4224,7 @@ function loadKnowledgeCards() {
             document.getElementById('knowledgeList').textContent = '';
             var p = document.createElement('p');
             p.className = 'text-slate-500 text-sm text-center py-4';
-            p.textContent = 'Could not load cards. Run migrate_v7.php first.';
+            p.textContent = 'Could not load knowledge cards. Check your connection and try again.';
             document.getElementById('knowledgeList').appendChild(p);
         });
 }
@@ -4478,17 +4485,20 @@ function loadResources() {
             lucide.createIcons();
         })
         .catch(function() {
-            var el = document.getElementById('resourcesList');
-            el.textContent = '';
-            var p = document.createElement('p');
-            p.className = 'text-slate-500 text-sm text-center py-4';
-            p.textContent = 'Could not load resources. Run migrate_v7.php first.';
-            el.appendChild(p);
+            ['resourcesList', 'resourcesList2'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = '';
+                var p = document.createElement('p');
+                p.className = 'text-slate-500 text-sm text-center py-4';
+                p.textContent = 'Could not load resources.';
+                el.appendChild(p);
+            });
         });
 }
 
 function renderResources(resources) {
-    var list = document.getElementById('resourcesList');
+    var list = document.getElementById('resourcesList') || document.getElementById('resourcesList2');
     list.textContent = '';
     if (!resources.length) {
         var p = document.createElement('p');
@@ -4531,6 +4541,12 @@ function renderResources(resources) {
         section.appendChild(grid);
         list.appendChild(section);
     });
+    // Mirror to second resources list if it exists
+    var list2 = document.getElementById('resourcesList2');
+    if (list2 && list2 !== list) {
+        list2.textContent = '';
+        list.childNodes.forEach(function(node) { list2.appendChild(node.cloneNode(true)); });
+    }
 }
 
 // ── Google Sheets import (basic) ─────────────────────────────────────
