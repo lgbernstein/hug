@@ -20,6 +20,12 @@ if ($v9type && $r9 = $v9type->fetch_assoc()) {
         $conn->query("ALTER TABLE study_history MODIFY item_type VARCHAR(20) NOT NULL DEFAULT 'phrase'");
     }
 }
+// Add Anna's Lessons if missing
+$annaCheck = $conn->query("SELECT 1 FROM learning_resources WHERE name=\"Anna's Lessons\" LIMIT 1");
+if ($annaCheck && $annaCheck->num_rows === 0) {
+    $conn->query("INSERT INTO learning_resources (category, name, url, icon, sort_order) VALUES
+        ('Lessons', 'Anna\\'s Lessons', 'https://drive.google.com/drive/u/0/folders/1B0YucQ3xCLWhx8KroZrmC7nXlQG8XtKD', '👩‍🏫', 3)");
+}
 
 $who_safe   = $conn->real_escape_string($who);
 $bio_filter = ($who !== 'All')
@@ -580,6 +586,75 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'resources') {
     exit;
 }
 
+// AJAX: calendar data — daily study activity for the past N days + upcoming plan
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'calendar') {
+    header('Content-Type: application/json');
+    $days = min(90, max(7, (int)($_GET['days'] ?? 60)));
+
+    // Past days: what was actually studied
+    $history = [];
+    $r = $conn->query("SELECT DATE(completed_at) AS d, SUM(duration_min) AS mins,
+            COUNT(*) AS blocks, SUM(items_completed) AS items, SUM(items_passed) AS passed
+            FROM study_log WHERE who='$who_safe' AND completed_at >= DATE_SUB(CURDATE(), INTERVAL $days DAY)
+            GROUP BY DATE(completed_at) ORDER BY d");
+    if ($r) { while ($row = $r->fetch_assoc()) {
+        $row['mins'] = (int)$row['mins'];
+        $row['blocks'] = (int)$row['blocks'];
+        $row['items'] = (int)$row['items'];
+        $row['passed'] = (int)$row['passed'];
+        $history[$row['d']] = $row;
+    }}
+
+    // SRS overview: items by mastery level
+    $mastery = ['new' => 0, 'learning' => 0, 'review' => 0, 'mastered' => 0];
+    $r = $conn->query("SELECT
+        SUM(CASE WHEN pass_count = 0 THEN 1 ELSE 0 END) AS new_count,
+        SUM(CASE WHEN pass_count BETWEEN 1 AND 2 THEN 1 ELSE 0 END) AS learning,
+        SUM(CASE WHEN pass_count BETWEEN 3 AND 5 THEN 1 ELSE 0 END) AS review,
+        SUM(CASE WHEN pass_count >= 6 THEN 1 ELSE 0 END) AS mastered
+        FROM study_history WHERE who='$who_safe'");
+    if ($r && $row = $r->fetch_assoc()) {
+        $mastery = ['new' => (int)$row['new_count'], 'learning' => (int)$row['learning'],
+                    'review' => (int)$row['review'], 'mastered' => (int)$row['mastered']];
+    }
+
+    // Upcoming: items due per day for next 14 days
+    $upcoming = [];
+    $r = $conn->query("SELECT DATE(next_review) AS d, COUNT(*) AS due
+            FROM study_history WHERE who='$who_safe' AND next_review BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 14 DAY)
+            GROUP BY DATE(next_review) ORDER BY d");
+    if ($r) { while ($row = $r->fetch_assoc()) $upcoming[$row['d']] = (int)$row['due']; }
+
+    // Total items in corpus
+    $totalPhrases = 0;
+    $r = $conn->query("SELECT COUNT(*) AS c FROM hungarian_prep");
+    if ($r) $totalPhrases = (int)($r->fetch_assoc()['c'] ?? 0);
+
+    // Streak
+    $streak = 0;
+    $r = $conn->query("SELECT DISTINCT DATE(completed_at) AS d FROM study_log WHERE who='$who_safe' ORDER BY d DESC LIMIT 60");
+    if ($r) {
+        $checkDate = new DateTime('today');
+        while ($row = $r->fetch_assoc()) {
+            $d = new DateTime($row['d']);
+            if ($d->format('Y-m-d') === $checkDate->format('Y-m-d')) { $streak++; $checkDate->modify('-1 day'); }
+            else break;
+        }
+    }
+
+    // Leeches
+    $leeches = 0;
+    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND is_leech=1");
+    if ($r) $leeches = (int)($r->fetch_assoc()['c'] ?? 0);
+
+    echo json_encode([
+        'history' => $history, 'mastery' => $mastery, 'upcoming' => $upcoming,
+        'streak' => $streak, 'total_phrases' => $totalPhrases, 'leeches' => $leeches,
+        'exam_date' => '2026-07-15' // target date
+    ]);
+    exit;
+}
+
 // AJAX: list knowledge cards
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'knowledge_cards') {
     header('Content-Type: application/json');
@@ -865,25 +940,36 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
         $availableMin -= $blockDuration;
     }
 
-    // ── 9. Add external resources (passive listening blocks) ──
-    $extOrder = ['Pimsleur', 'HungarianPod101', 'Quizlet'];
-    foreach ($extOrder as $extName) {
-        if ($availableMin < 15) break;
-        $btKey = strtolower(str_replace(' ', '', $extName));
+    // ── 9. Add external resources — rotate all apps as passive blocks ──
+    // Interleave external apps between active blocks: listening, vocab apps, lesson review
+    $extApps = [
+        ['name' => 'Pimsleur',         'duration' => 20, 'subtitle' => 'Listening & speaking drills'],
+        ['name' => "Anna's Lessons",    'duration' => 20, 'subtitle' => 'Review lesson video & notes'],
+        ['name' => 'Drops',            'duration' => 10, 'subtitle' => 'Quick vocabulary game'],
+        ['name' => 'HungarianPod101',  'duration' => 20, 'subtitle' => 'Podcast lesson'],
+        ['name' => 'Quizlet',          'duration' => 15, 'subtitle' => 'Flashcard review'],
+        ['name' => 'Duolingo',         'duration' => 10, 'subtitle' => 'Quick grammar practice'],
+        ['name' => 'Aktív MagyarOK',   'duration' => 15, 'subtitle' => 'Textbook exercises'],
+    ];
+    $extAdded = 0;
+    foreach ($extApps as $ea) {
+        if ($availableMin < $ea['duration']) break;
+        if ($extAdded >= 3) break; // max 3 external blocks per day
+        $btKey = strtolower(preg_replace('/[^a-z0-9]/i', '', $ea['name']));
         if (!empty($todayBlocks[$btKey])) continue;
-        $ext = array_values(array_filter($resources, function($r) use ($extName) { return $r['name'] === $extName; }));
-        if ($ext) {
-            // Insert a break before external if last block was active
-            if (!empty($blocks) && end($blocks)['type'] !== 'break') {
-                $blocks[] = ['type' => 'break', 'block_type' => 'break_ext_' . $btKey,
-                    'title' => 'Break', 'subtitle' => 'Switch modes', 'duration' => $breakDuration, 'icon' => 'coffee'];
-                $availableMin -= $breakDuration;
-            }
-            $blocks[] = ['type' => 'external', 'block_type' => $btKey,
-                'title' => $ext[0]['name'], 'subtitle' => 'Listening & immersion',
-                'duration' => 20, 'icon' => 'headphones', 'url' => $ext[0]['url'], 'emoji' => $ext[0]['icon']];
-            $availableMin -= 20;
+        $ext = array_values(array_filter($resources, function($r) use ($ea) { return $r['name'] === $ea['name']; }));
+        if (!$ext) continue;
+        // Break before external if last block was active
+        if (!empty($blocks) && end($blocks)['type'] !== 'break') {
+            $blocks[] = ['type' => 'break', 'block_type' => 'break_ext_' . $btKey,
+                'title' => 'Break', 'subtitle' => 'Switch modes', 'duration' => $breakDuration, 'icon' => 'coffee'];
+            $availableMin -= $breakDuration;
         }
+        $blocks[] = ['type' => 'external', 'block_type' => $btKey,
+            'title' => $ext[0]['name'], 'subtitle' => $ea['subtitle'],
+            'duration' => $ea['duration'], 'icon' => 'external-link', 'url' => $ext[0]['url'], 'emoji' => $ext[0]['icon']];
+        $availableMin -= $ea['duration'];
+        $extAdded++;
     }
 
     // ── 10. Same-day re-review (PM only: items from this morning) ──
@@ -1678,12 +1764,20 @@ select option { background: #4a525a; color: #e8e6df; }
 
         <!-- Sub-nav -->
         <div class="flex items-center gap-1.5">
-            <button onclick="showProgressSub('dashboard')" id="progSub-dashboard" class="pill pill-active">Dashboard</button>
+            <button onclick="showProgressSub('calendar')" id="progSub-calendar" class="pill pill-active">Calendar</button>
+            <button onclick="showProgressSub('dashboard')" id="progSub-dashboard" class="pill pill-inactive">Dashboard</button>
             <button onclick="showProgressSub('phrases')" id="progSub-phrases" class="pill pill-inactive">Phrases</button>
         </div>
 
+        <!-- Calendar -->
+        <div id="progress-sub-calendar" class="space-y-4">
+            <div id="calendarView">
+                <p class="text-slate-500 text-sm text-center py-4">Loading calendar...</p>
+            </div>
+        </div>
+
         <!-- Dashboard -->
-        <div id="progress-sub-dashboard" class="space-y-4">
+        <div id="progress-sub-dashboard" style="display:none" class="space-y-4">
             <div id="progressDashboard">
                 <p class="text-slate-500 text-sm text-center py-4">Loading stats...</p>
             </div>
@@ -3037,7 +3131,7 @@ function showView(view) {
     });
     if (view === 'today') loadDailyPlan();
     if (view === 'study') { renderFcDecks(); }
-    if (view === 'progress') { loadProgressDashboard(); loadProgressPhrases(); }
+    if (view === 'progress') { showProgressSub(progressSub || 'calendar'); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     lucide.createIcons();
 }
@@ -3633,13 +3727,17 @@ function showStudySub(sub) {
 }
 
 // Progress sub-nav
-var progressSub = 'dashboard';
+var progressSub = 'calendar';
 function showProgressSub(sub) {
     progressSub = sub;
-    document.getElementById('progress-sub-dashboard').style.display = sub === 'dashboard' ? 'block' : 'none';
-    document.getElementById('progress-sub-phrases').style.display = sub === 'phrases' ? 'block' : 'none';
-    document.getElementById('progSub-dashboard').className = 'pill ' + (sub === 'dashboard' ? 'pill-active' : 'pill-inactive');
-    document.getElementById('progSub-phrases').className = 'pill ' + (sub === 'phrases' ? 'pill-active' : 'pill-inactive');
+    ['calendar', 'dashboard', 'phrases'].forEach(function(s) {
+        var el = document.getElementById('progress-sub-' + s);
+        if (el) el.style.display = s === sub ? 'block' : 'none';
+        var btn = document.getElementById('progSub-' + s);
+        if (btn) btn.className = 'pill ' + (s === sub ? 'pill-active' : 'pill-inactive');
+    });
+    if (sub === 'calendar') loadCalendar();
+    if (sub === 'dashboard') loadProgressDashboard();
     if (sub === 'phrases') loadProgressPhrases();
 }
 
@@ -6446,6 +6544,248 @@ function renderFcSummary(area, controls) {
     backBtn.textContent = '← Decks';
     backBtn.onclick = closeFcSession;
     controls.appendChild(backBtn);
+}
+
+// ── Calendar View ─────────────────────────────────────────────────────
+var calendarData = null;
+function loadCalendar() {
+    var container = document.getElementById('calendarView');
+    if (!container) return;
+    fetch('?who=' + who + '&ajax=1&action=calendar&days=60').then(function(r) { return r.json(); }).then(function(data) {
+        calendarData = data;
+        renderCalendar(data);
+    });
+}
+
+function renderCalendar(data) {
+    var container = document.getElementById('calendarView');
+    container.textContent = '';
+
+    // ── Countdown to exam ──
+    var examDate = new Date(data.exam_date || '2026-07-15');
+    var today = new Date(); today.setHours(0,0,0,0);
+    var daysLeft = Math.ceil((examDate - today) / 86400000);
+
+    var countdown = document.createElement('div');
+    countdown.className = 'glass rounded-2xl p-4 flex items-center justify-between mb-1';
+    var cdLeft = document.createElement('div');
+    var cdTitle = document.createElement('div');
+    cdTitle.className = 'text-sm font-bold text-white';
+    cdTitle.textContent = 'Interview Target';
+    var cdSub = document.createElement('div');
+    cdSub.className = 'text-xs text-slate-400';
+    cdSub.textContent = examDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    cdLeft.appendChild(cdTitle);
+    cdLeft.appendChild(cdSub);
+    var cdRight = document.createElement('div');
+    cdRight.className = 'text-right';
+    var cdNum = document.createElement('div');
+    cdNum.className = 'text-2xl font-black ' + (daysLeft < 30 ? 'text-red-400' : daysLeft < 60 ? 'text-amber-400' : 'text-accent-light');
+    cdNum.textContent = daysLeft;
+    var cdLabel = document.createElement('div');
+    cdLabel.className = 'text-[10px] text-slate-500 uppercase';
+    cdLabel.textContent = 'days left';
+    cdRight.appendChild(cdNum);
+    cdRight.appendChild(cdLabel);
+    countdown.appendChild(cdLeft);
+    countdown.appendChild(cdRight);
+    container.appendChild(countdown);
+
+    // ── Stats row ──
+    var statsRow = document.createElement('div');
+    statsRow.className = 'grid grid-cols-4 gap-2 mb-1';
+    var statItems = [
+        { label: 'Streak', value: data.streak + 'd', color: 'text-teal-400' },
+        { label: 'Mastered', value: data.mastery.mastered, color: 'text-green-400' },
+        { label: 'Learning', value: data.mastery.learning + data.mastery.review, color: 'text-blue-400' },
+        { label: 'Leeches', value: data.leeches, color: data.leeches > 0 ? 'text-red-400' : 'text-slate-500' },
+    ];
+    statItems.forEach(function(s) {
+        var card = document.createElement('div');
+        card.className = 'glass rounded-xl p-3 text-center';
+        var val = document.createElement('div');
+        val.className = 'text-lg font-black ' + s.color;
+        val.textContent = s.value;
+        var lbl = document.createElement('div');
+        lbl.className = 'text-[10px] text-slate-500 uppercase';
+        lbl.textContent = s.label;
+        card.appendChild(val);
+        card.appendChild(lbl);
+        statsRow.appendChild(card);
+    });
+    container.appendChild(statsRow);
+
+    // ── Heatmap calendar (last 8 weeks) ──
+    var calSection = document.createElement('div');
+    calSection.className = 'glass rounded-2xl p-4';
+    var calTitle = document.createElement('div');
+    calTitle.className = 'text-sm font-bold text-white mb-3';
+    calTitle.textContent = 'Study Activity';
+    calSection.appendChild(calTitle);
+
+    // Build 8-week grid (Mon-Sun rows, weeks as columns)
+    var grid = document.createElement('div');
+    grid.className = 'flex gap-1';
+    var dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+    // Label column
+    var labelCol = document.createElement('div');
+    labelCol.className = 'flex flex-col gap-1 mr-1';
+    dayLabels.forEach(function(d, i) {
+        var lbl = document.createElement('div');
+        lbl.className = 'w-4 h-4 text-[9px] text-slate-500 flex items-center justify-center';
+        lbl.textContent = (i % 2 === 0) ? d : '';
+        labelCol.appendChild(lbl);
+    });
+    grid.appendChild(labelCol);
+
+    // Find the Monday 8 weeks ago
+    var startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 55 - startDate.getDay() + 1);
+    if (startDate.getDay() !== 1) startDate.setDate(startDate.getDate() - startDate.getDay() + 1);
+
+    var d = new Date(startDate);
+    var weekCol = null;
+    var weekNum = 0;
+    while (d <= today) {
+        var dow = d.getDay();
+        var mondayDow = dow === 0 ? 6 : dow - 1; // Mon=0, Sun=6
+        if (mondayDow === 0) {
+            weekCol = document.createElement('div');
+            weekCol.className = 'flex flex-col gap-1';
+            grid.appendChild(weekCol);
+            weekNum++;
+        }
+        var key = d.toISOString().slice(0, 10);
+        var dayData = data.history[key];
+        var mins = dayData ? dayData.mins : 0;
+        var isFuture = d > today;
+
+        var cell = document.createElement('div');
+        cell.className = 'w-4 h-4 rounded-sm transition-all';
+        cell.title = key + (mins ? ' — ' + mins + ' min' : '');
+        if (isFuture) {
+            cell.style.background = 'rgba(255,255,255,0.03)';
+        } else if (mins === 0) {
+            cell.style.background = 'rgba(255,255,255,0.06)';
+        } else if (mins < 30) {
+            cell.style.background = 'rgba(99,102,241,0.25)';
+        } else if (mins < 90) {
+            cell.style.background = 'rgba(99,102,241,0.5)';
+        } else if (mins < 150) {
+            cell.style.background = 'rgba(99,102,241,0.75)';
+        } else {
+            cell.style.background = 'rgba(99,102,241,1)';
+        }
+        if (key === today.toISOString().slice(0, 10)) {
+            cell.style.outline = '2px solid rgba(99,102,241,0.6)';
+            cell.style.outlineOffset = '1px';
+        }
+        if (weekCol) weekCol.appendChild(cell);
+        d.setDate(d.getDate() + 1);
+    }
+    calSection.appendChild(grid);
+
+    // Legend
+    var legend = document.createElement('div');
+    legend.className = 'flex items-center gap-2 mt-3 text-[9px] text-slate-500';
+    legend.textContent = 'Less ';
+    ['rgba(255,255,255,0.06)', 'rgba(99,102,241,0.25)', 'rgba(99,102,241,0.5)', 'rgba(99,102,241,0.75)', 'rgba(99,102,241,1)'].forEach(function(c) {
+        var box = document.createElement('div');
+        box.className = 'w-3 h-3 rounded-sm';
+        box.style.background = c;
+        legend.appendChild(box);
+    });
+    var moreText = document.createTextNode(' More');
+    legend.appendChild(moreText);
+    calSection.appendChild(legend);
+    container.appendChild(calSection);
+
+    // ── Upcoming week: items due per day ──
+    var upSection = document.createElement('div');
+    upSection.className = 'glass rounded-2xl p-4';
+    var upTitle = document.createElement('div');
+    upTitle.className = 'text-sm font-bold text-white mb-3';
+    upTitle.textContent = 'Upcoming Reviews';
+    upSection.appendChild(upTitle);
+
+    var upGrid = document.createElement('div');
+    upGrid.className = 'grid grid-cols-7 gap-1';
+    for (var i = 0; i < 14; i++) {
+        var fd = new Date(today);
+        fd.setDate(fd.getDate() + i);
+        var fKey = fd.toISOString().slice(0, 10);
+        var due = data.upcoming[fKey] || 0;
+        var dayCard = document.createElement('div');
+        dayCard.className = 'rounded-lg p-2 text-center ' + (i === 0 ? 'bg-accent/15 border border-accent/30' : 'bg-surface-100 border border-white/5');
+        var dayName = document.createElement('div');
+        dayName.className = 'text-[9px] text-slate-500';
+        dayName.textContent = fd.toLocaleDateString('en-US', { weekday: 'short' });
+        var dayNum = document.createElement('div');
+        dayNum.className = 'text-[10px] text-slate-400';
+        dayNum.textContent = fd.getDate();
+        var dueNum = document.createElement('div');
+        dueNum.className = 'text-sm font-bold ' + (due > 20 ? 'text-red-400' : due > 0 ? 'text-accent-light' : 'text-slate-600');
+        dueNum.textContent = due || '—';
+        var dueLabel = document.createElement('div');
+        dueLabel.className = 'text-[8px] text-slate-600';
+        dueLabel.textContent = due ? 'due' : '';
+        dayCard.appendChild(dayName);
+        dayCard.appendChild(dayNum);
+        dayCard.appendChild(dueNum);
+        dayCard.appendChild(dueLabel);
+        upGrid.appendChild(dayCard);
+    }
+    upSection.appendChild(upGrid);
+    container.appendChild(upSection);
+
+    // ── Mastery breakdown bar ──
+    var mastBar = document.createElement('div');
+    mastBar.className = 'glass rounded-2xl p-4';
+    var mastTitle = document.createElement('div');
+    mastTitle.className = 'text-sm font-bold text-white mb-2';
+    mastTitle.textContent = 'Mastery Breakdown';
+    mastBar.appendChild(mastTitle);
+    var total = data.mastery.new + data.mastery.learning + data.mastery.review + data.mastery.mastered;
+    if (total > 0) {
+        var bar = document.createElement('div');
+        bar.className = 'h-4 rounded-full overflow-hidden flex';
+        bar.style.background = 'rgba(255,255,255,0.06)';
+        var segments = [
+            { pct: data.mastery.mastered / total * 100, color: '#22c55e', label: 'Mastered' },
+            { pct: data.mastery.review / total * 100, color: '#3b82f6', label: 'Review' },
+            { pct: data.mastery.learning / total * 100, color: '#f59e0b', label: 'Learning' },
+            { pct: data.mastery.new / total * 100, color: '#64748b', label: 'New' },
+        ];
+        segments.forEach(function(seg) {
+            if (seg.pct > 0) {
+                var s = document.createElement('div');
+                s.style.width = seg.pct + '%';
+                s.style.background = seg.color;
+                s.title = seg.label + ': ' + Math.round(seg.pct) + '%';
+                bar.appendChild(s);
+            }
+        });
+        mastBar.appendChild(bar);
+        var mastLegend = document.createElement('div');
+        mastLegend.className = 'flex justify-between mt-2 text-[9px] text-slate-500';
+        segments.forEach(function(seg) {
+            var item = document.createElement('span');
+            var dot = document.createElement('span');
+            dot.style.cssText = 'display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:3px;background:' + seg.color;
+            item.appendChild(dot);
+            item.appendChild(document.createTextNode(seg.label + ' ' + Math.round(seg.pct) + '%'));
+            mastLegend.appendChild(item);
+        });
+        mastBar.appendChild(mastLegend);
+    }
+    var corpusNote = document.createElement('div');
+    corpusNote.className = 'text-[10px] text-slate-500 mt-2';
+    corpusNote.textContent = total + ' items tracked of ' + data.total_phrases + ' in corpus';
+    mastBar.appendChild(corpusNote);
+    container.appendChild(mastBar);
+
+    lucide.createIcons();
 }
 
 // Keyboard support for flashcards
