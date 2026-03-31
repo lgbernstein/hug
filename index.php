@@ -1426,11 +1426,12 @@ select option { background: #4a525a; color: #e8e6df; }
                                 <div id="fcFill" class="h-full bg-amber-500 rounded-full transition-all duration-300" style="width:0%"></div>
                             </div>
                         </div>
-                        <!-- Card area -->
-                        <div id="fcCardArea" class="p-5 min-h-[280px] flex flex-col items-center justify-center">
-                        </div>
-                        <!-- Controls -->
-                        <div id="fcControls" class="px-5 pb-5 flex gap-2">
+                        <!-- Card + controls side by side -->
+                        <div class="p-5 flex gap-4 items-stretch flex-col md:flex-row">
+                            <div id="fcCardArea" class="flex-1 min-h-[280px] flex flex-col items-center justify-center">
+                            </div>
+                            <div id="fcControls" class="flex md:flex-col gap-2 md:w-[140px] md:justify-center shrink-0">
+                            </div>
                         </div>
                     </div>
                     <!-- Score tally -->
