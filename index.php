@@ -901,7 +901,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     $breakDuration = 5;
     $itemsPerBlock = 10; // ~2.5 min per item
     $newItemsCap   = 18; // max new items per day
-    $availableMin  = 210; // 3.5 hours default
+    $availableMin  = 300; // 5 hours — includes external resources (Pimsleur, videos, etc.)
 
     // ── 1. What's done today? ──
     $todayMin = 0;
@@ -988,9 +988,35 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     $r = $conn->query("SELECT name, url, icon, category FROM learning_resources ORDER BY sort_order");
     if ($r) { while ($row = $r->fetch_assoc()) $resources[] = $row; }
 
-    // ── 7. Build interleaved blocks ──
+    // ── 7. Prepare external resource queue (interleaved into the plan) ──
+    // Pimsleur lessons are 30min + pause time = 40min; Hungarea videos ~10-15min;
+    // Pod101 lessons ~15-20min; Anna's lessons ~20min
+    $extApps = [
+        ['name' => 'Pimsleur',         'duration' => 40, 'subtitle' => '30-min lesson + pause time'],
+        ['name' => "Anna's Lessons",    'duration' => 20, 'subtitle' => 'Review lesson video & notes'],
+        ['name' => 'HungarianPod101',  'duration' => 20, 'subtitle' => 'Podcast lesson'],
+        ['name' => 'Hungarea',          'duration' => 15, 'subtitle' => 'Sándor\'s YouTube (1-2 videos)'],
+        ['name' => 'Drops',            'duration' => 10, 'subtitle' => 'Quick vocabulary game'],
+        ['name' => 'Quizlet',          'duration' => 15, 'subtitle' => 'Flashcard review'],
+        ['name' => 'Duolingo',         'duration' => 10, 'subtitle' => 'Quick grammar practice'],
+        ['name' => 'Aktív MagyarOK',   'duration' => 15, 'subtitle' => 'Textbook exercises'],
+    ];
+    $extQueue = [];
+    foreach ($extApps as $ea) {
+        $btKey = strtolower(preg_replace('/[^a-z0-9]/i', '', $ea['name']));
+        if (!empty($todayBlocks[$btKey])) continue;
+        $ext = array_values(array_filter($resources, function($r) use ($ea) { return $r['name'] === $ea['name']; }));
+        if (!$ext) continue;
+        $extQueue[] = ['key' => $btKey, 'app' => $ea, 'resource' => $ext[0]];
+    }
+    $extIdx = 0;
+    $extAdded = 0;
+    $maxExt = 3;
+
+    // ── 8. Build interleaved blocks (active + external every 2 active) ──
     $blocks = [];
     $blockNum = 0;
+    $activeStreak = 0;
     $reviewIdx = 0;
     $newIdx = 0;
     $newUsed = 0;
@@ -998,16 +1024,12 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     while ($availableMin >= $blockDuration && ($reviewIdx < count($reviewPool) || ($newIdx < count($newPool) && $newUsed < $newRemaining))) {
         $items = [];
 
-        // 70% review (~7 items), 30% new (~3 items) per block
         $reviewTarget = 7;
         $newTarget = min(3, $newRemaining - $newUsed);
 
-        // Fill review items, round-robin across types for interleaving
         for ($i = 0; $i < $reviewTarget && $reviewIdx < count($reviewPool); $i++) {
             $items[] = $reviewPool[$reviewIdx++];
         }
-
-        // Fill new items
         for ($i = 0; $i < $newTarget && $newIdx < count($newPool) && $newUsed < $newRemaining; $i++) {
             $items[] = $newPool[$newIdx++];
             $newUsed++;
@@ -1015,7 +1037,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
 
         if (empty($items)) break;
 
-        // Minimum 5 items per block — pad from whichever pool has more
+        // Minimum 5 items per block
         while (count($items) < 5 && $reviewIdx < count($reviewPool)) {
             $items[] = $reviewPool[$reviewIdx++];
         }
@@ -1024,9 +1046,8 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
             $newUsed++;
         }
 
-        shuffle($items); // interleave within block
+        shuffle($items);
 
-        // Determine block character from item types present
         $types = array_unique(array_column($items, 'item_type'));
         $typeLabels = ['phrase' => 'Phrases', 'flashcard' => 'Flashcards', 'grammar' => 'Grammar', 'knowledge' => 'Knowledge'];
         $titleParts = [];
@@ -1048,16 +1069,37 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
 
         $availableMin -= $blockDuration;
         $blockNum++;
+        $activeStreak++;
 
-        // Break every 3 active blocks (Pomodoro: 3×25 + long break)
-        if ($blockNum % 3 === 0 && $availableMin >= $breakDuration + $blockDuration) {
+        // After every 2 active blocks, inject an external resource for variety
+        if ($activeStreak >= 2 && $extIdx < count($extQueue) && $extAdded < $maxExt) {
+            $e = $extQueue[$extIdx];
+            if ($availableMin >= $e['app']['duration'] + $breakDuration) {
+                $blocks[] = ['type' => 'break', 'block_type' => 'break_' . $blockNum,
+                    'title' => 'Break', 'subtitle' => 'Switch modes', 'duration' => $breakDuration, 'icon' => 'coffee'];
+                $availableMin -= $breakDuration;
+
+                $blocks[] = ['type' => 'external', 'block_type' => $e['key'],
+                    'title' => $e['resource']['name'], 'subtitle' => $e['app']['subtitle'],
+                    'duration' => $e['app']['duration'], 'icon' => 'external-link',
+                    'url' => $e['resource']['url'], 'emoji' => $e['resource']['icon']];
+                $availableMin -= $e['app']['duration'];
+                $extAdded++;
+                $extIdx++;
+                $activeStreak = 0;
+            }
+        }
+
+        // Break every 3 consecutive active blocks (Pomodoro rhythm)
+        if ($activeStreak >= 3 && $availableMin >= $breakDuration + $blockDuration) {
             $blocks[] = ['type' => 'break', 'block_type' => 'break_' . $blockNum,
                 'title' => 'Break', 'subtitle' => 'Stretch, water, move', 'duration' => $breakDuration, 'icon' => 'coffee'];
             $availableMin -= $breakDuration;
+            $activeStreak = 0;
         }
     }
 
-    // ── 8. Add interview practice block (speaking is its own skill) ──
+    // ── 9. Add interview practice block ──
     if ($availableMin >= $blockDuration && empty($todayBlocks['interview_sim'])) {
         $blocks[] = ['type' => 'in_app', 'block_type' => 'interview_sim',
             'title' => 'Interview Practice', 'subtitle' => 'Answer in Hungarian',
@@ -1066,46 +1108,13 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
         $availableMin -= $blockDuration;
     }
 
-    // ── 8b. Mock Interview — full 15-min conversation (once per day) ──
+    // ── 9b. Mock Interview (once per day) ──
     if ($availableMin >= 15 && empty($todayBlocks['mock_interview'])) {
         $blocks[] = ['type' => 'in_app', 'block_type' => 'mock_interview',
             'title' => 'Mock Interview', 'subtitle' => '15-min conversation practice',
             'duration' => 15, 'icon' => 'message-circle',
             'session' => ['mode' => 'mock_interview']];
         $availableMin -= 15;
-    }
-
-    // ── 9. Add external resources — rotate all apps as passive blocks ──
-    // Interleave external apps between active blocks: listening, vocab apps, lesson review
-    $extApps = [
-        ['name' => 'Pimsleur',         'duration' => 20, 'subtitle' => 'Listening & speaking drills'],
-        ['name' => "Anna's Lessons",    'duration' => 20, 'subtitle' => 'Review lesson video & notes'],
-        ['name' => 'Drops',            'duration' => 10, 'subtitle' => 'Quick vocabulary game'],
-        ['name' => 'HungarianPod101',  'duration' => 20, 'subtitle' => 'Podcast lesson'],
-        ['name' => 'Quizlet',          'duration' => 15, 'subtitle' => 'Flashcard review'],
-        ['name' => 'Duolingo',         'duration' => 10, 'subtitle' => 'Quick grammar practice'],
-        ['name' => 'Hungarea',          'duration' => 15, 'subtitle' => 'Sándor\'s Hungarian YouTube'],
-        ['name' => 'Aktív MagyarOK',   'duration' => 15, 'subtitle' => 'Textbook exercises'],
-    ];
-    $extAdded = 0;
-    foreach ($extApps as $ea) {
-        if ($availableMin < $ea['duration']) break;
-        if ($extAdded >= 3) break; // max 3 external blocks per day
-        $btKey = strtolower(preg_replace('/[^a-z0-9]/i', '', $ea['name']));
-        if (!empty($todayBlocks[$btKey])) continue;
-        $ext = array_values(array_filter($resources, function($r) use ($ea) { return $r['name'] === $ea['name']; }));
-        if (!$ext) continue;
-        // Break before external if last block was active
-        if (!empty($blocks) && end($blocks)['type'] !== 'break') {
-            $blocks[] = ['type' => 'break', 'block_type' => 'break_ext_' . $btKey,
-                'title' => 'Break', 'subtitle' => 'Switch modes', 'duration' => $breakDuration, 'icon' => 'coffee'];
-            $availableMin -= $breakDuration;
-        }
-        $blocks[] = ['type' => 'external', 'block_type' => $btKey,
-            'title' => $ext[0]['name'], 'subtitle' => $ea['subtitle'],
-            'duration' => $ea['duration'], 'icon' => 'external-link', 'url' => $ext[0]['url'], 'emoji' => $ext[0]['icon']];
-        $availableMin -= $ea['duration'];
-        $extAdded++;
     }
 
     // ── 10. Same-day re-review (PM only: items from this morning) ──
