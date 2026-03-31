@@ -861,82 +861,73 @@ tailwind.config = {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, sans-serif; }
-body { background: #0f172a; color: #e2e8f0; overflow-x: hidden; }
-body.light { background: #f1f5f9; color: #1e293b; }
-body.light .glass { background: #fff; border-color: #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-body.light .glass-strong { background: #fff; border-color: #cbd5e1; }
-body.light .pill-inactive { color: #334155; border-color: #cbd5e1; }
-body.light .pill-inactive:hover { color: #0f172a; background: #e2e8f0; }
-body.light .grammar-card, body.light .drill-card { background: #fff; border-color: #e2e8f0; }
-body.light .grammar-card:hover, body.light .drill-card:hover { border-color: #6366f1; }
-body.light .phrase-item:hover { background: #f1f5f9; }
-body.light .question-text { color: #0f172a; }
-body.light .progress-track { background: #e2e8f0; }
-body.light .result-pass { background: #f0fdf4; border-color: #86efac; }
-body.light .result-fail { background: #fef2f2; border-color: #fca5a5; }
-body.light [class*="bg-surface"] { background: #f1f5f9; }
-body.light [class*="text-slate-3"] { color: #475569; }
-body.light [class*="text-slate-4"] { color: #334155; }
-body.light [class*="text-slate-5"] { color: #1e293b; }
-body.light [class*="text-white"] { color: #0f172a; }
-body.light [class*="border-white"] { border-color: #e2e8f0; }
-body.light .quick-bar { background: #fff; border-color: #e2e8f0; }
-body.light .modal-backdrop { background: rgba(0,0,0,0.4); }
-body.light select option { background: white; color: #1e293b; }
+body { background: #111827; color: #f1f5f9; overflow-x: hidden; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-.glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(99, 102, 241, 0.1); }
-.glass-strong { background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(30px); border: 1px solid rgba(99, 102, 241, 0.15); }
-.glow-accent { box-shadow: 0 0 30px rgba(99, 102, 241, 0.15), 0 0 60px rgba(99, 102, 241, 0.05); }
-.glow-red { box-shadow: 0 0 25px rgba(239, 68, 68, 0.3); }
-.glow-green { box-shadow: 0 0 25px rgba(34, 197, 94, 0.3); }
-@keyframes mic-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); } }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+.glass { background: rgba(31,43,63,0.85); border: 1px solid rgba(99,102,241,0.1); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.glass-strong { background: rgba(31,43,63,0.95); border: 1px solid rgba(99,102,241,0.15); box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+.glow-accent { box-shadow: 0 0 20px rgba(99,102,241,0.12); }
+.glow-red { box-shadow: 0 0 20px rgba(239,68,68,0.25); }
+.glow-green { box-shadow: 0 0 20px rgba(34,197,94,0.25); }
+@keyframes mic-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } }
 .mic-active { animation: mic-pulse 1.5s ease-in-out infinite; background: #dc2626 !important; }
-.progress-track { background: rgba(99, 102, 241, 0.1); }
-.progress-fill { background: linear-gradient(90deg, #6366f1, #a78bfa); transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+.progress-track { background: rgba(99,102,241,0.12); }
+.progress-fill { background: linear-gradient(90deg, #6366f1, #a78bfa); transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; transition: all 0.3s; }
-.dot-off { background: #334155; }
+.dot-off { background: #475569; }
 .dot-warmup { background: #eab308; box-shadow: 0 0 8px #eab308; }
-.dot-live { background: #ef4444; box-shadow: 0 0 12px #ef4444; }
+.dot-live { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
 .vol-track { width: 48px; height: 4px; background: #1e293b; border-radius: 2px; overflow: hidden; }
-.vol-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #22c55e, #4ade80); border-radius: 2px; transition: width 0.05s; }
+.vol-fill { height: 100%; width: 0%; background: linear-gradient(90deg,#22c55e,#4ade80); border-radius: 2px; transition: width 0.05s; }
 .listen-blur { filter: blur(16px); cursor: pointer; transition: filter 0.4s ease; user-select: none; }
-.modal-backdrop { background: rgba(6, 11, 24, 0.9); backdrop-filter: blur(8px); }
+.modal-backdrop { background: rgba(6,11,24,0.9); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* Pills */
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; transition: all 0.2s; cursor: pointer; user-select: none; }
-.pill-active { background: #6366f1; color: white; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2); }
-.pill-inactive { color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15); }
-.pill-inactive:hover { color: #f1f5f9; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.25); }
-.ctrl-btn { display: flex; align-items: center; justify-content: center; border-radius: 16px; transition: all 0.2s; }
-.ctrl-btn:active { transform: scale(0.95); }
-.result-pass { border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.05); }
-.result-fail { border-color: rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); }
+.pill-active { background: #6366f1; color: white; }
+.pill-inactive { color: #94a3b8; border: 1px solid rgba(255,255,255,0.12); }
+.pill-inactive:hover { color: #f1f5f9; background: rgba(255,255,255,0.05); }
+/* Buttons — 3 tiers */
+.btn-primary { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #6366f1; color: white; transition: all 0.15s; cursor: pointer; }
+.btn-primary:hover { background: #4f46e5; }
+.btn-primary:active { transform: scale(0.97); }
+.btn-secondary { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #1f2b3f; color: #cbd5e1; border: 1px solid rgba(255,255,255,0.08); transition: all 0.15s; cursor: pointer; }
+.btn-secondary:hover { color: #f1f5f9; border-color: rgba(99,102,241,0.3); }
+.btn-secondary:active { transform: scale(0.97); }
+.btn-ghost { padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #94a3b8; background: transparent; border: none; transition: all 0.15s; cursor: pointer; }
+.btn-ghost:hover { color: #e2e8f0; background: rgba(255,255,255,0.05); }
+.btn-ghost:disabled { opacity: 0.35; cursor: default; }
+/* Results */
+.result-pass { border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.12); }
+.result-fail { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.12); }
+/* Phrase list */
 .phrase-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; transition: all 0.2s; cursor: pointer; border: 1px solid transparent; }
-.phrase-item:hover { background: rgba(255,255,255,0.03); border-color: rgba(99, 102, 241, 0.2); }
+.phrase-item:hover { background: rgba(255,255,255,0.04); border-color: rgba(99,102,241,0.15); }
 .mastery-new { background: #475569; }
 .mastery-learning { background: #eab308; }
 .mastery-known { background: #3b82f6; }
 .mastery-mastered { background: #22c55e; }
-.question-text { font-size: clamp(1.5rem, 5vw, 3rem); line-height: 1.2; font-weight: 800; letter-spacing: -0.02em; }
+/* Question text */
+.question-text { font-size: clamp(1.5rem, 5vw, 2.75rem); line-height: 1.2; font-weight: 800; letter-spacing: -0.02em; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
 .kbd { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-family: monospace; background: rgba(255,255,255,0.05); color: #64748b; border: 1px solid rgba(255,255,255,0.1); }
-.quick-bar { display: flex; justify-content: space-around; align-items: center; padding: 6px 8px; background: rgba(17, 26, 46, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(99, 102, 241, 0.08); border-radius: 16px; }
+.quick-bar { display: flex; justify-content: space-around; align-items: center; padding: 6px 8px; background: rgba(31,43,63,0.85); border: 1px solid rgba(99,102,241,0.08); border-radius: 16px; }
 @media (min-width: 768px) { .quick-bar { justify-content: center; gap: 4px; } }
 .view-section { display: none; }
 .view-section.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .view-section.active { animation: fadeIn 0.2s ease-out; }
-.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.grammar-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; transition: all 0.2s; }
-.grammar-card:hover { border-color: rgba(99, 102, 241, 0.15); background: rgba(17, 26, 46, 0.8); }
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+.grammar-card { background: #1a2236; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; transition: all 0.2s; }
+.grammar-card:hover { border-color: rgba(99,102,241,0.2); background: #1f2b3f; }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.drill-card { background: rgba(17, 26, 46, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px 20px; transition: all 0.2s; cursor: pointer; }
-.drill-card:hover { border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05); transform: translateY(-1px); }
-.tag-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(99, 102, 241, 0.1); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.15); }
-.tag-pill-active { background: rgba(99, 102, 241, 0.35); border-color: rgba(99, 102, 241, 0.5); color: #fff; }
-select option { background: #111a2e; color: #e2e8f0; }
+.drill-card { background: #1a2236; border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px 20px; transition: all 0.2s; cursor: pointer; }
+.drill-card:hover { border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.05); transform: translateY(-1px); }
+.tag-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(99,102,241,0.1); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.15); }
+.tag-pill-active { background: rgba(99,102,241,0.35); border-color: rgba(99,102,241,0.5); color: #fff; }
+select option { background: #1a2236; color: #f1f5f9; }
 </style>
 </head>
 <body class="min-h-screen flex flex-col items-center pb-6">
@@ -1034,9 +1025,6 @@ select option { background: #111a2e; color: #e2e8f0; }
         <div id="headerSpeedBar" class="flex gap-px items-center"></div>
         <input id="headerStrictSlider" type="range" min="1" max="5" step="1" class="w-12 h-1 accent-accent cursor-pointer" title="Grading strictness">
         <span id="headerStrictLabel" class="text-[8px] font-bold text-accent-light w-10"></span>
-        <button onclick="toggleTheme()" title="Toggle light/dark" class="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all">
-            <i data-lucide="sun" class="w-3.5 h-3.5" id="themeIcon"></i>
-        </button>
         <a href="admin.php" title="Admin" class="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all">
             <i data-lucide="settings" class="w-3.5 h-3.5"></i>
         </a>
@@ -1611,13 +1599,13 @@ let audioCtx = null, analyser = null, micStream = null, volTimer = null;
 let mediaRecorder = null, audioChunks = [], lastRecordingBlob = null;
 var volFill = document.getElementById('volFill');
 
-const VAD_THRESHOLD = 8;
-const VAD_SILENCE   = 1200;
+const VAD_THRESHOLD = 14;
+const VAD_SILENCE   = 1500;
 let vadLastSpeech = 0;
 let vadSpeaked    = false;
 
 function startVolume() {
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(function(stream) {
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }, video: false }).then(function(stream) {
         micStream = stream;
         audioCtx  = new AudioContext();
         analyser  = audioCtx.createAnalyser();
@@ -1681,24 +1669,59 @@ function playMyVoice() {
     new Audio(url).play();
 }
 
-// ── Voice synthesis ───────────────────────────────────────────────────
+// ── Voice synthesis (ElevenLabs with Web Speech API fallback) ─────────
 var huVoice = null;
+var ttsCache = {}; // Cache audio blobs by text to avoid repeat API calls
 function loadVoices() {
     var voices = window.speechSynthesis.getVoices();
-    huVoice = voices.find(function(v) { return v.lang === 'hu-HU'; }) ||
-              voices.find(function(v) { return v.lang.startsWith('hu'); }) || null;
+    var huVoices = voices.filter(function(v) { return v.lang === 'hu-HU' || v.lang.startsWith('hu'); });
+    huVoice = huVoices.find(function(v) { return v.name.indexOf('Tünde') >= 0; }) ||
+              huVoices.find(function(v) { return v.name.indexOf('Enhanced') >= 0 || v.name.indexOf('Premium') >= 0; }) ||
+              huVoices[0] || null;
 }
 window.speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
-// Ensure voices load on first user tap (Safari/Chrome requirement)
-document.addEventListener('click', function initVoices() {
-    loadVoices();
-    // Warm up speechSynthesis with silent utterance
-    var warmup = new SpeechSynthesisUtterance('');
-    warmup.volume = 0;
-    window.speechSynthesis.speak(warmup);
-    document.removeEventListener('click', initVoices);
-}, { once: true });
+
+// ElevenLabs TTS — returns a promise that resolves when audio finishes playing
+function elevenSpeak(text, onEnd) {
+    if (!text) return;
+    window.speechSynthesis.cancel();
+    // Check cache first
+    if (ttsCache[text]) {
+        var a = new Audio(ttsCache[text]);
+        if (onEnd) a.onended = onEnd;
+        a.play();
+        return;
+    }
+    var fd = new FormData();
+    fd.append('text', text);
+    fetch('speak.php', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.audio) {
+                var url = 'data:audio/mpeg;base64,' + data.audio;
+                ttsCache[text] = url;
+                var a = new Audio(url);
+                if (onEnd) a.onended = onEnd;
+                a.play();
+            } else {
+                // Fallback to Web Speech API
+                webSpeechFallback(text, 1.0, onEnd);
+            }
+        })
+        .catch(function() { webSpeechFallback(text, 1.0, onEnd); });
+}
+
+function webSpeechFallback(text, rate, onEnd) {
+    window.speechSynthesis.cancel();
+    if (!huVoice) loadVoices();
+    var msg = new SpeechSynthesisUtterance(text);
+    msg.lang = 'hu-HU';
+    msg.rate = rate || 1.0;
+    if (huVoice) msg.voice = huVoice;
+    if (onEnd) msg.onend = onEnd;
+    window.speechSynthesis.speak(msg);
+}
 
 function speak(rate, autoRecord) {
     if (autoRecord === undefined) autoRecord = true;
@@ -1713,14 +1736,8 @@ function speak(rate, autoRecord) {
     var ms = document.getElementById('matchScore'); if (ms) ms.textContent = '';
     var tr = document.getElementById('transcript'); if (tr) tr.textContent = '';
     var pb = document.getElementById('playbackBtn'); if (pb) pb.classList.add('hidden');
-    setTimeout(function() {
-        var msg = new SpeechSynthesisUtterance(targetQ);
-        msg.lang = 'hu-HU';
-        msg.rate = rate;
-        if (huVoice) msg.voice = huVoice;
-        if (autoRecord) { msg.onend = function() { setTimeout(toggleMic, 350); }; }
-        window.speechSynthesis.speak(msg);
-    }, 50);
+    var onEnd = autoRecord ? function() { setTimeout(toggleMic, 350); } : null;
+    elevenSpeak(targetQ, onEnd);
 }
 
 // ── Speed control ─────────────────────────────────────────────────────
@@ -2354,13 +2371,7 @@ function recordSRS(phrase, pass) {
 function speakPractice() {
     var text = document.getElementById('practiceInput').value.trim();
     if (!text) return;
-    window.speechSynthesis.cancel();
-    var msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'hu-HU';
-    msg.rate = 1.0;
-    if (huVoice) msg.voice = huVoice;
-    msg.onend = function() { isPractice = true; setTimeout(toggleMic, 350); };
-    window.speechSynthesis.speak(msg);
+    elevenSpeak(text, function() { isPractice = true; setTimeout(toggleMic, 350); });
 }
 
 function translatePractice() {
@@ -2382,14 +2393,7 @@ function translatePractice() {
                 speakBtn.className = 'inline-flex items-center ml-1 text-indigo-400 hover:text-white transition-colors align-middle';
                 speakBtn.title = 'Listen';
                 speakBtn.textContent = '\u{1F50A}';
-                speakBtn.onclick = function() {
-                    window.speechSynthesis.cancel();
-                    var msg = new SpeechSynthesisUtterance(result);
-                    msg.lang = 'hu-HU';
-                    msg.rate = 0.9;
-                    if (huVoice) msg.voice = huVoice;
-                    window.speechSynthesis.speak(msg);
-                };
+                speakBtn.onclick = function() { elevenSpeak(result); };
                 el.appendChild(speakBtn);
             }
         })
@@ -3624,35 +3628,33 @@ function renderSessionStep() {
 function renderAudioStep(step, content, controls) {
     var isPron = (step.mode || 'pronunciation') === 'pronunciation';
 
-    // Phrase area — full width, top
+    // ── Phrase (centered, prominent) ──
     var q = document.createElement('h1');
     q.id = 'questionText';
-    q.className = 'question-text text-white mb-1 text-center';
+    q.className = 'question-text mb-2 text-center';
     q.textContent = step.q;
     if (listenMode) { q.classList.add('listen-blur'); q.onclick = function() { q.classList.remove('listen-blur'); }; }
     content.appendChild(q);
 
-    // Translation — blurred, tap to reveal
+    // Translation — blurred by default
     var transRow = document.createElement('div');
-    transRow.className = 'mb-2 flex items-center gap-1.5 justify-center';
+    transRow.className = 'flex items-center gap-1.5 justify-center mb-3';
     var transText = document.createElement('span');
-    transText.className = 'text-blue-300/70 text-sm italic';
+    transText.className = 'text-slate-500 text-sm italic';
     transText.textContent = step.a;
-    transText.style.cssText = 'filter:blur(6px);cursor:pointer;transition:filter 0.2s';
+    transText.style.cssText = 'filter:blur(5px);cursor:pointer;transition:filter 0.2s';
     var transToggle = document.createElement('button');
-    transToggle.className = 'text-[9px] text-blue-400/50 hover:text-blue-300 font-bold px-1 py-0.5 rounded border border-blue-400/20';
+    transToggle.className = 'btn-ghost text-[10px] px-2 py-1';
     transToggle.textContent = 'EN';
-    var transVisible = false;
-    function toggleTrans() { transVisible = !transVisible; transText.style.filter = transVisible ? 'none' : 'blur(6px)'; }
-    transText.onclick = toggleTrans;
-    transToggle.onclick = toggleTrans;
-    transRow.appendChild(transText);
-    transRow.appendChild(transToggle);
+    var tv = false;
+    function tt() { tv = !tv; transText.style.filter = tv ? 'none' : 'blur(5px)'; }
+    transText.onclick = tt; transToggle.onclick = tt;
+    transRow.appendChild(transText); transRow.appendChild(transToggle);
     content.appendChild(transRow);
 
-    // Status dot + volume (centered, small)
+    // Status indicator (mic dot + volume bar)
     var statusRow = document.createElement('div');
-    statusRow.className = 'flex items-center gap-2 justify-center mb-2';
+    statusRow.className = 'flex items-center gap-2 justify-center';
     var readyDot = document.createElement('div');
     readyDot.id = 'readyIndicator';
     readyDot.className = 'status-dot dot-off';
@@ -3664,80 +3666,43 @@ function renderAudioStep(step, content, controls) {
     volFillEl.className = 'vol-fill';
     volFill = volFillEl;
     volTrack.appendChild(volFillEl);
-    statusRow.appendChild(readyDot);
-    statusRow.appendChild(volTrack);
+    statusRow.appendChild(readyDot); statusRow.appendChild(volTrack);
     content.appendChild(statusRow);
 
-    // Reveal expected answer (interview mode)
+    // Expected answer (interview mode)
     if (!isPron && step.a_hu) {
-        var revealWrap = document.createElement('details');
-        revealWrap.id = 'revealDetails';
-        revealWrap.className = 'mb-2 text-center';
-        var revealSummary = document.createElement('summary');
-        revealSummary.className = 'text-xs text-slate-500 cursor-pointer hover:text-white';
-        revealSummary.textContent = 'Show expected answer';
-        revealWrap.appendChild(revealSummary);
-        var revealText = document.createElement('p');
-        revealText.id = 'answerText';
-        revealText.className = 'text-sm text-accent-light font-semibold mt-1';
-        revealText.textContent = step.a_hu;
-        revealWrap.appendChild(revealText);
-        content.appendChild(revealWrap);
+        var reveal = document.createElement('details');
+        reveal.id = 'revealDetails';
+        reveal.className = 'mt-2 text-center';
+        var rs = document.createElement('summary');
+        rs.className = 'text-xs text-slate-500 cursor-pointer hover:text-slate-300';
+        rs.textContent = 'Show expected answer';
+        reveal.appendChild(rs);
+        var rt = document.createElement('p');
+        rt.id = 'answerText';
+        rt.className = 'text-sm text-accent-light font-semibold mt-1';
+        rt.textContent = step.a_hu;
+        reveal.appendChild(rt);
+        content.appendChild(reveal);
     }
 
-    // Button grid — right-aligned, 2 columns
-    var btnWrap = document.createElement('div');
-    btnWrap.className = 'flex justify-end';
-    var btnGrid = document.createElement('div');
-    btnGrid.className = 'grid grid-cols-2 gap-1.5 w-[260px]';
-    var btn = 'py-2 px-2 rounded-lg text-[11px] font-bold transition-all active:scale-[0.97] text-center';
+    // ── Button grid (right-aligned, 2 cols) ──
+    var wrap = document.createElement('div');
+    wrap.className = 'flex justify-end mt-2';
+    var grid = document.createElement('div');
+    grid.className = 'grid grid-cols-2 gap-2';
+    grid.style.width = '280px';
 
-    var listenBtn = document.createElement('button');
-    listenBtn.className = btn + ' col-span-2 bg-accent text-white hover:bg-accent-dark';
-    listenBtn.textContent = '🎤 Listen & Repeat';
-    listenBtn.onclick = function() {
-        targetQ = step.q; targetA = step.a; targetAH = step.a_hu || '';
-        currentMode = step.mode || 'pronunciation';
-        speak(currentSpeed);
-    };
-    btnGrid.appendChild(listenBtn);
+    function doSpeak() { targetQ = step.q; targetA = step.a; targetAH = step.a_hu || ''; currentMode = step.mode || 'pronunciation'; speak(currentSpeed); }
+    function doNext() { if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); } else { nextQuestion(); } }
 
-    var nextBtn = document.createElement('button');
-    nextBtn.className = btn + ' col-span-2 bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
-    nextBtn.textContent = 'Next →';
-    nextBtn.onclick = function() {
-        if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); }
-        else { nextQuestion(); }
-    };
-    btnGrid.appendChild(nextBtn);
+    var b1 = document.createElement('button'); b1.className = 'btn-primary col-span-2'; b1.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer'; b1.onclick = doSpeak; grid.appendChild(b1);
+    var b2 = document.createElement('button'); b2.className = 'btn-secondary col-span-2'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
+    var b3 = document.createElement('button'); b3.className = 'btn-secondary'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
+    var b4 = document.createElement('button'); b4.className = 'btn-secondary'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.style.opacity = '0.35'; b4.onclick = function() { playMyVoice(); }; grid.appendChild(b4);
+    var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-ghost col-span-2 text-yellow-400'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
 
-    var hearAgainBtn = document.createElement('button');
-    hearAgainBtn.className = btn + ' bg-surface-50 border border-white/10 text-slate-300 hover:text-white';
-    hearAgainBtn.textContent = '🔊 Again';
-    hearAgainBtn.onclick = function() {
-        targetQ = step.q; targetA = step.a; targetAH = step.a_hu || '';
-        currentMode = step.mode || 'pronunciation';
-        speak(currentSpeed);
-    };
-    btnGrid.appendChild(hearAgainBtn);
-
-    var hearMeBtn = document.createElement('button');
-    hearMeBtn.id = 'gridHearMe';
-    hearMeBtn.className = btn + ' bg-surface-50 border border-white/10 text-slate-400';
-    hearMeBtn.textContent = '🎧 Hear Me';
-    hearMeBtn.disabled = true;
-    hearMeBtn.style.opacity = '0.35';
-    hearMeBtn.onclick = function() { playMyVoice(); };
-    btnGrid.appendChild(hearMeBtn);
-
-    var breakdownBtn = document.createElement('button');
-    breakdownBtn.className = btn + ' col-span-2 bg-yellow-500/10 border border-yellow-500/15 text-yellow-300 hover:bg-yellow-500/20';
-    breakdownBtn.textContent = '📖 Break it Down';
-    var breakdownLoaded = false;
-    btnGrid.appendChild(breakdownBtn);
-
-    btnWrap.appendChild(btnGrid);
-    controls.appendChild(btnWrap);
+    wrap.appendChild(grid); controls.appendChild(wrap);
 
     // Wire breakdown button onclick
     breakdownBtn.onclick = function(e) {
@@ -4392,21 +4357,7 @@ function closeLesson() {
 
 function speakHu(text) {
     if (!text) return;
-    // Chrome bug: speechSynthesis can get stuck. Cancel + resume.
-    window.speechSynthesis.cancel();
-    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-
-    // Reload voices if not found yet
-    if (!huVoice) loadVoices();
-
-    var msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'hu-HU'; msg.rate = 0.8;
-    if (huVoice) msg.voice = huVoice;
-
-    // Chrome workaround: short delay after cancel
-    setTimeout(function() {
-        window.speechSynthesis.speak(msg);
-    }, 50);
+    elevenSpeak(text);
 }
 
 function escHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
