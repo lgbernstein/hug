@@ -473,7 +473,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
 
     $sentenceEsc = addslashes($sentence);
     $englishEsc = addslashes($english);
-    $prompt = "Break down this Hungarian phrase word by word.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"meaning\": \"1-3 word English meaning\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. OHR-vosh)\",\n      \"note\": \"Max 6 words. Only for suffixes or non-obvious grammar. Examples: '-ban = in', '-ból = out of', 'past tense of lát'. Omit for simple/obvious words.\"\n    }\n  ],\n  \"tip\": \"One sentence English translation\"\n}\n\nBe extremely brief. No full sentences in notes — fragments only. Skip note for names, articles, conjunctions.";
+    $prompt = "Break down this Hungarian phrase word by word.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"meaning\": \"1-3 word English meaning\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. OHR-vosh)\",\n      \"note\": \"Max 6 words. Only for suffixes or non-obvious grammar. Examples: '-ban = in', '-ból = out of', '-om = my'. Never use grammar terms like locative, possessive, accusative, dative — just show what the suffix means. Omit for simple/obvious words.\"\n    }\n  ],\n  \"tip\": \"Plain English translation of the full phrase\"\n}\n\nBe extremely brief. No full sentences in notes — fragments only. Skip note for names, articles, conjunctions.";
 
     $apiKey = $env['GEMINI_KEY'];
     $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
@@ -3275,17 +3275,9 @@ function renderBreakdown(data, container) {
         sentenceBar.appendChild(sentenceSpeak);
         var sentenceText = document.createElement('span');
         sentenceText.style.cssText = 'font-size:17px;font-weight:700;color:#fff;line-height:1.4';
-        sentenceText.textContent = fullSentence;
+        sentenceText.textContent = data.tip || fullSentence;
         sentenceBar.appendChild(sentenceText);
         drawer.appendChild(sentenceBar);
-
-        // Tip right under sentence (if present)
-        if (data.tip) {
-            var tip = document.createElement('div');
-            tip.style.cssText = 'padding:8px 12px;background:#fef9c3;border-radius:8px;border:1px solid #fde68a;font-size:13px;color:#92400e;line-height:1.4;margin-bottom:12px';
-            tip.textContent = '💡 ' + data.tip;
-            drawer.appendChild(tip);
-        }
 
         // Compact word list — one line per word, tap row for note
         var table = document.createElement('div');
