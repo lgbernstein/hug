@@ -473,7 +473,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
 
     $sentenceEsc = addslashes($sentence);
     $englishEsc = addslashes($english);
-    $prompt = "Break down this Hungarian phrase for an American English speaker learning Hungarian for a citizenship interview.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON with this structure:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"base\": \"dictionary form\",\n      \"meaning\": \"English meaning (2-3 words)\",\n      \"suffixes\": \"-suffix = what it means (e.g. -ban = in, -om = my)\",\n      \"pronunciation\": \"English phonetic guide in CAPS (e.g. MAH-sseer)\"\n    }\n  ],\n  \"type\": \"What type: person/place/thing/action/greeting (one word)\",\n  \"grammar_note\": \"One key grammar pattern this uses, with example. E.g.: Person + -nál/-nél = at someone's. A masszőrömnél = at my massage therapist's.\",\n  \"tip\": \"One practical memory tip, under 15 words\"\n}\n\nKeep it concise but educational. Focus on suffixes and pronunciation.";
+    $prompt = "Break down this Hungarian phrase for a beginner American English speaker.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"base\": \"dictionary form\",\n      \"meaning\": \"English (2-3 words)\",\n      \"suffixes\": \"-suffix = meaning (e.g. -ban = in, -om = my). Skip if none.\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. MAH-sseer)\"\n    }\n  ],\n  \"type\": \"person/place/thing/action/greeting\",\n  \"grammar_note\": \"Show the practical pattern with EXAMPLES, not technical terms. Like:\\nHova? – Budapestre (to Budapest)\\nHol? – Budapesten (in Budapest)\\nHonnan? – Budapestről (from Budapest)\\nUse real words from the phrase, not grammar terminology.\",\n  \"tip\": \"One memory trick, under 15 words\"\n}\n\nIMPORTANT: The grammar_note must show EXAMPLES with the actual words, not linguistic terms like 'locative' or 'possessive locative'. Write it like a cheat sheet a student would tape to their wall.";
 
     $apiKey = $env['GEMINI_KEY'];
     $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
@@ -3775,6 +3775,8 @@ function renderAudioStep(step, content, controls) {
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
     var b4 = document.createElement('button'); b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice;
     b4.style.cssText = 'padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;background:#a78bfa;color:#4c1d95;cursor:pointer';
+    b4.onmouseenter = function() { b4.style.background = b4.disabled ? '#b49ffc' : '#6d28d9'; };
+    b4.onmouseleave = function() { b4.style.background = b4.disabled ? '#a78bfa' : '#7c3aed'; };
     grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
     var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 English';
