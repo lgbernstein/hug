@@ -3663,20 +3663,20 @@ function renderAudioStep(step, content, controls) {
     };
     controls.appendChild(listenBtn);
 
-    // Too Hard — skip button
-    var skipRow = document.createElement('div');
-    skipRow.className = 'flex items-center justify-center mt-3';
-    var skipBtn = document.createElement('button');
-    skipBtn.className = 'text-[11px] text-slate-500 hover:text-white transition-colors underline decoration-dotted underline-offset-2';
-    skipBtn.textContent = 'Too hard — skip for now';
-    skipBtn.onclick = function() {
-        // Push review out 7 days
-        var fd = new FormData();
-        fd.append('phrase', step.q);
-        fd.append('pass', '0');
-        fd.append('who', who);
-        fetch('record.php', { method: 'POST', body: fd });
-        // Advance to next
+    // Navigation: Repeat / Next / Break it down
+    var navRow = document.createElement('div');
+    navRow.className = 'flex items-center justify-center gap-3 mt-3';
+
+    var repeatBtn = document.createElement('button');
+    repeatBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30 transition-all';
+    repeatBtn.textContent = '🔁 Repeat';
+    repeatBtn.onclick = function() { speak(currentSpeed, false); };
+    navRow.appendChild(repeatBtn);
+
+    var nextNavBtn = document.createElement('button');
+    nextNavBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-accent/80 hover:bg-accent text-white transition-all';
+    nextNavBtn.textContent = 'Next →';
+    nextNavBtn.onclick = function() {
         if (activeSession && sessionSteps.length > 0) {
             sessionIdx++;
             sessionTotalCount++;
@@ -3685,7 +3685,12 @@ function renderAudioStep(step, content, controls) {
             nextQuestion();
         }
     };
-    skipRow.appendChild(skipBtn);
+    navRow.appendChild(nextNavBtn);
+
+    controls.appendChild(navRow);
+
+    var skipRow = document.createElement('div');
+    skipRow.className = 'flex items-center justify-center mt-2';
 
     // Grammar breakdown toggle button
     var breakdownBtn = document.createElement('button');
