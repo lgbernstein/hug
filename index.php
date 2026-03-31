@@ -3509,14 +3509,44 @@ function startSessionBlock(block, blockIdx) {
 
     var badge = document.getElementById('sessionBadge');
     badge.textContent = block.title;
-    badge.className = 'text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ' +
+    badge.className = 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ' +
         (block.block_type.indexOf('grammar') !== -1 ? 'bg-purple-500/20 text-purple-400' :
          block.block_type.indexOf('knowledge') !== -1 ? 'bg-amber-500/20 text-amber-400' :
          block.block_type.indexOf('interview') !== -1 ? 'bg-pink-500/20 text-pink-400' :
          'bg-accent/20 text-accent-light');
 
-    // Fetch session content based on block mode
+    // Show intro card
     var mode = block.session.mode;
+    var introMessages = {
+        'review': { emoji: '🎤', title: 'Pronunciation Practice', desc: 'Listen to each phrase, then repeat it aloud.' },
+        'practice': { emoji: '🎤', title: 'Phrase Practice', desc: 'Listen and repeat. Focus on clear pronunciation.' },
+        'interview': { emoji: '💬', title: 'Interview Practice', desc: 'Answer each question in Hungarian.' },
+        'grammar': { emoji: '📖', title: 'Grammar Lesson', desc: 'Review this grammar pattern and examples.' },
+        'knowledge': { emoji: '🧠', title: 'Knowledge Quiz', desc: 'Test your knowledge of Hungarian facts and culture.' }
+    };
+    var intro = introMessages[mode] || { emoji: '📚', title: block.title, desc: 'Get ready!' };
+    var content = document.getElementById('sessionContent');
+    var controls = document.getElementById('sessionControls');
+    content.textContent = '';
+    controls.textContent = '';
+    var introEl = document.createElement('div');
+    introEl.className = 'text-center';
+    introEl.style.animation = 'fadeIn 0.3s ease-out';
+    var emojiEl = document.createElement('div');
+    emojiEl.className = 'text-4xl mb-3';
+    emojiEl.textContent = intro.emoji;
+    var titleEl = document.createElement('h2');
+    titleEl.className = 'text-xl font-bold text-white mb-1';
+    titleEl.textContent = intro.title;
+    var descEl = document.createElement('p');
+    descEl.className = 'text-sm text-slate-400';
+    descEl.textContent = intro.desc;
+    introEl.appendChild(emojiEl);
+    introEl.appendChild(titleEl);
+    introEl.appendChild(descEl);
+    content.appendChild(introEl);
+
+    // Fetch session content based on block mode
     var limit = block.session.limit || 10;
 
     if (mode === 'review' || mode === 'practice' || mode === 'interview') {
@@ -3534,13 +3564,13 @@ function startSessionBlock(block, blockIdx) {
                 // Fallback to random
                 sessionSteps = [{ type: 'audio', q: targetQ, a: targetA, a_hu: targetAH, category: 'General', mode: modeParam }];
             }
-            renderSessionStep();
+            setTimeout(renderSessionStep, 1800);
         });
     } else if (mode === 'grammar') {
         // Load grammar pattern + generate quiz
         var patternId = block.session.pattern_id;
         sessionSteps = [{ type: 'grammar_teach', pattern_id: patternId }];
-        renderSessionStep();
+        setTimeout(renderSessionStep, 1800);
     } else if (mode === 'knowledge') {
         var kcCategory = block.session.category || '';
         fetch('?who=' + who + '&ajax=1&action=knowledge_cards&kccat=' + kcCategory)
@@ -3550,7 +3580,7 @@ function startSessionBlock(block, blockIdx) {
                 sessionSteps = shuffled.map(function(c) {
                     return { type: 'knowledge', title_hu: c.title_hu, title_en: c.title_en, content_hu: c.content_hu, content_en: c.content_en, key_fact: c.key_fact, category: c.category, id: c.id };
                 });
-                renderSessionStep();
+                setTimeout(renderSessionStep, 1800);
             });
     }
 }
