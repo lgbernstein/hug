@@ -1647,7 +1647,7 @@ function startVolume() {
                 lastRecordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 // Enable grid Hear Me button
                 var ghm = document.getElementById('gridHearMe');
-                if (ghm) { ghm.disabled = false; ghm.style.opacity = '1'; }
+                if (ghm) { ghm.disabled = false; }
                 if (showPlaybackWhenReady) {
                     showPlaybackWhenReady = false;
                     var pb = document.getElementById('playbackBtn');
@@ -1683,6 +1683,7 @@ function playMyVoice() {
 // ── Voice synthesis (ElevenLabs with Web Speech API fallback) ─────────
 var huVoice = null;
 var ttsCache = {}; // Cache audio blobs by text to avoid repeat API calls
+var currentTtsAudio = null; // Track current playing audio to prevent echo
 function loadVoices() {
     var voices = window.speechSynthesis.getVoices();
     var huVoices = voices.filter(function(v) { return v.lang === 'hu-HU' || v.lang.startsWith('hu'); });
@@ -1696,11 +1697,14 @@ loadVoices();
 // ElevenLabs TTS — returns a promise that resolves when audio finishes playing
 function elevenSpeak(text, onEnd) {
     if (!text) return;
+    // Stop any currently playing audio to prevent echo
+    if (currentTtsAudio) { currentTtsAudio.pause(); currentTtsAudio.currentTime = 0; currentTtsAudio = null; }
     window.speechSynthesis.cancel();
     // Check cache first
     if (ttsCache[text]) {
         var a = new Audio(ttsCache[text]);
-        if (onEnd) a.onended = onEnd;
+        currentTtsAudio = a;
+        if (onEnd) a.onended = function() { currentTtsAudio = null; onEnd(); };
         a.play();
         return;
     }
@@ -1713,10 +1717,10 @@ function elevenSpeak(text, onEnd) {
                 var url = 'data:audio/mpeg;base64,' + data.audio;
                 ttsCache[text] = url;
                 var a = new Audio(url);
-                if (onEnd) a.onended = onEnd;
+                currentTtsAudio = a;
+                if (onEnd) a.onended = function() { currentTtsAudio = null; onEnd(); };
                 a.play();
             } else {
-                // Fallback to Web Speech API
                 webSpeechFallback(text, 1.0, onEnd);
             }
         })
@@ -2189,7 +2193,7 @@ function processSpeechResult() {
 
             // Enable Hear Me button
             var ghm = document.getElementById('gridHearMe');
-            if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.style.opacity = '1'; }
+            if (ghm && lastRecordingBlob) { ghm.disabled = false; }
 
             // Hands-free auto-flow — no clicking needed
             if (activeSession) {
@@ -3668,16 +3672,12 @@ function renderAudioStep(step, content, controls) {
     var transRow = document.createElement('div');
     transRow.className = 'flex items-center gap-1.5 justify-center mb-3';
     var transText = document.createElement('span');
-    transText.className = 'text-slate-500 text-sm italic';
+    transText.id = 'sessionTranslation';
+    transText.className = 'text-sky-300 text-sm italic';
     transText.textContent = step.a;
     transText.style.cssText = 'filter:blur(5px);cursor:pointer;transition:filter 0.2s';
-    var transToggle = document.createElement('button');
-    transToggle.className = 'btn-ghost text-[10px] px-2 py-1';
-    transToggle.textContent = 'EN';
-    var tv = false;
-    function tt() { tv = !tv; transText.style.filter = tv ? 'none' : 'blur(5px)'; }
-    transText.onclick = tt; transToggle.onclick = tt;
-    transRow.appendChild(transText); transRow.appendChild(transToggle);
+    transText.onclick = function() { transText.style.filter = transText.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)'; };
+    transRow.appendChild(transText);
     content.appendChild(transRow);
 
     // Status indicator (mic dot + volume bar)
@@ -3727,10 +3727,10 @@ function renderAudioStep(step, content, controls) {
     var b1 = document.createElement('button'); b1.className = 'btn-primary'; b1.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer'; b1.onclick = doSpeak; grid.appendChild(b1);
     var b2 = document.createElement('button'); b2.className = 'btn-next'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
-    var b4 = document.createElement('button'); b4.className = 'btn-purple'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = function() { playMyVoice(); }; grid.appendChild(b4);
+    var b4 = document.createElement('button'); b4.className = 'btn-purple'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice; grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
     var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 Show English';
-    enBtn.onclick = function() { var t = document.querySelector('#sessionContent span[style*="blur"]'); if (t) { t.style.filter = t.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)'; } };
+    enBtn.onclick = function() { var t = document.getElementById('sessionTranslation'); if (t) { t.style.filter = t.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)'; } };
     grid.appendChild(enBtn);
 
     wrap.appendChild(grid); controls.appendChild(wrap);
