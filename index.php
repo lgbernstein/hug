@@ -1772,7 +1772,7 @@ select option { background: #4a525a; color: #e8e6df; }
         <div class="flex items-center gap-1.5">
             <button onclick="showProgressSub('calendar')" id="progSub-calendar" class="pill pill-active">Calendar</button>
             <button onclick="showProgressSub('dashboard')" id="progSub-dashboard" class="pill pill-inactive">Dashboard</button>
-            <button onclick="showProgressSub('phrases')" id="progSub-phrases" class="pill pill-inactive">Phrases</button>
+            <div style="display:none"><button id="progSub-phrases"></button></div>
         </div>
 
         <!-- Calendar -->
