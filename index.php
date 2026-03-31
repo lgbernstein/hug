@@ -1397,6 +1397,9 @@ select option { background: #4a525a; color: #e8e6df; }
             <div class="space-y-4">
                 <!-- Deck picker (shown when no deck active) -->
                 <div id="fcDeckPicker">
+                    <button onclick="launchSuffixQuiz()" class="w-full py-3.5 mb-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-base font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/30">
+                        Suffix Quiz — Conjugations, Cases &amp; Possessives
+                    </button>
                     <h2 class="text-lg font-bold text-white mb-1">Grammar Flashcards</h2>
                     <p class="text-xs text-slate-400 mb-4">Tap a deck to start drilling. Flip cards to check yourself.</p>
                     <div id="fcDeckGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
