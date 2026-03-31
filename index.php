@@ -2406,7 +2406,13 @@ function searchPhrases() {
     loadPhrases(q);
 }
 
+var allPhrasesData = [];
+var phrasesShown = 0;
+var PHRASES_PAGE = 50;
+
 function renderPhrases(data) {
+    allPhrasesData = data;
+    phrasesShown = 0;
     var list = document.getElementById('browseList');
     document.getElementById('browseCount').textContent = data.length + ' phrases';
     list.textContent = '';
@@ -2417,37 +2423,58 @@ function renderPhrases(data) {
         list.appendChild(empty);
         return;
     }
-    data.forEach(function(p) {
-        var mastery = p.pass_count >= 3 ? 'mastered' : p.pass_count >= 1 ? 'known' : p.fail_count > 0 ? 'learning' : 'new';
-        var item = document.createElement('div');
-        item.className = 'phrase-item';
-        item.addEventListener('click', function() { jumpToPhrase(p.q, p.a); });
+    showMorePhrases();
+}
 
-        var textDiv = document.createElement('div');
-        textDiv.className = 'flex-1 min-w-0';
-        var qLine = document.createElement('p');
-        qLine.className = 'text-sm font-medium text-white truncate';
-        qLine.textContent = p.q;
-        var aLine = document.createElement('p');
-        aLine.className = 'text-xs text-slate-500 truncate';
-        aLine.textContent = p.a;
-        textDiv.appendChild(qLine);
-        textDiv.appendChild(aLine);
+function showMorePhrases() {
+    var list = document.getElementById('browseList');
+    var oldBtn = document.getElementById('showMoreBtn');
+    if (oldBtn) oldBtn.remove();
+    var end = Math.min(phrasesShown + PHRASES_PAGE, allPhrasesData.length);
+    for (var i = phrasesShown; i < end; i++) {
+        list.appendChild(buildPhraseItem(allPhrasesData[i]));
+    }
+    phrasesShown = end;
+    if (phrasesShown < allPhrasesData.length) {
+        var btn = document.createElement('button');
+        btn.id = 'showMoreBtn';
+        btn.className = 'w-full py-3 mt-2 rounded-xl bg-surface-100 border border-white/5 text-xs font-semibold text-slate-400 hover:text-white hover:border-accent/30 transition-all';
+        btn.textContent = 'Show more (' + (allPhrasesData.length - phrasesShown) + ' remaining)';
+        btn.onclick = showMorePhrases;
+        list.appendChild(btn);
+    }
+}
 
-        var metaDiv = document.createElement('div');
-        metaDiv.className = 'flex items-center gap-2 ml-3';
-        var catSpan = document.createElement('span');
-        catSpan.className = 'text-[10px] text-slate-600';
-        catSpan.textContent = p.category;
-        var dot = document.createElement('div');
-        dot.className = 'w-2 h-2 rounded-full mastery-' + mastery;
-        metaDiv.appendChild(catSpan);
-        metaDiv.appendChild(dot);
+function buildPhraseItem(p) {
+    var mastery = p.pass_count >= 3 ? 'mastered' : p.pass_count >= 1 ? 'known' : p.fail_count > 0 ? 'learning' : 'new';
+    var item = document.createElement('div');
+    item.className = 'phrase-item';
+    item.addEventListener('click', function() { jumpToPhrase(p.q, p.a); });
 
-        item.appendChild(textDiv);
-        item.appendChild(metaDiv);
-        list.appendChild(item);
-    });
+    var textDiv = document.createElement('div');
+    textDiv.className = 'flex-1 min-w-0';
+    var qLine = document.createElement('p');
+    qLine.className = 'text-sm font-medium text-white truncate';
+    qLine.textContent = p.q;
+    var aLine = document.createElement('p');
+    aLine.className = 'text-xs text-slate-500 truncate';
+    aLine.textContent = p.a;
+    textDiv.appendChild(qLine);
+    textDiv.appendChild(aLine);
+
+    var metaDiv = document.createElement('div');
+    metaDiv.className = 'flex items-center gap-2 ml-3';
+    var catSpan = document.createElement('span');
+    catSpan.className = 'text-[10px] text-slate-600';
+    catSpan.textContent = p.category;
+    var dot = document.createElement('div');
+    dot.className = 'w-2 h-2 rounded-full mastery-' + mastery;
+    metaDiv.appendChild(catSpan);
+    metaDiv.appendChild(dot);
+
+    item.appendChild(textDiv);
+    item.appendChild(metaDiv);
+    return item;
 }
 
 function jumpToPhrase(q, a) {
@@ -3170,11 +3197,32 @@ function searchStudyPhrases() {
         .then(function(r) { return r.json(); })
         .then(function(data) { renderStudyPhrases(data); });
 }
+var studyPhrasesData = [];
+var studyPhrasesShown = 0;
+
 function renderStudyPhrases(data) {
+    studyPhrasesData = data;
+    studyPhrasesShown = 0;
     var list = document.getElementById('studyBrowseList');
     document.getElementById('studyBrowseCount').textContent = data.length + ' phrases';
     list.textContent = '';
-    data.forEach(function(p) {
+    if (!data.length) {
+        var empty = document.createElement('p');
+        empty.className = 'text-slate-500 text-sm text-center py-8';
+        empty.textContent = 'No phrases found.';
+        list.appendChild(empty);
+        return;
+    }
+    showMoreStudyPhrases();
+}
+
+function showMoreStudyPhrases() {
+    var list = document.getElementById('studyBrowseList');
+    var oldBtn = document.getElementById('showMoreStudyBtn');
+    if (oldBtn) oldBtn.remove();
+    var end = Math.min(studyPhrasesShown + PHRASES_PAGE, studyPhrasesData.length);
+    for (var i = studyPhrasesShown; i < end; i++) {
+        var p = studyPhrasesData[i];
         var mastery = p.pass_count >= 3 ? 'mastered' : p.pass_count >= 1 ? 'known' : p.fail_count > 0 ? 'learning' : 'new';
         var item = document.createElement('div');
         item.className = 'phrase-item';
@@ -3193,7 +3241,16 @@ function renderStudyPhrases(data) {
         item.appendChild(textDiv);
         item.appendChild(dot);
         list.appendChild(item);
-    });
+    }
+    studyPhrasesShown = end;
+    if (studyPhrasesShown < studyPhrasesData.length) {
+        var btn = document.createElement('button');
+        btn.id = 'showMoreStudyBtn';
+        btn.className = 'w-full py-3 mt-2 rounded-xl bg-surface-100 border border-white/5 text-xs font-semibold text-slate-400 hover:text-white hover:border-accent/30 transition-all';
+        btn.textContent = 'Show more (' + (studyPhrasesData.length - studyPhrasesShown) + ' remaining)';
+        btn.onclick = showMoreStudyPhrases;
+        list.appendChild(btn);
+    }
 }
 
 // ── Daily Plan Engine ────────────────────────────────────────────────
