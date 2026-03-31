@@ -906,7 +906,7 @@ body { background: #111827; color: #f1f5f9; overflow-x: hidden; }
 .phrase-item { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; transition: all 0.2s; cursor: pointer; border: 1px solid transparent; }
 .phrase-item:hover { background: rgba(255,255,255,0.04); border-color: rgba(99,102,241,0.15); }
 .mastery-new { background: #475569; }
-.mastery-learning { background: #eab308; }
+.mastery-learning { background: #14b8a6; }
 .mastery-known { background: #3b82f6; }
 .mastery-mastered { background: #22c55e; }
 /* Question text */
@@ -952,7 +952,7 @@ select option { background: #1a2236; color: #f1f5f9; }
             </div>
             <div class="w-px bg-slate-700/50"></div>
             <div>
-                <div id="summaryStreak" class="text-3xl font-black text-amber-400">0</div>
+                <div id="summaryStreak" class="text-3xl font-black text-teal-400">0</div>
                 <div class="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Best Streak</div>
             </div>
         </div>
@@ -1065,8 +1065,8 @@ select option { background: #1a2236; color: #f1f5f9; }
         </div>
         <div class="flex items-center gap-2">
             <div class="glass rounded-xl px-3 py-2 flex items-center gap-1.5">
-                <i data-lucide="flame" class="w-4 h-4 text-amber-400"></i>
-                <span id="planStreak" class="text-sm font-black text-amber-400">0</span>
+                <i data-lucide="flame" class="w-4 h-4 text-teal-400"></i>
+                <span id="planStreak" class="text-sm font-black text-teal-400">0</span>
             </div>
             <div class="glass rounded-xl px-3 py-2 flex items-center gap-1.5">
                 <i data-lucide="clock" class="w-4 h-4 text-accent-light"></i>
@@ -1134,7 +1134,7 @@ select option { background: #1a2236; color: #f1f5f9; }
             <div class="flex justify-center gap-6 mb-4">
                 <div><div id="summaryScore" class="text-2xl font-black text-green-400">0%</div><div class="text-[10px] text-slate-500 uppercase">Score</div></div>
                 <div><div id="summaryItems" class="text-2xl font-black text-accent-light">0</div><div class="text-[10px] text-slate-500 uppercase">Items</div></div>
-                <div><div id="summaryTime" class="text-2xl font-black text-amber-400">0m</div><div class="text-[10px] text-slate-500 uppercase">Time</div></div>
+                <div><div id="summaryTime" class="text-2xl font-black text-teal-400">0m</div><div class="text-[10px] text-slate-500 uppercase">Time</div></div>
             </div>
             <button onclick="closeSessionSummary()" class="w-full py-3 bg-accent hover:bg-accent-dark rounded-xl text-sm font-bold text-white transition-all">
                 Back to Plan
@@ -1145,7 +1145,7 @@ select option { background: #1a2236; color: #f1f5f9; }
     <!-- Quick actions -->
     <div class="flex items-center gap-2">
         <button onclick="quickReview()" class="flex-1 flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 transition-all">
-            <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+            <i data-lucide="zap" class="w-4 h-4 text-teal-400"></i>
             <div><span class="text-xs font-semibold text-white block">Quick Review</span><span class="text-[10px] text-slate-500">5 due phrases</span></div>
         </button>
         <button onclick="switchItUp()" class="flex-1 flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 transition-all">
@@ -1201,7 +1201,7 @@ select option { background: #1a2236; color: #f1f5f9; }
         <div>
             <div class="flex items-center justify-between mb-3">
                 <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                    <i data-lucide="lightbulb" class="w-4 h-4 text-yellow-400"></i> Work On These
+                    <i data-lucide="lightbulb" class="w-4 h-4 text-sky-400"></i> Work On These
                 </h2>
                 <button onclick="toggleAllGrammar()" id="showAllGrammarBtn" class="text-[11px] text-slate-500 hover:text-white transition-colors">See all ▸</button>
             </div>
@@ -1230,7 +1230,7 @@ select option { background: #1a2236; color: #f1f5f9; }
             <div class="glass rounded-2xl overflow-hidden border border-accent/20">
                 <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-accent/5">
                     <h2 id="lessonTitle" class="text-base font-bold flex items-center gap-2">
-                        <i data-lucide="sparkles" class="w-4 h-4 text-yellow-400"></i> <span></span>
+                        <i data-lucide="sparkles" class="w-4 h-4 text-sky-400"></i> <span></span>
                     </h2>
                     <button onclick="closeLesson()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
                         <i data-lucide="x" class="w-4 h-4"></i>
@@ -1247,7 +1247,7 @@ select option { background: #1a2236; color: #f1f5f9; }
             <div class="glass rounded-2xl overflow-hidden border border-accent/20">
                 <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-accent/5">
                     <h2 id="knowledgeLessonTitle" class="text-base font-bold flex items-center gap-2">
-                        <i data-lucide="sparkles" class="w-4 h-4 text-yellow-400"></i> <span></span>
+                        <i data-lucide="sparkles" class="w-4 h-4 text-sky-400"></i> <span></span>
                     </h2>
                     <button onclick="closeKnowledgeLesson()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
                         <i data-lucide="x" class="w-4 h-4"></i>
@@ -1476,7 +1476,7 @@ var historyIndex = 0;
 
 // 1=Beginner, 2=Forgiving, 3=Interview standard, 4=Tough interviewer, 5=Exam board
 var strictLabels = { 1: 'Beginner', 2: 'Forgiving', 3: 'Interview', 4: 'Tough', 5: 'Exam' };
-var strictColors = { 1: 'text-green-400', 2: 'text-blue-400', 3: 'text-accent-light', 4: 'text-amber-400', 5: 'text-red-400' };
+var strictColors = { 1: 'text-green-400', 2: 'text-blue-400', 3: 'text-accent-light', 4: 'text-teal-400', 5: 'text-red-400' };
 
 function initStrictSlider() {
     // Sync both header and hidden session sliders
@@ -1501,13 +1501,13 @@ function initSessionToolbar() {
     bar.textContent = '';
     [0.5, 0.7, 0.8, 1.0].forEach(function(s) {
         var pill = document.createElement('button');
-        pill.className = 'speed-btn px-1 py-0.5 rounded text-[8px] font-bold transition-all ' + (currentSpeed === s ? 'bg-amber-500 text-white' : 'text-slate-500 hover:text-white');
+        pill.className = 'speed-btn px-1 py-0.5 rounded text-[8px] font-bold transition-all ' + (currentSpeed === s ? 'bg-teal-500 text-white' : 'text-slate-500 hover:text-white');
         pill.textContent = s === 1.0 ? '1x' : s.toFixed(1);
         pill.onclick = function() {
             setSpeed(s);
             bar.querySelectorAll('button').forEach(function(p) {
                 var ps = parseFloat(p.textContent);
-                p.className = 'speed-btn px-1 py-0.5 rounded text-[8px] font-bold transition-all ' + (ps === s ? 'bg-amber-500 text-white' : 'text-slate-500 hover:text-white');
+                p.className = 'speed-btn px-1 py-0.5 rounded text-[8px] font-bold transition-all ' + (ps === s ? 'bg-teal-500 text-white' : 'text-slate-500 hover:text-white');
             });
         };
         bar.appendChild(pill);
@@ -2253,7 +2253,7 @@ recognition.onresult = function(event) {
         .catch(function() {
             scoreDisplay.textContent = '';
             var errBadge = document.createElement('span');
-            errBadge.className = 'inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider';
+            errBadge.className = 'inline-flex items-center gap-1.5 bg-teal-500/15 text-teal-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider';
             errBadge.textContent = 'Error';
             scoreDisplay.appendChild(errBadge);
         });
@@ -2332,10 +2332,10 @@ function applyPhoneticState() {
     var btn = document.getElementById('phoneticBtn');
     var el = document.getElementById('phoneticHint');
     if (phoneticOn) {
-        btn.classList.add('text-amber-400');
+        btn.classList.add('text-teal-400');
         btn.classList.remove('text-slate-500', 'text-slate-200');
     } else {
-        btn.classList.remove('text-amber-400');
+        btn.classList.remove('text-teal-400');
         btn.classList.add('text-slate-200');
         el.classList.add('hidden');
     }
@@ -2787,14 +2787,14 @@ function renderScenarios(scenarios) {
         var barTrack = document.createElement('div');
         barTrack.className = 'h-1.5 bg-surface-50 rounded-full overflow-hidden';
         var barFill = document.createElement('div');
-        barFill.className = 'h-full rounded-full transition-all ' + (s.pct >= 80 ? 'bg-green-500' : s.pct >= 40 ? 'bg-amber-500' : 'bg-accent');
+        barFill.className = 'h-full rounded-full transition-all ' + (s.pct >= 80 ? 'bg-green-500' : s.pct >= 40 ? 'bg-teal-500' : 'bg-accent');
         barFill.style.width = s.pct + '%';
         barTrack.appendChild(barFill);
         barWrap.appendChild(barTrack);
         var stats = document.createElement('div');
         stats.className = 'flex items-center justify-between mt-1';
         var pctLabel = document.createElement('span');
-        pctLabel.className = 'text-[9px] font-bold ' + (s.pct >= 80 ? 'text-green-400' : s.pct >= 40 ? 'text-amber-400' : 'text-accent-light');
+        pctLabel.className = 'text-[9px] font-bold ' + (s.pct >= 80 ? 'text-green-400' : s.pct >= 40 ? 'text-teal-400' : 'text-accent-light');
         pctLabel.textContent = s.pct + '% mastered';
         var countLabel = document.createElement('span');
         countLabel.className = 'text-[9px] text-slate-600';
@@ -2984,7 +2984,7 @@ function renderQuizStep() {
     speedBar.appendChild(speedLabel);
     [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].forEach(function(s) {
         var pill = document.createElement('button');
-        pill.className = 'px-2 py-0.5 rounded text-[10px] font-bold transition-all ' + (currentSpeed === s ? 'bg-amber-500 text-white' : 'bg-surface-50 text-slate-400 hover:text-white');
+        pill.className = 'px-2 py-0.5 rounded text-[10px] font-bold transition-all ' + (currentSpeed === s ? 'bg-teal-500 text-white' : 'bg-surface-50 text-slate-400 hover:text-white');
         pill.textContent = s === 1.0 ? '1.0' : s.toFixed(1);
         pill.onclick = function(e) { e.stopPropagation(); setSpeed(s); updateSpeedBar(speedBar); };
         speedBar.appendChild(pill);
@@ -3058,7 +3058,7 @@ function renderQuizStep() {
 
     // Breakdown button
     var breakdownBtn = document.createElement('button');
-    breakdownBtn.className = 'w-full py-2 rounded-xl bg-yellow-400/10 border border-yellow-400/15 text-xs font-bold text-yellow-300 hover:bg-yellow-400/20 transition-all';
+    breakdownBtn.className = 'w-full py-2 rounded-xl bg-sky-500/10 border border-sky-400/15 text-xs font-bold text-sky-300 hover:bg-sky-500/15 transition-all';
     breakdownBtn.textContent = '📖 Break it down — explain grammar & suffixes';
     breakdownBtn.onclick = function(e) {
         e.stopPropagation();
@@ -3115,7 +3115,7 @@ function updateSpeedBar(bar) {
     var pills = bar.querySelectorAll('button');
     pills.forEach(function(p) {
         var s = parseFloat(p.textContent);
-        if (s === currentSpeed) { p.className = 'px-2 py-0.5 rounded text-[10px] font-bold transition-all bg-amber-500 text-white'; }
+        if (s === currentSpeed) { p.className = 'px-2 py-0.5 rounded text-[10px] font-bold transition-all bg-teal-500 text-white'; }
         else { p.className = 'px-2 py-0.5 rounded text-[10px] font-bold transition-all bg-surface-50 text-slate-400 hover:text-white'; }
     });
 }
@@ -3139,7 +3139,7 @@ function renderBreakdown(data, container) {
         drawer.style.background = document.body.classList.contains('light') ? '#fff' : '#0f172a';
         drawer.style.borderLeft = '1px solid rgba(99,102,241,0.15)';
         drawer.style.transform = 'translateX(100%)';
-        drawer.style.transition = 'transform 0.15s ease-out';
+        drawer.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
         overlay.appendChild(drawer);
 
         // Tap backdrop to close
@@ -3166,7 +3166,7 @@ function renderBreakdown(data, container) {
             var line1 = document.createElement('div');
             line1.className = 'flex items-baseline gap-1.5';
             var hu = document.createElement('span');
-            hu.className = 'text-sm font-bold text-yellow-300';
+            hu.className = 'text-sm font-bold text-sky-300';
             hu.textContent = w.word;
             line1.appendChild(hu);
             if (w.base && w.base !== w.word) {
@@ -3182,7 +3182,7 @@ function renderBreakdown(data, container) {
             row.appendChild(line1);
             if (w.suffixes && w.suffixes !== 'none' && w.suffixes !== 'N/A') {
                 var suf = document.createElement('div');
-                suf.className = 'text-[10px] text-amber-300/80 mt-0.5';
+                suf.className = 'text-[10px] text-sky-300/80 mt-0.5';
                 suf.textContent = w.suffixes;
                 row.appendChild(suf);
             }
@@ -3191,7 +3191,7 @@ function renderBreakdown(data, container) {
     }
     if (data.tip) {
         var tip = document.createElement('p');
-        tip.className = 'text-[11px] text-yellow-200/70 mt-3 italic';
+        tip.className = 'text-[11px] text-sky-200/70 mt-3 italic';
         tip.textContent = '💡 ' + data.tip;
         drawer.appendChild(tip);
     }
@@ -3235,7 +3235,7 @@ function renderDrillSummary() {
     var pct = scenarioDrillTotal > 0 ? Math.round((scenarioDrillPass / scenarioDrillTotal) * 100) : 0;
 
     var icon = document.createElement('div');
-    icon.className = 'w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 ' + (pct >= 70 ? 'bg-green-500/20' : 'bg-amber-500/20');
+    icon.className = 'w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 ' + (pct >= 70 ? 'bg-green-500/20' : 'bg-teal-500/15');
     icon.textContent = pct >= 70 ? '🎉' : '💪';
     icon.style.fontSize = '24px';
     content.appendChild(icon);
@@ -3407,7 +3407,7 @@ function renderDailyPlan(data) {
         'phrase_review': 'border-blue-500/20 bg-blue-500/5',
         'grammar_lesson': 'border-purple-500/20 bg-purple-500/5',
         'interview_sim': 'border-pink-500/20 bg-pink-500/5',
-        'knowledge_review': 'border-amber-500/20 bg-amber-500/5',
+        'knowledge_review': 'border-amber-500/20 bg-teal-500/5',
         'phrase_practice': 'border-green-500/20 bg-green-500/5',
         'free_practice': 'border-accent/20 bg-accent/5',
         'break': 'border-slate-500/20 bg-slate-500/5'
@@ -3416,7 +3416,7 @@ function renderDailyPlan(data) {
         'phrase_review': 'bg-blue-500/20 text-blue-400',
         'grammar_lesson': 'bg-purple-500/20 text-purple-400',
         'interview_sim': 'bg-pink-500/20 text-pink-400',
-        'knowledge_review': 'bg-amber-500/20 text-amber-400',
+        'knowledge_review': 'bg-teal-500/15 text-teal-400',
         'phrase_practice': 'bg-green-500/20 text-green-400',
         'free_practice': 'bg-accent/20 text-accent-light',
         'break': 'bg-slate-500/20 text-slate-400'
@@ -3522,7 +3522,7 @@ function startSessionBlock(block, blockIdx) {
     badge.textContent = block.title;
     badge.className = 'text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ' +
         (block.block_type.indexOf('grammar') !== -1 ? 'bg-purple-500/20 text-purple-400' :
-         block.block_type.indexOf('knowledge') !== -1 ? 'bg-amber-500/20 text-amber-400' :
+         block.block_type.indexOf('knowledge') !== -1 ? 'bg-teal-500/15 text-teal-400' :
          block.block_type.indexOf('interview') !== -1 ? 'bg-pink-500/20 text-pink-400' :
          'bg-accent/20 text-accent-light');
 
@@ -3696,7 +3696,7 @@ function renderAudioStep(step, content, controls) {
     var b2 = document.createElement('button'); b2.className = 'btn-secondary col-span-2'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
     var b3 = document.createElement('button'); b3.className = 'btn-secondary'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
     var b4 = document.createElement('button'); b4.className = 'btn-secondary'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.style.opacity = '0.35'; b4.onclick = function() { playMyVoice(); }; grid.appendChild(b4);
-    var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-ghost col-span-2 text-yellow-400'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
+    var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-ghost col-span-2 text-sky-400'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
 
     wrap.appendChild(grid); controls.appendChild(wrap);
 
@@ -3866,7 +3866,7 @@ function renderGrammarTeachStep(step, content, controls) {
             lessonEl.appendChild(expl);
             if (data.tip) {
                 var tip = document.createElement('p');
-                tip.className = 'text-xs text-yellow-200 bg-yellow-400/5 rounded-lg p-3 border border-yellow-400/15';
+                tip.className = 'text-xs text-sky-200 bg-sky-500/5 rounded-lg p-3 border border-sky-400/15';
                 tip.textContent = '💡 ' + data.tip;
                 lessonEl.appendChild(tip);
             }
@@ -4277,9 +4277,9 @@ function renderLesson(data, pattern) {
 
     // Tip
     if (data.tip) {
-        html += '<div class="bg-yellow-400/5 rounded-xl p-4 border border-yellow-400/15 flex items-start gap-3">';
-        html += '<i data-lucide="lightbulb" class="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5"></i>';
-        html += '<p class="text-sm text-yellow-200">' + escHtml(data.tip) + '</p>';
+        html += '<div class="bg-sky-500/5 rounded-xl p-4 border border-sky-400/15 flex items-start gap-3">';
+        html += '<i data-lucide="lightbulb" class="w-5 h-5 text-sky-400 flex-shrink-0 mt-0.5"></i>';
+        html += '<p class="text-sm text-sky-200">' + escHtml(data.tip) + '</p>';
         html += '</div>';
     }
 
@@ -4424,7 +4424,7 @@ function renderKnowledgeCards(cards) {
         list.appendChild(empty);
         return;
     }
-    var catColors = { history: 'border-amber-500/20 text-amber-400', geography: 'border-blue-500/20 text-blue-400', family: 'border-pink-500/20 text-pink-400', culture: 'border-purple-500/20 text-purple-400' };
+    var catColors = { history: 'border-amber-500/20 text-teal-400', geography: 'border-blue-500/20 text-blue-400', family: 'border-pink-500/20 text-pink-400', culture: 'border-purple-500/20 text-purple-400' };
     cards.forEach(function(c) {
         var tile = document.createElement('button');
         tile.className = 'grammar-card text-left flex flex-col gap-1 p-3 active:scale-95 cursor-pointer relative ' + (catColors[c.category] || '');
@@ -4510,7 +4510,7 @@ function renderKnowledgeLesson(data) {
     var html = '';
     html += '<div class="bg-surface-50 rounded-xl p-4 border border-white/5"><p class="text-sm text-slate-200 leading-relaxed">' + escHtml(data.lesson) + '</p></div>';
     if (data.tip) {
-        html += '<div class="bg-yellow-400/5 rounded-xl p-4 border border-yellow-400/15 flex items-start gap-3"><p class="text-sm text-yellow-200">' + escHtml(data.tip) + '</p></div>';
+        html += '<div class="bg-sky-500/5 rounded-xl p-4 border border-sky-400/15 flex items-start gap-3"><p class="text-sm text-sky-200">' + escHtml(data.tip) + '</p></div>';
     }
     if (data.key_facts && data.key_facts.length) {
         html += '<div><h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Key Facts</h3><div class="space-y-2">';
