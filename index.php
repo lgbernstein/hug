@@ -4055,58 +4055,58 @@ function renderDailyPlan(data) {
     }
 
     function getBlockColor(bt) {
-        if (bt.indexOf('mixed_') === 0) return 'border-indigo-500/20 bg-indigo-500/5';
-        if (bt.indexOf('break') === 0) return 'border-slate-500/20 bg-slate-500/5';
-        var m = { 'phrase_review': 'border-blue-500/20 bg-blue-500/5', 'grammar_lesson': 'border-purple-500/20 bg-purple-500/5',
-            'interview_sim': 'border-pink-500/20 bg-pink-500/5', 'mock_interview': 'border-pink-500/20 bg-pink-500/5',
-            'knowledge_review': 'border-amber-500/20 bg-teal-500/5',
-            'phrase_practice': 'border-green-500/20 bg-green-500/5', 'free_practice': 'border-accent/20 bg-accent/5' };
-        return m[bt] || 'border-white/5 bg-surface-100 hover:border-accent/30';
+        if (bt.indexOf('mixed_') === 0) return 'border-indigo-500/30 bg-indigo-500/10';
+        if (bt.indexOf('break') === 0) return 'border-slate-500/25 bg-slate-500/8';
+        var m = { 'phrase_review': 'border-blue-500/30 bg-blue-500/10', 'grammar_lesson': 'border-purple-500/30 bg-purple-500/10',
+            'interview_sim': 'border-pink-500/30 bg-pink-500/10', 'mock_interview': 'border-pink-500/30 bg-pink-500/10',
+            'knowledge_review': 'border-teal-500/30 bg-teal-500/10',
+            'phrase_practice': 'border-green-500/30 bg-green-500/10', 'free_practice': 'border-accent/30 bg-accent/10' };
+        return m[bt] || 'border-white/10 bg-surface-100 hover:border-accent/40';
     }
     function getBlockBadge(bt) {
-        if (bt.indexOf('mixed_') === 0) return 'bg-indigo-500/20 text-indigo-400';
-        if (bt.indexOf('break') === 0) return 'bg-slate-500/15 text-slate-400';
-        var m = { 'phrase_review': 'bg-blue-500/20 text-blue-400', 'grammar_lesson': 'bg-purple-500/20 text-purple-400',
-            'interview_sim': 'bg-pink-500/20 text-pink-400', 'mock_interview': 'bg-pink-500/20 text-pink-400',
-            'knowledge_review': 'bg-teal-500/15 text-teal-400',
-            'phrase_practice': 'bg-green-500/20 text-green-400' };
-        return m[bt] || 'bg-white/5 text-slate-400';
+        if (bt.indexOf('mixed_') === 0) return 'bg-indigo-500/25 text-indigo-300';
+        if (bt.indexOf('break') === 0) return 'bg-slate-500/20 text-slate-300';
+        var m = { 'phrase_review': 'bg-blue-500/25 text-blue-300', 'grammar_lesson': 'bg-purple-500/25 text-purple-300',
+            'interview_sim': 'bg-pink-500/25 text-pink-300', 'mock_interview': 'bg-pink-500/25 text-pink-300',
+            'knowledge_review': 'bg-teal-500/25 text-teal-300',
+            'phrase_practice': 'bg-green-500/25 text-green-300' };
+        return m[bt] || 'bg-white/10 text-slate-300';
     }
     var blockColors = {
-        'phrase_review': 'border-blue-500/20 bg-blue-500/5',
-        'grammar_lesson': 'border-purple-500/20 bg-purple-500/5',
-        'interview_sim': 'border-pink-500/20 bg-pink-500/5',
-        'knowledge_review': 'border-amber-500/20 bg-teal-500/5',
-        'phrase_practice': 'border-green-500/20 bg-green-500/5',
-        'free_practice': 'border-accent/20 bg-accent/5',
-        'break': 'border-slate-500/20 bg-slate-500/5'
+        'phrase_review': 'border-blue-500/30 bg-blue-500/10',
+        'grammar_lesson': 'border-purple-500/30 bg-purple-500/10',
+        'interview_sim': 'border-pink-500/30 bg-pink-500/10',
+        'knowledge_review': 'border-teal-500/30 bg-teal-500/10',
+        'phrase_practice': 'border-green-500/30 bg-green-500/10',
+        'free_practice': 'border-accent/30 bg-accent/10',
+        'break': 'border-slate-500/25 bg-slate-500/8'
     };
     var blockBadgeColors = {
-        'phrase_review': 'bg-blue-500/20 text-blue-400',
-        'grammar_lesson': 'bg-purple-500/20 text-purple-400',
-        'interview_sim': 'bg-pink-500/20 text-pink-400',
-        'knowledge_review': 'bg-teal-500/15 text-teal-400',
-        'phrase_practice': 'bg-green-500/20 text-green-400',
-        'free_practice': 'bg-accent/20 text-accent-light',
-        'break': 'bg-slate-500/20 text-slate-400'
+        'phrase_review': 'bg-blue-500/25 text-blue-300',
+        'grammar_lesson': 'bg-purple-500/25 text-purple-300',
+        'interview_sim': 'bg-pink-500/25 text-pink-300',
+        'knowledge_review': 'bg-teal-500/25 text-teal-300',
+        'phrase_practice': 'bg-green-500/25 text-green-300',
+        'free_practice': 'bg-accent/25 text-accent-light',
+        'break': 'bg-slate-500/20 text-slate-300'
     };
 
     data.blocks.forEach(function(block, idx) {
         var isDone = completedTypes[block.block_type];
         var tile = document.createElement('button');
-        tile.className = 'rounded-xl border p-3 transition-all flex flex-col items-center gap-1.5 text-center min-h-[80px] justify-center active:scale-95 '
+        tile.className = 'rounded-xl border p-3 transition-all flex flex-col items-center gap-2 text-center min-h-[88px] justify-center active:scale-95 hover:brightness-125 '
             + (isDone ? 'opacity-40 border-white/5 bg-surface-50' : getBlockColor(block.block_type));
 
         // Icon / emoji
         var iconWrap = document.createElement('div');
-        iconWrap.className = 'w-9 h-9 rounded-lg flex items-center justify-center ' + getBlockBadge(block.block_type);
+        iconWrap.className = 'w-10 h-10 rounded-xl flex items-center justify-center ' + getBlockBadge(block.block_type);
         if (block.emoji) {
             iconWrap.textContent = block.emoji;
-            iconWrap.className = 'w-9 h-9 rounded-lg flex items-center justify-center text-lg ' + getBlockBadge(block.block_type);
+            iconWrap.className = 'w-10 h-10 rounded-xl flex items-center justify-center text-xl ' + getBlockBadge(block.block_type);
         } else {
             var lucideIcon = document.createElement('i');
             lucideIcon.setAttribute('data-lucide', block.icon || 'circle');
-            lucideIcon.className = 'w-4 h-4';
+            lucideIcon.className = 'w-5 h-5';
             iconWrap.appendChild(lucideIcon);
         }
         tile.appendChild(iconWrap);
