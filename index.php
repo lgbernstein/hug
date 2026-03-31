@@ -1014,6 +1014,16 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
         }
 
         if (empty($items)) break;
+
+        // Minimum 5 items per block — pad from whichever pool has more
+        while (count($items) < 5 && $reviewIdx < count($reviewPool)) {
+            $items[] = $reviewPool[$reviewIdx++];
+        }
+        while (count($items) < 5 && $newIdx < count($newPool) && $newUsed < $newRemaining) {
+            $items[] = $newPool[$newIdx++];
+            $newUsed++;
+        }
+
         shuffle($items); // interleave within block
 
         // Determine block character from item types present
@@ -4280,7 +4290,7 @@ function startSessionBlock(block, blockIdx) {
             } else if (item.item_type === 'phrase') {
                 return { type: 'audio', q: item.q, a: item.a || '', a_hu: item.a_hu || '', category: item.category || '', mode: 'pronunciation' };
             } else if (item.item_type === 'grammar') {
-                return { type: 'flashcard', front: item.q, back: item.a || '', note: item.a_hu || '', item_type: 'grammar', item_id: item.item_id };
+                return { type: 'grammar_teach', pattern_id: item.item_id, pattern_name: item.q, explanation: item.a || '', suffix_words: item.a_hu || '' };
             } else if (item.item_type === 'knowledge') {
                 return { type: 'flashcard', front: item.q, back: item.a || '', note: item.a_hu || '', item_type: 'knowledge', item_id: item.item_id };
             }
@@ -4752,57 +4762,210 @@ function launchSuffixQuiz() {
 
 function renderGrammarTeachStep(step, content, controls) {
     content.textContent = '';
+
+    // Show pattern name + explanation immediately while Gemini loads
+    var patternName = step.pattern_name || '';
+    var explanation = step.explanation || '';
+    var suffixWords = step.suffix_words || '';
+
     var loading = document.createElement('div');
-    loading.className = 'flex flex-col items-center py-8 gap-3';
-    loading.innerHTML = '<div class="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div><p class="text-slate-400 text-sm">Generating grammar lesson...</p>';
+    loading.className = 'flex flex-col items-center py-6 gap-3';
+    if (patternName) {
+        var nameEl = document.createElement('h2');
+        nameEl.className = 'text-lg font-bold text-purple-300 text-center';
+        nameEl.textContent = patternName;
+        loading.appendChild(nameEl);
+    }
+    if (explanation) {
+        var explPreview = document.createElement('p');
+        explPreview.className = 'text-sm text-slate-300 text-center max-w-md';
+        explPreview.textContent = explanation;
+        loading.appendChild(explPreview);
+    }
+    if (suffixWords) {
+        var swPreview = document.createElement('p');
+        swPreview.className = 'text-xs text-slate-400 text-center italic';
+        swPreview.textContent = 'Examples: ' + suffixWords;
+        loading.appendChild(swPreview);
+    }
+    var spinWrap = document.createElement('div');
+    spinWrap.className = 'flex items-center gap-2 mt-3';
+    var spinDot = document.createElement('div');
+    spinDot.className = 'w-5 h-5 border-2 border-purple-400 border-t-transparent rounded-full animate-spin';
+    var spinText = document.createElement('span');
+    spinText.className = 'text-slate-500 text-xs';
+    spinText.textContent = 'Loading lesson...';
+    spinWrap.appendChild(spinDot);
+    spinWrap.appendChild(spinText);
+    loading.appendChild(spinWrap);
     content.appendChild(loading);
 
-    // Fetch grammar pattern details and teach
-    fetch('?ajax=1&action=grammar_patterns&search=')
-        .then(function(r) { return r.json(); })
-        .then(function(patterns) {
-            var p = patterns.find(function(pt) { return pt.id == step.pattern_id; }) || patterns[0];
-            if (!p) { content.textContent = 'No grammar patterns found.'; return; }
-            var fd = new FormData();
-            fd.append('pattern', p.pattern);
-            fd.append('suffix_words', p.suffix_words || '');
-            fd.append('explanation', p.explanation || '');
-            return fetch('?ajax=1&action=teach_me', { method: 'POST', body: fd });
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
+    // Fetch grammar pattern details and teach via Gemini
+    var teachPromise;
+    if (step.pattern_id) {
+        teachPromise = fetch('?ajax=1&action=grammar_patterns&search=')
+            .then(function(r) { return r.json(); })
+            .then(function(patterns) {
+                var p = patterns.find(function(pt) { return pt.id == step.pattern_id; }) || patterns[0];
+                if (!p) throw new Error('No grammar patterns found.');
+                var fd = new FormData();
+                fd.append('pattern', p.pattern);
+                fd.append('suffix_words', p.suffix_words || '');
+                fd.append('explanation', p.explanation || '');
+                return fetch('?ajax=1&action=teach_me', { method: 'POST', body: fd });
+            })
+            .then(function(r) { return r.json(); });
+    } else {
+        teachPromise = fetch('?ajax=1&action=grammar_patterns&search=')
+            .then(function(r) { return r.json(); })
+            .then(function(patterns) {
+                var p = patterns[0];
+                if (!p) throw new Error('No grammar patterns found.');
+                var fd = new FormData();
+                fd.append('pattern', p.pattern);
+                fd.append('suffix_words', p.suffix_words || '');
+                fd.append('explanation', p.explanation || '');
+                return fetch('?ajax=1&action=teach_me', { method: 'POST', body: fd });
+            })
+            .then(function(r) { return r.json(); });
+    }
+
+    teachPromise.then(function(data) {
             if (data.error) { content.textContent = data.error; return; }
             content.textContent = '';
+
+            // Pattern title
+            if (patternName) {
+                var titleEl = document.createElement('h2');
+                titleEl.className = 'text-lg font-bold text-purple-300 text-center mb-3';
+                titleEl.textContent = patternName;
+                content.appendChild(titleEl);
+            }
+
             // Render lesson content
             var lessonEl = document.createElement('div');
-            lessonEl.className = 'text-left space-y-4 w-full';
-            var expl = document.createElement('p');
-            expl.className = 'text-sm text-slate-200 leading-relaxed';
-            expl.textContent = data.lesson;
-            lessonEl.appendChild(expl);
+            lessonEl.className = 'text-left space-y-3 w-full';
+
+            var lessonText = data.lesson || '';
+            var paragraphs = lessonText.split('\n').filter(function(p) { return p.trim(); });
+            paragraphs.forEach(function(para) {
+                var pEl = document.createElement('p');
+                pEl.className = 'text-sm text-slate-200 leading-relaxed';
+                pEl.textContent = para;
+                lessonEl.appendChild(pEl);
+            });
+
+            if (data.examples && data.examples.length) {
+                var exList = document.createElement('div');
+                exList.className = 'bg-slate-800/60 rounded-lg p-3 space-y-1.5 border border-slate-700/50';
+                data.examples.forEach(function(ex) {
+                    var exRow = document.createElement('div');
+                    exRow.className = 'text-sm';
+                    var huSpan = document.createElement('span');
+                    huSpan.className = 'text-white font-medium';
+                    huSpan.textContent = ex.hu || ex;
+                    exRow.appendChild(huSpan);
+                    if (ex.en) {
+                        var enSpan = document.createElement('span');
+                        enSpan.className = 'text-slate-400';
+                        enSpan.textContent = ' — ' + ex.en;
+                        exRow.appendChild(enSpan);
+                    }
+                    exList.appendChild(exRow);
+                });
+                lessonEl.appendChild(exList);
+            }
+
             if (data.tip) {
                 var tip = document.createElement('p');
                 tip.className = 'text-xs text-sky-200 bg-sky-500/5 rounded-lg p-3 border border-sky-400/15';
-                tip.textContent = '💡 ' + data.tip;
+                tip.textContent = data.tip;
                 lessonEl.appendChild(tip);
             }
             content.appendChild(lessonEl);
 
-            // Done button (marks as complete)
+            // Interactive quiz section
+            if (data.quiz && data.quiz.length) {
+                var quizEl = document.createElement('div');
+                quizEl.className = 'mt-4 space-y-3';
+                var quizTitle = document.createElement('div');
+                quizTitle.className = 'text-xs font-bold uppercase tracking-wider text-purple-400';
+                quizTitle.textContent = 'Quick Quiz';
+                quizEl.appendChild(quizTitle);
+                data.quiz.forEach(function(q) {
+                    var qRow = document.createElement('div');
+                    qRow.className = 'bg-slate-800/40 rounded-lg p-3 border border-slate-700/30';
+                    var prompt = document.createElement('p');
+                    prompt.className = 'text-sm text-slate-200 mb-2';
+                    prompt.textContent = q.prompt;
+                    qRow.appendChild(prompt);
+                    var answerWrap = document.createElement('div');
+                    answerWrap.className = 'flex items-center gap-2';
+                    var input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'flex-1 bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50';
+                    input.placeholder = q.hint || 'Type answer...';
+                    var checkBtn = document.createElement('button');
+                    checkBtn.className = 'px-3 py-1.5 bg-purple-600/60 hover:bg-purple-600 rounded-lg text-xs font-bold text-white transition-all';
+                    checkBtn.textContent = 'Check';
+                    var feedback = document.createElement('div');
+                    feedback.className = 'text-xs mt-1.5 hidden';
+                    checkBtn.onclick = (function(inp, fb, ans) {
+                        return function() {
+                            var userAns = inp.value.trim().toLowerCase();
+                            var correct = ans.toLowerCase();
+                            if (userAns === correct) {
+                                fb.textContent = 'Correct!';
+                                fb.className = 'text-xs mt-1.5 text-green-400';
+                                inp.className = inp.className.replace('border-slate-600/50', 'border-green-500/50');
+                            } else {
+                                fb.textContent = 'Answer: ' + ans;
+                                fb.className = 'text-xs mt-1.5 text-amber-400';
+                                inp.className = inp.className.replace('border-slate-600/50', 'border-amber-500/50');
+                            }
+                        };
+                    })(input, feedback, q.answer);
+                    input.onkeydown = (function(btn) { return function(e) { if (e.key === 'Enter') btn.click(); }; })(checkBtn);
+                    answerWrap.appendChild(input);
+                    answerWrap.appendChild(checkBtn);
+                    qRow.appendChild(answerWrap);
+                    qRow.appendChild(feedback);
+                    quizEl.appendChild(qRow);
+                });
+                content.appendChild(quizEl);
+            }
+
+            // Got It / Need Practice buttons
             controls.textContent = '';
-            var doneBtn = document.createElement('button');
-            doneBtn.className = 'w-full py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all';
-            doneBtn.textContent = 'Got It — Next';
-            doneBtn.onclick = function() {
+            var btnRow = document.createElement('div');
+            btnRow.className = 'flex gap-2';
+
+            var gotBtn = document.createElement('button');
+            gotBtn.className = 'flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all';
+            gotBtn.textContent = 'Got It — Next';
+            gotBtn.onclick = function() {
                 sessionPassCount++;
                 sessionTotalCount++;
-                recordSRSUnified(sessionBlockInfo.title, 'grammar', step.pattern_id, true);
+                recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, true);
                 sessionIdx++;
                 renderSessionStep();
             };
-            controls.appendChild(doneBtn);
+
+            var missBtn = document.createElement('button');
+            missBtn.className = 'flex-1 py-3 bg-red-600/80 hover:bg-red-600 rounded-xl text-sm font-bold text-white transition-all';
+            missBtn.textContent = 'Need Practice';
+            missBtn.onclick = function() {
+                sessionTotalCount++;
+                recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, false);
+                sessionIdx++;
+                renderSessionStep();
+            };
+
+            btnRow.appendChild(gotBtn);
+            btnRow.appendChild(missBtn);
+            controls.appendChild(btnRow);
         })
-        .catch(function(err) { content.textContent = 'Error loading lesson'; });
+        .catch(function(err) { content.textContent = 'Error loading lesson: ' + err.message; });
 }
 
 function recordSRSUnified(phrase, itemType, itemId, pass) {
