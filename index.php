@@ -2214,16 +2214,19 @@ function processSpeechResult() {
             var reader = new FileReader();
             reader.onload = function() {
                 var b64 = reader.result.split(',')[1];
-                if (b64 && b64.length < 500000) fd.append('audio', b64);
+                if (b64 && b64.length < 250000) fd.append('audio', b64);
                 resolve();
             };
             reader.onerror = function() { resolve(); };
             reader.readAsDataURL(lastRecordingBlob);
         });
     }
-    audioPromise.then(function() { return fetch('eval.php', { method: 'POST', body: fd }); })
+    var evalController = new AbortController();
+    var evalTimeout = setTimeout(function() { evalController.abort(); }, 20000);
+    audioPromise.then(function() { return fetch('eval.php', { method: 'POST', body: fd, signal: evalController.signal }); })
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            clearTimeout(evalTimeout);
             var isPass = data.pass;
             var correctAnswer = targetAH || data.correct || targetQ;
             var fb = (data.feedback || '').split(/\.\s/)[0];
@@ -2238,28 +2241,27 @@ function processSpeechResult() {
             var toast = document.createElement('div');
             toast.id = 'evalToast';
             toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;' +
-                'padding:12px 24px;border-radius:16px;max-width:500px;width:90%;text-align:center;' +
+                'padding:16px 28px;border-radius:16px;max-width:500px;width:90%;text-align:center;' +
                 'animation:fadeIn 0.2s ease-out;box-shadow:0 4px 20px rgba(0,0,0,0.4);' +
                 (isPass ? 'background:#0a2e14;border:1px solid rgba(34,197,94,0.4)' : 'background:#2e0a0a;border:1px solid rgba(239,68,68,0.4)');
 
-            // One line: badge + feedback + what was heard
-            var line = document.createElement('div');
-            line.className = 'flex items-center justify-center gap-3 flex-wrap';
-            var badge = document.createElement('span');
-            badge.className = 'font-bold text-sm ' + (isPass ? 'text-green-400' : 'text-red-400');
-            badge.textContent = isPass ? '✓' : '✗';
-            line.appendChild(badge);
+            // Badge
+            var badge = document.createElement('div');
+            badge.style.cssText = 'font-size:20px;font-weight:800;margin-bottom:4px;' + (isPass ? 'color:#4ade80' : 'color:#f87171');
+            badge.textContent = isPass ? '✓ Pass' : '✗ Try Again';
+            toast.appendChild(badge);
+            // Feedback
             if (fb) {
-                var fbSpan = document.createElement('span');
-                fbSpan.className = 'text-xs ' + (isPass ? 'text-green-300/80' : 'text-red-300/80');
-                fbSpan.textContent = fb;
-                line.appendChild(fbSpan);
+                var fbDiv = document.createElement('div');
+                fbDiv.style.cssText = 'font-size:15px;line-height:1.4;' + (isPass ? 'color:#86efac' : 'color:#fca5a5');
+                fbDiv.textContent = fb;
+                toast.appendChild(fbDiv);
             }
-            var heard = document.createElement('span');
-            heard.className = 'text-[10px] text-slate-500 italic';
-            heard.textContent = '"' + heardText + '"';
-            line.appendChild(heard);
-            toast.appendChild(line);
+            // What was heard
+            var heard = document.createElement('div');
+            heard.style.cssText = 'font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic';
+            heard.textContent = 'Heard: "' + heardText + '"';
+            toast.appendChild(heard);
             document.body.appendChild(toast);
 
             // Enable Hear Me button
