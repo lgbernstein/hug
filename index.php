@@ -5601,32 +5601,132 @@ var fcMiss = 0;
 var fcFlipped = false;
 var fcMissedPile = [];
 
+// DB phrase deck definitions — category → deck config
+var fcDbDecks = [
+    { id: 'db_interview', emoji: '🎤', title: 'Interview Phrases', cat: 'interview', desc: 'Full interview Q&A practice' },
+    { id: 'db_family', emoji: '👨‍👩‍👧‍👦', title: 'Family', cat: 'Family', desc: 'Family facts and sentences' },
+    { id: 'db_hungary', emoji: '🏛️', title: 'Hungary Knowledge', cat: 'Hungary Knowledge', desc: 'History, culture, geography' },
+    { id: 'db_daily', emoji: '☀️', title: 'Daily Routine', cat: 'Daily Routine', desc: 'Everyday activities and habits' },
+    { id: 'db_work', emoji: '💼', title: 'Work & Education', cat: 'Work & Education', desc: 'Career, studies, profession' },
+    { id: 'db_heritage', emoji: '🌳', title: 'Heritage & Ancestry', cat: 'Heritage & Ancestry', desc: 'Roots, immigration, Trianon' },
+    { id: 'db_food', emoji: '🍲', title: 'Food & Cooking', cat: 'Food & Cooking', desc: 'Hungarian food and meals' },
+    { id: 'db_travel', emoji: '✈️', title: 'Travel & Places', cat: 'Travel & Places', desc: 'Budapest, cities, trips' },
+    { id: 'db_all', emoji: '📚', title: 'All Phrases', cat: '_all', desc: 'Everything in the database — random 30' },
+];
+var fcDbCounts = {};
+
 function renderFcDecks() {
     var grid = document.getElementById('fcDeckGrid');
     grid.textContent = '';
+
+    // Section: Grammar
+    var gramLabel = document.createElement('div');
+    gramLabel.className = 'col-span-full text-xs font-bold text-slate-500 uppercase tracking-wider mt-1';
+    gramLabel.textContent = 'Grammar Patterns';
+    grid.appendChild(gramLabel);
+
     fcDecks.forEach(function(d) {
-        var tile = document.createElement('div');
-        tile.className = 'fc-deck-tile';
-        tile.onclick = function() { startFcDeck(d.id); };
-        var e1 = document.createElement('div');
-        e1.className = 'text-2xl mb-2';
-        e1.textContent = d.emoji;
-        var e2 = document.createElement('div');
-        e2.className = 'text-sm font-bold text-white mb-0.5';
-        e2.textContent = d.title;
-        var e3 = document.createElement('div');
-        e3.className = 'text-[11px] text-slate-400 line-clamp-2';
-        e3.textContent = d.desc;
-        var e4 = document.createElement('div');
-        e4.className = 'text-[10px] text-slate-500 mt-2';
-        e4.textContent = d.cards.length + ' cards';
-        tile.appendChild(e1);
-        tile.appendChild(e2);
-        tile.appendChild(e3);
-        tile.appendChild(e4);
+        grid.appendChild(makeDeckTile(d.emoji, d.title, d.desc, d.cards.length, function() { startFcDeck(d.id); }));
+    });
+
+    // Section: Phrase Bank
+    var phraseLabel = document.createElement('div');
+    phraseLabel.className = 'col-span-full text-xs font-bold text-slate-500 uppercase tracking-wider mt-4';
+    phraseLabel.textContent = 'Phrase Bank (from database)';
+    grid.appendChild(phraseLabel);
+
+    fcDbDecks.forEach(function(d) {
+        var count = fcDbCounts[d.cat] || '';
+        var tile = makeDeckTile(d.emoji, d.title, d.desc, count, function() { startDbDeck(d); });
+        tile.id = 'fcdb-' + d.id;
         grid.appendChild(tile);
     });
+
+    // Fetch counts
+    fetch('?who=' + who + '&ajax=1&action=phrases').then(function(r) { return r.json(); }).then(function(phrases) {
+        var counts = {};
+        phrases.forEach(function(p) { var c = p.category || 'Other'; counts[c] = (counts[c] || 0) + 1; });
+        counts['_all'] = phrases.length;
+        fcDbCounts = counts;
+        fcDbDecks.forEach(function(d) {
+            var el = document.getElementById('fcdb-' + d.id);
+            if (el) {
+                var countEl = el.querySelector('.fc-count');
+                if (countEl) countEl.textContent = (counts[d.cat] || 0) + ' cards';
+            }
+        });
+    });
+
     lucide.createIcons();
+}
+
+function makeDeckTile(emoji, title, desc, count, onclick) {
+    var tile = document.createElement('div');
+    tile.className = 'fc-deck-tile';
+    tile.onclick = onclick;
+    var e1 = document.createElement('div');
+    e1.className = 'text-2xl mb-2';
+    e1.textContent = emoji;
+    var e2 = document.createElement('div');
+    e2.className = 'text-sm font-bold text-white mb-0.5';
+    e2.textContent = title;
+    var e3 = document.createElement('div');
+    e3.className = 'text-[11px] text-slate-400 line-clamp-2';
+    e3.textContent = desc;
+    var e4 = document.createElement('div');
+    e4.className = 'text-[10px] text-slate-500 mt-2 fc-count';
+    e4.textContent = count ? count + ' cards' : '...';
+    tile.appendChild(e1);
+    tile.appendChild(e2);
+    tile.appendChild(e3);
+    tile.appendChild(e4);
+    return tile;
+}
+
+function startDbDeck(deckDef) {
+    document.getElementById('fcDeckPicker').classList.add('hidden');
+    document.getElementById('fcSession').classList.remove('hidden');
+    document.getElementById('fcDeckTitle').textContent = deckDef.emoji + ' ' + deckDef.title;
+    document.getElementById('fcCardArea').textContent = '';
+    var loadMsg = document.createElement('p');
+    loadMsg.className = 'text-slate-400 text-sm';
+    loadMsg.textContent = 'Loading phrases...';
+    document.getElementById('fcCardArea').appendChild(loadMsg);
+    document.getElementById('fcControls').textContent = '';
+
+    fetch('?who=' + who + '&ajax=1&action=phrases').then(function(r) { return r.json(); }).then(function(phrases) {
+        var filtered;
+        if (deckDef.cat === '_all') {
+            filtered = phrases.sort(function() { return Math.random() - 0.5; }).slice(0, 30);
+        } else {
+            filtered = phrases.filter(function(p) { return p.category === deckDef.cat; });
+            filtered = filtered.sort(function() { return Math.random() - 0.5; });
+        }
+        // Convert to flashcard format
+        var cards = filtered.map(function(p) {
+            var eng = p.a || p.a_hu || '';
+            return { front: p.q, back: eng, note: p.category || '' };
+        }).filter(function(c) { return c.front && c.back && c.front !== c.back; });
+
+        if (!cards.length) {
+            document.getElementById('fcCardArea').textContent = '';
+            var msg = document.createElement('p');
+            msg.className = 'text-slate-400 text-sm';
+            msg.textContent = 'No flashcard-ready phrases in this category (need both Hungarian and English).';
+            document.getElementById('fcCardArea').appendChild(msg);
+            return;
+        }
+
+        fcActiveDeck = { id: deckDef.id, emoji: deckDef.emoji, title: deckDef.title, cards: cards };
+        fcCards = cards;
+        fcIdx = 0;
+        fcGot = 0;
+        fcMiss = 0;
+        fcFlipped = false;
+        fcMissedPile = [];
+        renderFcCard();
+        lucide.createIcons();
+    });
 }
 
 function startFcDeck(deckId) {
