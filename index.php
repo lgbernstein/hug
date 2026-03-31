@@ -1647,7 +1647,7 @@ function startVolume() {
                 lastRecordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 // Enable grid Hear Me button
                 var ghm = document.getElementById('gridHearMe');
-                if (ghm) { ghm.disabled = false; ghm.classList.remove('is-disabled'); }
+                if (ghm) { ghm.disabled = false; ghm.style.background = '#7c3aed'; ghm.style.color = '#ffffff'; ghm.style.opacity = '1'; ghm.style.cursor = 'pointer'; }
                 if (showPlaybackWhenReady) {
                     showPlaybackWhenReady = false;
                     var pb = document.getElementById('playbackBtn');
@@ -2196,7 +2196,7 @@ function processSpeechResult() {
 
             // Enable Hear Me button
             var ghm = document.getElementById('gridHearMe');
-            if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.classList.remove('is-disabled'); }
+            if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.style.background = '#7c3aed'; ghm.style.color = '#ffffff'; ghm.style.opacity = '1'; ghm.style.cursor = 'pointer'; }
 
             // Hands-free auto-flow — no clicking needed
             if (activeSession) {
@@ -3773,7 +3773,9 @@ function renderAudioStep(step, content, controls) {
     var b1 = document.createElement('button'); b1.className = 'btn-primary'; b1.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer'; b1.onclick = doSpeak; grid.appendChild(b1);
     var b2 = document.createElement('button'); b2.className = 'btn-next'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
-    var b4 = document.createElement('button'); b4.className = 'btn-purple is-disabled'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice; grid.appendChild(b4);
+    var b4 = document.createElement('button'); b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice;
+    b4.style.cssText = 'padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:default;transition:all 0.15s;background:#5b21b6;color:#c4b5fd;opacity:0.6';
+    grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
     var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 English';
     enBtn.onclick = function() {
