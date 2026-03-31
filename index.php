@@ -479,7 +479,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
     $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
     $payload = json_encode([
         'contents' => [['parts' => [['text' => $prompt]]]],
-        'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2048, 'responseMimeType' => 'application/json']
+        'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2048]
     ]);
     $ch = curl_init($geminiUrl);
     curl_setopt_array($ch, [
@@ -490,7 +490,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
     $resp = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    if ($httpCode !== 200 || !$resp) { echo json_encode(['error' => 'Gemini API error']); exit; }
+    if ($httpCode !== 200 || !$resp) { echo json_encode(['error' => 'Gemini API error', 'http_code' => $httpCode]); exit; }
     $data = json_decode($resp, true);
     $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
     $text = preg_replace('/^```json\s*/i', '', $text);
