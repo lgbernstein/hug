@@ -116,19 +116,36 @@ if ($mode === 'interview') {
             . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"short feedback","correct":"the exact target phrase","pronunciation_poor":true/false}';
 }
 
+// Build payload — include audio if provided for direct pronunciation eval
+$audioData = $_POST['audio'] ?? '';
+$parts = [['text' => $prompt]];
+if ($audioData && $mode === 'pronunciation') {
+    // Audio is base64 webm — send to Gemini for direct listening
+    $parts = [
+        ['inlineData' => ['mimeType' => 'audio/webm', 'data' => $audioData]],
+        ['text' => 'Listen to this audio recording of a learner trying to say: "' . $target . '". '
+            . 'GRADING LEVEL (' . $strictness . '/5): ' . $strictnessGuide[$strictness] . ' '
+            . 'PASS if the spoken words are recognizably the right Hungarian words. Minor accent is fine. '
+            . 'FAIL if key words are missing or so distorted a Hungarian speaker would not understand. '
+            . 'The speech recognition transcript was: "' . $transcript . '" — but evaluate the AUDIO, not the transcript (speech recognition for accented Hungarian is unreliable). '
+            . 'Reply ONLY with JSON: {"pass":true/false,"feedback":"1 sentence max","correct":"' . $target . '","pronunciation_poor":true/false}']
+    ];
+}
 $payload = json_encode([
-    'contents' => [['parts' => [['text' => $prompt]]]],
+    'contents' => [['parts' => $parts]],
     'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2048]
 ]);
 
-$ch = curl_init('https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=' . $apiKey);
+// Use flash (not lite) when audio is included — lite doesn't support audio
+$model = ($audioData && $mode === 'pronunciation') ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
+$ch = curl_init('https://generativelanguage.googleapis.com/v1/models/' . $model . ':generateContent?key=' . $apiKey);
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST           => true,
     CURLOPT_POSTFIELDS     => $payload,
     CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
     CURLOPT_SSL_VERIFYPEER => false,
-    CURLOPT_TIMEOUT        => 15
+    CURLOPT_TIMEOUT        => ($audioData ? 25 : 15)
 ]);
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

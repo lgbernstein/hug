@@ -2100,7 +2100,22 @@ recognition.onresult = function(event) {
     fd.append('who',        who);
     fd.append('strictness', strictness);
     if (targetAH) fd.append('expected_hu', targetAH);
-    fetch('eval.php', { method: 'POST', body: fd })
+
+    // Send audio to Gemini for direct pronunciation eval (bypasses bad Web Speech API transcription)
+    var audioPromise = Promise.resolve();
+    if (lastRecordingBlob && currentMode === 'pronunciation') {
+        audioPromise = new Promise(function(resolve) {
+            var reader = new FileReader();
+            reader.onload = function() {
+                var b64 = reader.result.split(',')[1];
+                if (b64 && b64.length < 500000) fd.append('audio', b64);
+                resolve();
+            };
+            reader.onerror = function() { resolve(); };
+            reader.readAsDataURL(lastRecordingBlob);
+        });
+    }
+    audioPromise.then(function() { return fetch('eval.php', { method: 'POST', body: fd }); })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var isPass = data.pass;
