@@ -5860,6 +5860,7 @@ function renderFcCard() {
                 stemEl.textContent = frontText.replace(/[A-ZÁÉÍÓÖŐÚÜŰ]{2,}/, suffix);
                 elevenSpeak(frontText.replace(/[A-ZÁÉÍÓÖŐÚÜŰ]+/g, function(m) { return m.toLowerCase(); }));
                 if (correct) fcGot++; else { fcMiss++; fcMissedPile.push(card); }
+                recordSRSUnified(card.front, 'flashcard', null, correct);
                 setTimeout(function() { fcIdx++; renderFcCard(); }, correct ? 1200 : 2500);
             };
             choiceGrid.appendChild(btn);
@@ -5921,12 +5922,12 @@ function renderFcCard() {
     var gotBtn = document.createElement('button');
     gotBtn.className = 'w-full py-3 rounded-xl text-sm font-bold transition-all bg-green-600 hover:bg-green-700 text-white';
     gotBtn.textContent = '✓ Got It';
-    gotBtn.onclick = function(e) { e.stopPropagation(); fcGot++; fcIdx++; renderFcCard(); };
+    gotBtn.onclick = function(e) { e.stopPropagation(); fcGot++; recordSRSUnified(card.front, 'flashcard', null, true); fcIdx++; renderFcCard(); };
 
     var missBtn = document.createElement('button');
     missBtn.className = 'w-full py-3 rounded-xl text-sm font-bold transition-all bg-red-600 hover:bg-red-700 text-white';
     missBtn.textContent = '✗ Missed';
-    missBtn.onclick = function(e) { e.stopPropagation(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); fcIdx++; renderFcCard(); };
+    missBtn.onclick = function(e) { e.stopPropagation(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); recordSRSUnified(card.front, 'flashcard', null, false); fcIdx++; renderFcCard(); };
 
     var showAllBtn = document.createElement('button');
     showAllBtn.className = 'w-full py-2.5 rounded-xl text-xs font-bold transition-all text-amber-300 border border-amber-500/30 hover:bg-amber-500/10';
@@ -6118,8 +6119,8 @@ function renderFcSummary(area, controls) {
 document.addEventListener('keydown', function(e) {
     if (!fcActiveDeck || fcIdx >= fcCards.length) return;
     if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipFc(); }
-    if (fcFlipped && (e.key === 'ArrowRight' || e.key === 'g')) { e.preventDefault(); fcGot++; fcIdx++; renderFcCard(); }
-    if (fcFlipped && (e.key === 'ArrowLeft' || e.key === 'm')) { e.preventDefault(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); fcIdx++; renderFcCard(); }
+    if (fcFlipped && (e.key === 'ArrowRight' || e.key === 'g')) { e.preventDefault(); fcGot++; recordSRSUnified(fcCards[fcIdx].front, 'flashcard', null, true); fcIdx++; renderFcCard(); }
+    if (fcFlipped && (e.key === 'ArrowLeft' || e.key === 'm')) { e.preventDefault(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); recordSRSUnified(fcCards[fcIdx].front, 'flashcard', null, false); fcIdx++; renderFcCard(); }
 });
 
 // ── Init ──────────────────────────────────────────────────────────────
