@@ -75,10 +75,21 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'save_bio') {
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'phrases') {
     header('Content-Type: application/json');
     $search = $conn->real_escape_string($_GET['search'] ?? '');
+    $tagFilter = $_GET['tag'] ?? '';
+    $limitParam = (int)($_GET['limit'] ?? 0);
     $ahuBrowse = $hasAnswerHu ? "COALESCE(answer_hu,'') AS a_hu," : "'' AS a_hu,";
     $sql = "SELECT question_hu AS q, answer_en AS a, $ahuBrowse category FROM hungarian_prep";
-    if ($search) $sql .= " WHERE question_hu LIKE '%$search%' OR answer_en LIKE '%$search%'";
-    $sql .= " ORDER BY category, question_hu";
+    $wheres = [];
+    if ($search) $wheres[] = "(question_hu LIKE '%$search%' OR answer_en LIKE '%$search%')";
+    if ($tagFilter) {
+        $tagWhere = buildTagWhere($tagFilter, $conn);
+        $wheres[] = $tagWhere;
+    }
+    $whoFilter = ($who !== 'All') ? "(`who` = 'All' OR `who` = '$who_safe')" : '';
+    if ($whoFilter) $wheres[] = $whoFilter;
+    if ($wheres) $sql .= " WHERE " . implode(' AND ', $wheres);
+    $sql .= " ORDER BY " . ($tagFilter ? "RAND()" : "category, question_hu");
+    if ($limitParam > 0) $sql .= " LIMIT $limitParam";
     $result = $conn->query($sql);
     $rows = [];
     if ($result) { while ($r = $result->fetch_assoc()) $rows[] = $r; }
@@ -3360,8 +3371,10 @@ function startSessionBlock(block, blockIdx) {
     if (mode === 'review' || mode === 'practice' || mode === 'interview') {
         var catParam = block.session.cat || 'all';
         var modeParam = mode === 'interview' ? 'interview' : 'pronunciation';
+        var tagParam = block.session.tag || '';
         // Fetch multiple phrases
         var url = '?who=' + who + '&cat=' + catParam + '&ajax=1&action=phrases&limit=' + limit;
+        if (tagParam) url += '&tag=' + encodeURIComponent(tagParam);
         fetch(url).then(function(r) { return r.json(); }).then(function(phrases) {
             sessionSteps = phrases.slice(0, limit).map(function(p) {
                 return { type: 'audio', q: p.q, a: p.a, a_hu: p.a_hu || '', category: p.category, mode: modeParam };
