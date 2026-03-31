@@ -581,6 +581,117 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
     exit;
 }
 
+// AJAX: Mock Interview — Gemini as interviewer with conversation context
+if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'mock_interview') {
+    header('Content-Type: application/json');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { echo json_encode(['error'=>'POST only']); exit; }
+
+    $history = json_decode($_POST['history'] ?? '[]', true) ?: [];
+    $userAnswer = trim($_POST['answer'] ?? '');
+    $phase = trim($_POST['phase'] ?? 'start');
+    $phoneMode = ($_POST['phone_mode'] ?? '0') === '1';
+
+    // Load user bio facts for personalized interview
+    $bioFacts = [];
+    $r = $conn->query("SELECT fact_label_hu, fact_value_hu FROM user_bios WHERE subject_name = '$who_safe'");
+    if ($r) { while ($row = $r->fetch_assoc()) $bioFacts[] = $row['fact_label_hu'] . ': ' . $row['fact_value_hu']; }
+    $bioContext = implode("\n", $bioFacts);
+
+    $registerNote = $phoneMode
+        ? 'You are a caseworker from Budapest calling the applicant on the phone. Speak in FORMAL Hungarian. Use normal conversational speed. Do NOT slow down or simplify. Use On/Onnek forms. Be businesslike but polite.'
+        : 'You are a consul at the Hungarian consulate. Be warm but professional. Use formal On forms. Speak clearly.';
+
+    $systemPrompt = 'You are conducting a Hungarian simplified naturalization interview (egyszerusitett honositasi interjú). ' . $registerNote . '
+
+The applicant known facts:
+' . $bioContext . '
+
+INTERVIEW ARC (follow this order, spending 2-3 questions per phase):
+1. GREETING: Greet them, ask them to sit down, ask why they are here today
+2. PERSONAL: Name, birthday, where they live, marital status, children
+3. FAMILY_WORK: What they do for work, education, family details
+4. ANCESTRY: Hungarian roots, who was Hungarian in their family, where from, when they emigrated
+5. MOTIVATION: Why they want Hungarian citizenship, what it means to them
+6. KNOWLEDGE: A few factual questions about Hungary (flag colors, capital, rivers, national holidays, current PM, historical dates)
+7. CLOSING: Any final questions, thank them, say goodbye
+
+RULES:
+- Speak ONLY in Hungarian (the applicant must understand Hungarian)
+- Ask ONE question at a time
+- After the applicant answers, briefly acknowledge their answer naturally, then ask the next question
+- If their answer is unclear or too short, ask a follow-up before moving on
+- If they make a grammar mistake, do NOT correct them, just continue naturally
+- If they seem stuck, rephrase your question more simply
+- Keep track of which phase you are in and move forward after 2-3 questions per phase
+
+Respond in JSON:
+{
+  "question_hu": "Your next question in Hungarian",
+  "question_en": "English translation (hint for the app)",
+  "eval": "Brief evaluation of their last answer in English. null if first question.",
+  "phase": "current phase: greeting|personal|family_work|ancestry|motivation|knowledge|closing|done",
+  "score": null or 1-5 rating of last answer (5=perfect, 1=did not understand),
+  "tip": "One specific improvement tip in English. null if first question."
+}
+
+When phase is done, set question_hu to a farewell and include a summary field:
+{
+  "question_hu": "Koszonom szepen, viszontlatasra!",
+  "question_en": "Thank you very much, goodbye!",
+  "phase": "done",
+  "summary": {
+    "overall_score": 1-5,
+    "strengths": ["list of what went well"],
+    "weaknesses": ["list of what needs work"],
+    "recommendation": "Overall assessment and next steps"
+  }
+}';
+
+    // Build conversation for Gemini
+    $contents = [['role' => 'user', 'parts' => [['text' => $systemPrompt]]]];
+    $contents[] = ['role' => 'model', 'parts' => [['text' => '{"question_hu": "understood", "phase": "init"}']]];
+
+    foreach ($history as $turn) {
+        if (isset($turn['q'])) {
+            $contents[] = ['role' => 'model', 'parts' => [['text' => json_encode($turn['q'])]]];
+        }
+        if (isset($turn['a']) && $turn['a'] !== '') {
+            $contents[] = ['role' => 'user', 'parts' => [['text' => $turn['a']]]];
+        }
+    }
+
+    if ($phase === 'start') {
+        $contents[] = ['role' => 'user', 'parts' => [['text' => 'Begin the interview. Ask your first question.']]];
+    } else {
+        $contents[] = ['role' => 'user', 'parts' => [['text' => $userAnswer ?: '(silence, applicant did not respond)']]];
+    }
+
+    $apiKey = $env['GEMINI_KEY'];
+    $url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=$apiKey";
+    $payload = json_encode([
+        'contents' => $contents,
+        'generationConfig' => ['temperature' => 0.5, 'maxOutputTokens' => 1024]
+    ]);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => $payload, CURLOPT_TIMEOUT => 25, CURLOPT_SSL_VERIFYPEER => false,
+    ]);
+    $resp = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($httpCode !== 200 || !$resp) { echo json_encode(['error' => 'Gemini error', 'http_code' => $httpCode]); exit; }
+    $data = json_decode($resp, true);
+    $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $text = preg_replace('/^```json\s*/i', '', $text);
+    $text = preg_replace('/\s*```$/', '', $text);
+    $parsed = json_decode($text, true);
+    if (!$parsed) { echo json_encode(['error' => 'Parse error', 'raw' => $text]); exit; }
+    echo json_encode($parsed);
+    exit;
+}
+
 // AJAX: list learning resources
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'resources') {
     header('Content-Type: application/json');
@@ -1428,6 +1539,61 @@ select option { background: #4a525a; color: #e8e6df; }
         </div>
     </div>
 
+    <!-- Mock Interview buttons -->
+    <div class="grid grid-cols-2 gap-2">
+        <button onclick="startMockInterview(false)" class="flex items-center gap-2 p-3 rounded-xl bg-pink-500/10 border border-pink-500/20 hover:border-pink-500/40 transition-all">
+            <i data-lucide="message-circle" class="w-5 h-5 text-pink-400"></i>
+            <div class="text-left"><span class="text-xs font-semibold text-white block">Mock Interview</span><span class="text-[10px] text-slate-500">15-min conversation</span></div>
+        </button>
+        <button onclick="startMockInterview(true)" class="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 hover:border-red-500/40 transition-all">
+            <i data-lucide="phone" class="w-5 h-5 text-red-400"></i>
+            <div class="text-left"><span class="text-xs font-semibold text-white block">Phone Call</span><span class="text-[10px] text-slate-500">Budapest verification</span></div>
+        </button>
+    </div>
+
+    <!-- Mock Interview Panel (full conversation) -->
+    <div id="mockInterviewPanel" class="hidden">
+        <div class="glass rounded-3xl overflow-hidden border border-pink-500/20">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-pink-500/5">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="message-circle" class="w-4 h-4 text-pink-400"></i>
+                    <h2 id="mockTitle" class="text-sm font-bold text-pink-300">Mock Interview</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="mockTimer" class="text-[11px] text-slate-500 font-mono tabular-nums">0:00</span>
+                    <span id="mockPhase" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400">Greeting</span>
+                    <button onclick="endMockInterview()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- Conversation scroll area -->
+            <div id="mockConversation" class="p-4 space-y-3 max-h-[400px] overflow-y-auto"></div>
+            <!-- Input area -->
+            <div id="mockInputArea" class="px-4 pb-4">
+                <div class="flex items-center gap-2">
+                    <div id="mockMicDot" class="w-3 h-3 rounded-full bg-slate-600"></div>
+                    <div class="flex-1 text-sm text-slate-400" id="mockTranscript">Press the mic to answer...</div>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="mockListen()" id="mockMicBtn" class="flex-1 py-3 rounded-xl text-sm font-bold bg-pink-600 hover:bg-pink-700 text-white transition-all">
+                        🎤 Answer
+                    </button>
+                    <button onclick="mockSkip()" class="px-4 py-3 rounded-xl text-sm font-bold bg-surface-100 border border-white/10 text-slate-400 hover:text-white transition-all">
+                        Skip
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mock Interview Summary -->
+    <div id="mockSummary" class="hidden">
+        <div class="glass rounded-3xl overflow-hidden p-6 border border-pink-500/20">
+            <div id="mockSummaryContent" class="space-y-4"></div>
+        </div>
+    </div>
+
     <!-- Quick actions -->
     <div id="quickActions" class="flex items-center gap-2">
         <button onclick="quickReview()" class="flex-1 flex items-center gap-2 p-3 rounded-xl bg-surface-100 border border-white/5 hover:border-accent/30 transition-all">
@@ -1906,6 +2072,9 @@ let listenStartTime   = 0;
 let isPractice        = false;
 let showPlaybackWhenReady = false;
 let questionAttempted = false;
+let fluencyQuestionTime = 0;  // when TTS finished asking
+let fluencyFirstSpeech = 0;   // when user started speaking
+let fluencySpeechEnd = 0;     // when user stopped speaking
 
 // ── Session tracking ──────────────────────────────────────────────────
 let sessionPass = 0, sessionFail = 0, sessionStreak = 0, sessionBestStreak = 0, sessionCount = 0;
@@ -2105,7 +2274,7 @@ function speak(rate, autoRecord) {
     var ms = document.getElementById('matchScore'); if (ms) ms.textContent = '';
     var tr = document.getElementById('transcript'); if (tr) tr.textContent = '';
     var pb = document.getElementById('playbackBtn'); if (pb) pb.classList.add('hidden');
-    var onEnd = autoRecord ? function() { setTimeout(toggleMic, 350); } : null;
+    var onEnd = autoRecord ? function() { fluencyQuestionTime = Date.now(); fluencyFirstSpeech = 0; setTimeout(toggleMic, 350); } : null;
     elevenSpeak(targetQ, onEnd);
 }
 
@@ -2407,6 +2576,7 @@ var pendingResult = null;
 
 recognition.onresult = function(event) {
     if (!isListening) return;
+    if (!fluencyFirstSpeech) fluencyFirstSpeech = Date.now();
     // Don't stop yet — accumulate results, let VAD silence handle stopping
     // Store the latest result — VAD silence or timeout will trigger processing
     var fullTranscript = '';
@@ -2549,6 +2719,17 @@ function processSpeechResult() {
             heard.style.cssText = 'font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic';
             heard.textContent = 'Heard: "' + heardText + '"';
             toast.appendChild(heard);
+            // Fluency metrics
+            if (fluencyQuestionTime && fluencyFirstSpeech) {
+                var latency = ((fluencyFirstSpeech - fluencyQuestionTime) / 1000).toFixed(1);
+                var fluencyDiv = document.createElement('div');
+                fluencyDiv.style.cssText = 'font-size:11px;color:#64748b;margin-top:4px;display:flex;justify-content:center;gap:12px';
+                var latSpan = document.createElement('span');
+                latSpan.textContent = 'Response: ' + latency + 's';
+                latSpan.style.color = latency < 3 ? '#4ade80' : latency < 6 ? '#fbbf24' : '#f87171';
+                fluencyDiv.appendChild(latSpan);
+                toast.appendChild(fluencyDiv);
+            }
             document.body.appendChild(toast);
 
             // Enable Hear Me button
@@ -5738,6 +5919,351 @@ function renderProgressPhrases(data) {
     });
 }
 
+// ── Mock Interview ────────────────────────────────────────────────────
+var mockHistory = [];
+var mockPhoneMode = false;
+var mockStartTime = null;
+var mockTimerInterval = null;
+var mockActive = false;
+var mockRecognition = null;
+
+function startMockInterview(phoneMode) {
+    mockHistory = [];
+    mockPhoneMode = !!phoneMode;
+    mockActive = true;
+    mockStartTime = new Date();
+
+    document.getElementById('mockInterviewPanel').classList.remove('hidden');
+    document.getElementById('mockSummary').classList.add('hidden');
+    document.getElementById('planBlockList').classList.add('hidden');
+    var qa = document.getElementById('quickActions'); if (qa) qa.classList.add('hidden');
+
+    document.getElementById('mockTitle').textContent = phoneMode ? 'Budapest Phone Call' : 'Mock Interview';
+    document.getElementById('mockConversation').textContent = '';
+    document.getElementById('mockTranscript').textContent = 'Starting...';
+    document.getElementById('mockPhase').textContent = 'Starting';
+
+    // Timer
+    clearInterval(mockTimerInterval);
+    mockTimerInterval = setInterval(function() {
+        var elapsed = Math.floor((new Date() - mockStartTime) / 1000);
+        var m = Math.floor(elapsed / 60);
+        var s = elapsed % 60;
+        document.getElementById('mockTimer').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    }, 1000);
+
+    lucide.createIcons();
+
+    // Get first question from Gemini
+    fetchMockQuestion('start', '');
+}
+
+function fetchMockQuestion(phase, answer) {
+    var fd = new FormData();
+    fd.append('history', JSON.stringify(mockHistory));
+    fd.append('answer', answer);
+    fd.append('phase', phase);
+    fd.append('phone_mode', mockPhoneMode ? '1' : '0');
+
+    fetch('?who=' + who + '&ajax=1&action=mock_interview', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) {
+                addMockBubble('system', 'Error: ' + data.error);
+                return;
+            }
+
+            // Show eval of previous answer
+            if (data.eval) {
+                var evalDiv = document.createElement('div');
+                evalDiv.className = 'text-[11px] text-slate-500 px-3 py-1 rounded-lg bg-surface-100 mx-8';
+                var scoreStr = data.score ? ' (' + data.score + '/5)' : '';
+                evalDiv.textContent = data.eval + scoreStr;
+                if (data.tip) {
+                    var tipEl = document.createElement('div');
+                    tipEl.className = 'text-[10px] text-amber-400 mt-0.5';
+                    tipEl.textContent = 'Tip: ' + data.tip;
+                    evalDiv.appendChild(tipEl);
+                }
+                document.getElementById('mockConversation').appendChild(evalDiv);
+            }
+
+            // Update phase
+            var phaseEl = document.getElementById('mockPhase');
+            var phaseLabels = { greeting: 'Greeting', personal: 'Personal', family_work: 'Family/Work', ancestry: 'Ancestry', motivation: 'Motivation', knowledge: 'Knowledge', closing: 'Closing', done: 'Done' };
+            phaseEl.textContent = phaseLabels[data.phase] || data.phase;
+
+            // Check if interview is done
+            if (data.phase === 'done') {
+                addMockBubble('interviewer', data.question_hu, data.question_en);
+                speakHu(data.question_hu);
+                showMockSummary(data.summary);
+                return;
+            }
+
+            // Store in history
+            mockHistory.push({ q: data, a: '' });
+
+            // Show interviewer question
+            if (mockPhoneMode) {
+                // Phone mode: no text, audio only
+                addMockBubble('interviewer', '🔊 (listening...)', data.question_en);
+            } else {
+                addMockBubble('interviewer', data.question_hu, data.question_en);
+            }
+
+            // Speak the question
+            speakHu(data.question_hu);
+
+            // Ready for answer
+            document.getElementById('mockTranscript').textContent = 'Press mic to answer...';
+            document.getElementById('mockMicBtn').disabled = false;
+
+            // Scroll to bottom
+            var conv = document.getElementById('mockConversation');
+            conv.scrollTop = conv.scrollHeight;
+        });
+}
+
+function addMockBubble(role, text, subtitle) {
+    var conv = document.getElementById('mockConversation');
+    var bubble = document.createElement('div');
+    if (role === 'interviewer') {
+        bubble.className = 'flex gap-2';
+        var avatar = document.createElement('div');
+        avatar.className = 'w-7 h-7 rounded-full bg-pink-500/20 flex items-center justify-center text-xs shrink-0';
+        avatar.textContent = '🇭🇺';
+        var content = document.createElement('div');
+        content.className = 'flex-1';
+        var main = document.createElement('div');
+        main.className = 'text-sm text-white bg-surface-200 rounded-xl rounded-tl-sm px-3 py-2';
+        main.textContent = text;
+        content.appendChild(main);
+        if (subtitle && !mockPhoneMode) {
+            var sub = document.createElement('div');
+            sub.className = 'text-[10px] text-slate-500 mt-0.5 px-1';
+            sub.textContent = subtitle;
+            sub.style.cssText = 'filter:blur(4px);cursor:pointer;transition:filter 0.2s';
+            sub.onclick = function() { sub.style.filter = sub.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(4px)'; };
+            content.appendChild(sub);
+        }
+        bubble.appendChild(avatar);
+        bubble.appendChild(content);
+    } else if (role === 'user') {
+        bubble.className = 'flex gap-2 justify-end';
+        var content2 = document.createElement('div');
+        var main2 = document.createElement('div');
+        main2.className = 'text-sm text-white bg-accent/30 rounded-xl rounded-tr-sm px-3 py-2';
+        main2.textContent = text;
+        content2.appendChild(main2);
+        bubble.appendChild(content2);
+    } else {
+        bubble.className = 'text-center';
+        var sysMsg = document.createElement('div');
+        sysMsg.className = 'text-[11px] text-slate-500';
+        sysMsg.textContent = text;
+        bubble.appendChild(sysMsg);
+    }
+    conv.appendChild(bubble);
+    conv.scrollTop = conv.scrollHeight;
+}
+
+function mockListen() {
+    var btn = document.getElementById('mockMicBtn');
+    btn.disabled = true;
+    btn.textContent = '🔴 Listening...';
+    document.getElementById('mockMicDot').className = 'w-3 h-3 rounded-full bg-red-500 animate-pulse';
+    document.getElementById('mockTranscript').textContent = 'Listening...';
+
+    // Use Web Speech API
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        document.getElementById('mockTranscript').textContent = 'Speech recognition not supported';
+        btn.disabled = false;
+        btn.textContent = '🎤 Answer';
+        return;
+    }
+
+    mockRecognition = new SpeechRecognition();
+    mockRecognition.lang = 'hu-HU';
+    mockRecognition.continuous = true;
+    mockRecognition.interimResults = true;
+
+    var finalText = '';
+    var silenceTimer = null;
+
+    mockRecognition.onresult = function(e) {
+        var interim = '';
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) {
+                finalText += e.results[i][0].transcript + ' ';
+            } else {
+                interim += e.results[i][0].transcript;
+            }
+        }
+        document.getElementById('mockTranscript').textContent = finalText + interim || 'Listening...';
+        // Reset silence timer on any result
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(function() { try { mockRecognition.stop(); } catch(e2) {} }, 2500);
+    };
+
+    mockRecognition.onend = function() {
+        clearTimeout(silenceTimer);
+        btn.textContent = '🎤 Answer';
+        btn.disabled = false;
+        document.getElementById('mockMicDot').className = 'w-3 h-3 rounded-full bg-slate-600';
+
+        var answer = finalText.trim();
+        if (answer) {
+            addMockBubble('user', answer);
+            // Update last history entry with answer
+            if (mockHistory.length > 0) mockHistory[mockHistory.length - 1].a = answer;
+            // Measure response time
+            document.getElementById('mockTranscript').textContent = 'Processing...';
+            fetchMockQuestion('continue', answer);
+        } else {
+            document.getElementById('mockTranscript').textContent = 'No speech detected. Try again.';
+        }
+    };
+
+    mockRecognition.onerror = function(e) {
+        btn.textContent = '🎤 Answer';
+        btn.disabled = false;
+        document.getElementById('mockMicDot').className = 'w-3 h-3 rounded-full bg-slate-600';
+        document.getElementById('mockTranscript').textContent = 'Error: ' + e.error + '. Try again.';
+    };
+
+    mockRecognition.start();
+    // Auto-stop after 30 seconds
+    setTimeout(function() { try { mockRecognition.stop(); } catch(e3) {} }, 30000);
+}
+
+function mockSkip() {
+    if (mockHistory.length > 0) mockHistory[mockHistory.length - 1].a = '(skipped)';
+    addMockBubble('user', '(skipped)');
+    fetchMockQuestion('continue', '');
+}
+
+function endMockInterview() {
+    mockActive = false;
+    clearInterval(mockTimerInterval);
+    try { if (mockRecognition) mockRecognition.stop(); } catch(e4) {}
+    document.getElementById('mockInterviewPanel').classList.add('hidden');
+    document.getElementById('planBlockList').classList.remove('hidden');
+    var qa = document.getElementById('quickActions'); if (qa) qa.classList.remove('hidden');
+
+    // Log it
+    var elapsed = Math.round((new Date() - mockStartTime) / 60000);
+    var answered = mockHistory.filter(function(h) { return h.a && h.a !== '(skipped)'; }).length;
+    logBlock(mockPhoneMode ? 'phone_call' : 'mock_interview', mockPhoneMode ? 'Budapest Phone Call' : 'Mock Interview', elapsed || 1, mockHistory.length, answered);
+}
+
+function showMockSummary(summary) {
+    mockActive = false;
+    clearInterval(mockTimerInterval);
+
+    document.getElementById('mockInputArea').style.display = 'none';
+
+    if (!summary) return;
+
+    var panel = document.getElementById('mockSummary');
+    var content = document.getElementById('mockSummaryContent');
+    panel.classList.remove('hidden');
+    content.textContent = '';
+
+    // Score
+    var scoreRow = document.createElement('div');
+    scoreRow.className = 'text-center';
+    var scoreNum = document.createElement('div');
+    scoreNum.className = 'text-4xl font-black ' + (summary.overall_score >= 4 ? 'text-green-400' : summary.overall_score >= 3 ? 'text-amber-400' : 'text-red-400');
+    scoreNum.textContent = summary.overall_score + '/5';
+    var scoreLabel = document.createElement('div');
+    scoreLabel.className = 'text-xs text-slate-500 uppercase mt-1';
+    scoreLabel.textContent = 'Overall Score';
+    scoreRow.appendChild(scoreNum);
+    scoreRow.appendChild(scoreLabel);
+    content.appendChild(scoreRow);
+
+    // Time
+    var elapsed = Math.round((new Date() - mockStartTime) / 60000);
+    var turns = mockHistory.filter(function(h) { return h.a && h.a !== '(skipped)'; }).length;
+    var timeRow = document.createElement('div');
+    timeRow.className = 'flex justify-center gap-6 text-center';
+    var timeEl = document.createElement('div');
+    timeEl.className = 'text-lg font-bold text-accent-light';
+    timeEl.textContent = elapsed + 'm';
+    var timeLabel = document.createElement('div');
+    timeLabel.className = 'text-[10px] text-slate-500';
+    timeLabel.textContent = 'Duration';
+    var turnEl = document.createElement('div');
+    turnEl.className = 'text-lg font-bold text-teal-400';
+    turnEl.textContent = turns;
+    var turnLabel = document.createElement('div');
+    turnLabel.className = 'text-[10px] text-slate-500';
+    turnLabel.textContent = 'Answers';
+    var t1 = document.createElement('div'); t1.appendChild(timeEl); t1.appendChild(timeLabel);
+    var t2 = document.createElement('div'); t2.appendChild(turnEl); t2.appendChild(turnLabel);
+    timeRow.appendChild(t1); timeRow.appendChild(t2);
+    content.appendChild(timeRow);
+
+    // Strengths
+    if (summary.strengths && summary.strengths.length) {
+        var strDiv = document.createElement('div');
+        var strTitle = document.createElement('div');
+        strTitle.className = 'text-xs font-bold text-green-400 mb-1';
+        strTitle.textContent = 'Strengths';
+        strDiv.appendChild(strTitle);
+        summary.strengths.forEach(function(s) {
+            var item = document.createElement('div');
+            item.className = 'text-xs text-slate-300 pl-3';
+            item.textContent = '+ ' + s;
+            strDiv.appendChild(item);
+        });
+        content.appendChild(strDiv);
+    }
+
+    // Weaknesses
+    if (summary.weaknesses && summary.weaknesses.length) {
+        var weakDiv = document.createElement('div');
+        var weakTitle = document.createElement('div');
+        weakTitle.className = 'text-xs font-bold text-red-400 mb-1';
+        weakTitle.textContent = 'Needs Work';
+        weakDiv.appendChild(weakTitle);
+        summary.weaknesses.forEach(function(w) {
+            var item = document.createElement('div');
+            item.className = 'text-xs text-slate-300 pl-3';
+            item.textContent = '- ' + w;
+            weakDiv.appendChild(item);
+        });
+        content.appendChild(weakDiv);
+    }
+
+    // Recommendation
+    if (summary.recommendation) {
+        var recDiv = document.createElement('div');
+        recDiv.className = 'text-xs text-slate-400 italic bg-surface-100 rounded-xl p-3';
+        recDiv.textContent = summary.recommendation;
+        content.appendChild(recDiv);
+    }
+
+    // Done button
+    var doneBtn = document.createElement('button');
+    doneBtn.className = 'w-full py-3 bg-accent hover:bg-accent-dark rounded-xl text-sm font-bold text-white transition-all';
+    doneBtn.textContent = 'Back to Plan';
+    doneBtn.onclick = function() {
+        endMockInterview();
+        document.getElementById('mockSummary').classList.add('hidden');
+        document.getElementById('mockInputArea').style.display = '';
+    };
+    content.appendChild(doneBtn);
+
+    // Log completion
+    logBlock(mockPhoneMode ? 'phone_call' : 'mock_interview', mockPhoneMode ? 'Budapest Phone Call' : 'Mock Interview',
+        elapsed || 1, mockHistory.length, turns);
+
+    lucide.createIcons();
+}
+
 // ── Flashcard Decks ───────────────────────────────────────────────────
 var fcDecks = [
   { id: 'conjugation', emoji: '🔄', title: 'Verb Conjugation', desc: 'Present tense for all 6 persons', color: 'amber',
@@ -6014,6 +6540,46 @@ var fcDecks = [
     { front: 'lakik', back: 'lives, resides (Verb)', note: 'Los Angelesben lakom 2015 óta.' },
     { front: 'mióta', back: 'since when (Other)', note: 'Mióta él ott?' },
     { front: 'született', back: 'was born (Verb)', note: '1990. 05. 14-én születtem Budapesten.' },
+  ]},
+  // ── Recovery Phrases — survival skills for when you blank ──
+  { id: 'recovery', emoji: '🆘', title: 'Recovery Phrases', desc: 'When you blank — buy time and stay in Hungarian', color: 'red', cards: [
+    { front: 'Elnézést, nem értettem.', back: 'Sorry, I didn\'t understand.', note: 'Your #1 safety phrase. Use it freely.' },
+    { front: 'Meg tudná ismételni?', back: 'Could you repeat that?', note: 'Formal — use with the interviewer' },
+    { front: 'Még egyszer, kérem.', back: 'Once more, please.', note: 'Shorter version of asking to repeat' },
+    { front: 'Lassabban, kérem.', back: 'Slower, please.', note: 'If they speak too fast' },
+    { front: 'Hogy mondják magyarul...?', back: 'How do you say in Hungarian...?', note: 'When you know the English but not the Hungarian' },
+    { front: 'Úgy értem, hogy...', back: 'I mean that...', note: 'To clarify or rephrase what you said' },
+    { front: 'Várjon egy pillanatot, kérem.', back: 'Wait a moment, please.', note: 'Buys you thinking time — totally acceptable' },
+    { front: 'Jól értettem, hogy...?', back: 'Did I understand correctly that...?', note: 'Confirm what they asked before answering' },
+    { front: 'Ezt nem tudom, de...', back: 'I don\'t know this, but...', note: 'Honest and redirects — better than silence' },
+    { front: 'Hogyan mondhatnám...', back: 'How could I say...', note: 'Thinking aloud in Hungarian — shows engagement' },
+    { front: 'Bocsánat, újra mondom.', back: 'Sorry, I\'ll say it again.', note: 'When you want to correct yourself' },
+    { front: 'Szóval...', back: 'So... / Well...', note: 'Filler word — buys time naturally' },
+    { front: 'Ez egy jó kérdés.', back: 'That\'s a good question.', note: 'Flatters the interviewer while you think' },
+    { front: 'Hadd gondolkozzam...', back: 'Let me think...', note: 'Explicitly buys thinking time' },
+  ]},
+  // ── Hungary Knowledge — factual Q&A for the interview ──
+  { id: 'hungary_facts', emoji: '🇭🇺', title: 'Hungary Facts', desc: 'Must-know facts they WILL ask', color: 'red', cards: [
+    { front: 'Mi Magyarország fővárosa?', back: 'Budapest', note: 'The capital — they always ask this' },
+    { front: 'Hány ember él Magyarországon?', back: 'Körülbelül 9,6 millió', note: 'About 9.6 million people' },
+    { front: 'Milyen színű a magyar zászló?', back: 'Piros, fehér, zöld', note: 'Red, white, green — top to bottom' },
+    { front: 'Mondjon magyar folyókat!', back: 'Duna, Tisza', note: 'The two main rivers. Balaton is a lake (tó).' },
+    { front: 'Mi a legnagyobb magyar tó?', back: 'A Balaton', note: 'Lake Balaton — "the Hungarian Sea"' },
+    { front: 'Ki a miniszterelnök?', back: 'Orbán Viktor', note: 'Prime Minister (as of 2026)' },
+    { front: 'Ki a köztársasági elnök?', back: 'Sulyok Tamás', note: 'President of the Republic (as of 2024)' },
+    { front: 'Mikor lépett be Magyarország az EU-ba?', back: '2004-ben', note: 'May 1, 2004' },
+    { front: 'Mikor van március 15?', back: 'Az 1848-as forradalom ünnepe', note: 'Revolution against the Habsburgs — Petőfi Sándor' },
+    { front: 'Mikor van augusztus 20?', back: 'Szent István ünnepe, államalapítás', note: 'St. Stephen\'s Day, founding of the state (1000 AD)' },
+    { front: 'Mikor van október 23?', back: 'Az 1956-os forradalom ünnepe', note: 'Revolution against Soviet occupation' },
+    { front: 'Ki írta a Himnuszt?', back: 'Kölcsey Ferenc (szöveg), Erkel Ferenc (zene)', note: 'Lyrics: Kölcsey. Music: Erkel.' },
+    { front: 'Mikor alapították a magyar államot?', back: '1000-ben, Szent István király', note: 'King Stephen crowned in the year 1000' },
+    { front: 'Mi történt 1920-ban?', back: 'A trianoni békediktátum', note: 'Treaty of Trianon — Hungary lost 2/3 of its territory' },
+    { front: 'Mi a magyar pénznem?', back: 'Forint (HUF)', note: 'The Hungarian forint' },
+    { front: 'Mondjon híres magyar feltalálókat!', back: 'Rubik Ernő (Rubik-kocka), Puskás Tivadar (telefonközpont), Neumann János (számítógép)', note: 'Rubik\'s Cube, telephone exchange, computer' },
+    { front: 'Mondjon híres magyar írókat!', back: 'Petőfi Sándor, Arany János, Jókai Mór, Molnár Ferenc', note: 'Poets and writers — Petőfi is the most important' },
+    { front: 'Mi a Himnusz első sora?', back: 'Isten, áldd meg a magyart', note: 'God, bless the Hungarian — know at least the first line' },
+    { front: 'Miért akar magyar állampolgár lenni?', back: '(Personal answer — practice yours!)', note: 'THE most asked question. Must be personal and emotional.' },
+    { front: 'Van magyar felmenője?', back: 'Igen, a nagyapám/nagyanyám magyar volt.', note: 'Yes, my grandfather/grandmother was Hungarian.' },
   ]},
 ];
 
