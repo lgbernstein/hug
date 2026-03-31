@@ -3622,50 +3622,54 @@ function renderSessionStep() {
 }
 
 function renderAudioStep(step, content, controls) {
-    // Mode label — make clear what's expected
-    var modeLabel = document.createElement('div');
     var isPron = (step.mode || 'pronunciation') === 'pronunciation';
-    modeLabel.className = 'mb-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ' +
-        (isPron ? 'bg-blue-500/15 text-blue-400' : 'bg-pink-500/15 text-pink-400');
-    modeLabel.textContent = isPron ? '🎤 Repeat this phrase aloud' : '💬 Answer this question in Hungarian';
-    content.appendChild(modeLabel);
 
-    // Question text
+    // Two-column layout: phrase left, buttons right
+    var layout = document.createElement('div');
+    layout.className = 'flex flex-col md:flex-row gap-4 items-start w-full';
+
+    // Left: phrase area
+    var phraseCol = document.createElement('div');
+    phraseCol.className = 'flex-1 text-center md:text-left';
+
+    var modeLabel = document.createElement('div');
+    modeLabel.className = 'mb-2 inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold ' +
+        (isPron ? 'bg-blue-500/15 text-blue-400' : 'bg-pink-500/15 text-pink-400');
+    modeLabel.textContent = isPron ? '🎤 Repeat aloud' : '💬 Answer in Hungarian';
+    phraseCol.appendChild(modeLabel);
+
     var q = document.createElement('h1');
     q.id = 'questionText';
-    q.className = 'question-text text-white mb-2';
+    q.className = 'question-text text-white mb-1';
     q.textContent = step.q;
     if (listenMode) { q.classList.add('listen-blur'); q.onclick = function() { q.classList.remove('listen-blur'); }; }
-    content.appendChild(q);
+    phraseCol.appendChild(q);
 
-    // Translation — tap to reveal
+    // Translation — blurred, tap EN to reveal
     var transRow = document.createElement('div');
-    transRow.className = 'mb-3 flex items-center justify-center gap-1.5';
+    transRow.className = 'mb-2 flex items-center gap-1.5 justify-center md:justify-start';
     var transText = document.createElement('span');
     transText.className = 'text-blue-300/70 text-sm italic';
     transText.textContent = step.a;
-    transText.style.filter = 'blur(6px)';
-    transText.style.cursor = 'pointer';
-    transText.style.transition = 'filter 0.2s';
+    transText.style.cssText = 'filter:blur(6px);cursor:pointer;transition:filter 0.2s';
     var transToggle = document.createElement('button');
-    transToggle.className = 'text-[10px] text-blue-400/50 hover:text-blue-300 font-bold px-1.5 py-0.5 rounded border border-blue-400/20';
+    transToggle.className = 'text-[9px] text-blue-400/50 hover:text-blue-300 font-bold px-1 py-0.5 rounded border border-blue-400/20';
     transToggle.textContent = 'EN';
-    transToggle.title = 'Show/hide English';
     var transVisible = false;
     function toggleTrans() { transVisible = !transVisible; transText.style.filter = transVisible ? 'none' : 'blur(6px)'; }
     transText.onclick = toggleTrans;
     transToggle.onclick = toggleTrans;
     transRow.appendChild(transText);
     transRow.appendChild(transToggle);
-    content.appendChild(transRow);
+    phraseCol.appendChild(transRow);
 
-    // Reveal answer (for interview mode)
+    // Reveal expected answer (interview mode)
     if (!isPron && step.a_hu) {
         var revealWrap = document.createElement('details');
         revealWrap.id = 'revealDetails';
-        revealWrap.className = 'mb-4';
+        revealWrap.className = 'mb-2';
         var revealSummary = document.createElement('summary');
-        revealSummary.className = 'text-xs text-slate-500 cursor-pointer hover:text-white transition-colors';
+        revealSummary.className = 'text-xs text-slate-500 cursor-pointer hover:text-white';
         revealSummary.textContent = 'Show expected answer';
         revealWrap.appendChild(revealSummary);
         var revealText = document.createElement('p');
@@ -3673,12 +3677,12 @@ function renderAudioStep(step, content, controls) {
         revealText.className = 'text-sm text-accent-light font-semibold mt-1';
         revealText.textContent = step.a_hu;
         revealWrap.appendChild(revealText);
-        content.appendChild(revealWrap);
+        phraseCol.appendChild(revealWrap);
     }
 
-    // Status indicators
+    // Status dot + volume
     var statusRow = document.createElement('div');
-    statusRow.className = 'flex items-center justify-center gap-2 mb-4';
+    statusRow.className = 'flex items-center gap-2 justify-center md:justify-start';
     var readyDot = document.createElement('div');
     readyDot.id = 'readyIndicator';
     readyDot.className = 'status-dot dot-off';
@@ -3692,64 +3696,69 @@ function renderAudioStep(step, content, controls) {
     volTrack.appendChild(volFillEl);
     statusRow.appendChild(readyDot);
     statusRow.appendChild(volTrack);
-    content.appendChild(statusRow);
+    phraseCol.appendChild(statusRow);
 
-    // Listen & Speak button (above result card so it's always visible)
-    // Button stack: all full-width, clear labels
-    var stack = document.createElement('div');
-    stack.className = 'flex flex-col gap-2 max-w-sm mx-auto w-full';
-    var btnClass = 'w-full py-2.5 rounded-lg text-sm font-bold transition-all active:scale-[0.98]';
+    layout.appendChild(phraseCol);
+
+    // Right: button grid (2 columns)
+    var btnGrid = document.createElement('div');
+    btnGrid.className = 'grid grid-cols-2 gap-2 w-full md:w-auto md:min-w-[240px]';
+    var btnClass = 'py-2.5 px-3 rounded-lg text-xs font-bold transition-all active:scale-[0.97] text-center';
 
     var listenBtn = document.createElement('button');
-    listenBtn.className = btnClass + ' bg-accent text-white hover:bg-accent-dark';
-    listenBtn.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer';
+    listenBtn.className = btnClass + ' col-span-2 bg-accent text-white hover:bg-accent-dark';
+    listenBtn.textContent = isPron ? '🎤 Listen & Repeat' : '🎤 Listen & Answer';
     listenBtn.onclick = function() {
         targetQ = step.q; targetA = step.a; targetAH = step.a_hu || '';
         currentMode = step.mode || 'pronunciation';
         speak(currentSpeed);
     };
-    stack.appendChild(listenBtn);
+    btnGrid.appendChild(listenBtn);
 
     var nextBtn = document.createElement('button');
-    nextBtn.className = btnClass + ' bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
+    nextBtn.className = btnClass + ' col-span-2 bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
     nextBtn.textContent = 'Next →';
     nextBtn.onclick = function() {
         if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); }
         else { nextQuestion(); }
     };
-    stack.appendChild(nextBtn);
+    btnGrid.appendChild(nextBtn);
 
     var hearAgainBtn = document.createElement('button');
     hearAgainBtn.className = btnClass + ' bg-surface-50 border border-white/10 text-slate-300 hover:text-white';
-    hearAgainBtn.textContent = '🔊  Hear Again';
-    hearAgainBtn.onclick = function() { speak(currentSpeed, false); };
-    stack.appendChild(hearAgainBtn);
+    hearAgainBtn.textContent = '🔊 Listen Again';
+    hearAgainBtn.onclick = function() {
+        targetQ = step.q; targetA = step.a; targetAH = step.a_hu || '';
+        currentMode = step.mode || 'pronunciation';
+        speak(currentSpeed);
+    };
+    btnGrid.appendChild(hearAgainBtn);
 
     var hearMeBtn = document.createElement('button');
     hearMeBtn.id = 'gridHearMe';
     hearMeBtn.className = btnClass + ' bg-surface-50 border border-white/10 text-slate-400';
-    hearMeBtn.textContent = '🎧  Hear Me';
+    hearMeBtn.textContent = '🎧 Hear Me';
     hearMeBtn.disabled = true;
     hearMeBtn.style.opacity = '0.35';
     hearMeBtn.onclick = function() { playMyVoice(); };
-    stack.appendChild(hearMeBtn);
+    btnGrid.appendChild(hearMeBtn);
 
-    var breakdownRow = document.createElement('div');
-    breakdownRow.className = 'flex justify-center';
-    var skipRow = breakdownRow;
-    stack.appendChild(breakdownRow);
-
-    controls.appendChild(stack);
-
-    // Grammar breakdown toggle button
     var breakdownBtn = document.createElement('button');
-    breakdownBtn.className = 'text-[11px] text-yellow-400/70 hover:text-yellow-300 transition-colors underline decoration-dotted underline-offset-2 ml-4';
-    breakdownBtn.textContent = '📖 Break it down';
+    var skipRow = { appendChild: function(child) { /* breakdown appends here */ } };
+    breakdownBtn.className = btnClass + ' col-span-2 bg-yellow-500/10 border border-yellow-500/15 text-yellow-300 hover:bg-yellow-500/20';
+    breakdownBtn.textContent = '📖 Break it Down';
     var breakdownLoaded = false;
+
+    controls.appendChild(layout);
+
+    // Breakdown button added to grid after skipRow setup below
+    btnGrid.appendChild(breakdownBtn);
+    layout.appendChild(btnGrid);
+
+    // Wire breakdown button onclick
     breakdownBtn.onclick = function(e) {
         e.stopPropagation();
         var overlay = document.getElementById('breakdownOverlay');
-        // If already loaded, just toggle
         if (breakdownLoaded) {
             if (overlay && overlay.style.pointerEvents === 'auto') { closeBreakdownDrawer(); }
             else { overlay.style.opacity = '1'; overlay.style.pointerEvents = 'auto'; document.getElementById('breakdownDrawer').style.transform = 'translateX(0)'; }
@@ -3762,18 +3771,15 @@ function renderAudioStep(step, content, controls) {
         fetch('?ajax=1&action=breakdown', { method: 'POST', body: fd })
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                breakdownBtn.textContent = '📖 Break it down';
-                if (data.error) { breakdownBtn.textContent = '📖 Error — try again'; return; }
+                breakdownBtn.textContent = '📖 Break it Down';
+                if (data.error) { breakdownBtn.textContent = '📖 Error'; return; }
                 breakdownLoaded = true;
                 renderBreakdown(data, null);
             })
-            .catch(function() { breakdownBtn.textContent = '📖 Error — try again'; });
+            .catch(function() { breakdownBtn.textContent = '📖 Error'; });
     };
-    skipRow.appendChild(breakdownBtn);
 
-    controls.appendChild(skipRow);
-
-    // Result card (hidden until eval completes — below controls so Listen & Repeat stays visible)
+    // Result card (hidden until eval completes)
     var resultCard = document.createElement('div');
     resultCard.id = 'resultCard';
     resultCard.className = 'hidden glass rounded-2xl p-3 border mt-3';
@@ -3804,6 +3810,11 @@ function renderAudioStep(step, content, controls) {
     targetA = step.a;
     targetAH = step.a_hu || '';
     currentMode = step.mode || 'pronunciation';
+
+    // Auto-play: brief reading pause then speak + listen
+    if (sessionIdx > 0) {
+        setTimeout(function() { speak(currentSpeed); }, 1200);
+    }
 }
 
 function renderKnowledgeStep(step, content, controls) {
