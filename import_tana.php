@@ -44,9 +44,9 @@ $interview = [
     // --- Hungarian Origin ---
     ['Magyar származású?', 'Are you of Hungarian origin?', 'Igen, magyar származású vagyok.', 'interview', 'All', 'interview,essential,origin'],
     ['Melyik felmenője volt magyar?', 'Which ancestor was Hungarian?', 'A nagyapám, Edward Bernstein magyar volt.', 'interview', 'Larry', 'interview,essential,origin'],
-    ['Hol született a dédapja?', 'Where was your great-grandfather born?', 'A dédapám Polenában született 1901-ben. Polena Magyarország része volt Trianon előtt.', 'interview', 'Larry', 'interview,essential,origin,history'],
-    ['Mikor emigrált a dédapja?', 'When did your great-grandfather emigrate?', '1920-ban emigrált Amerikába.', 'interview', 'Larry', 'interview,essential,origin,history'],
-    ['Le tudja vezetni magyar származását?', 'Can you trace your Hungarian origin?', 'A dédapám magyar volt. Polenában lakott. 1920-ban emigrált Amerikába. A nagyapám Amerikában született 1917-ben. Az apám Amerikában született 1950-ben.', 'interview', 'Larry', 'interview,essential,origin'],
+    ['Hol született a nagyapja?', 'Where was your grandfather born?', 'A nagyapám Polenában született 1901-ben. Polena Magyarország része volt Trianon előtt.', 'interview', 'Larry', 'interview,essential,origin,history'],
+    ['Mikor emigrált a nagyapja?', 'When did your grandfather emigrate?', '1920-ban emigrált Amerikába.', 'interview', 'Larry', 'interview,essential,origin,history'],
+    ['Le tudja vezetni magyar származását?', 'Can you trace your Hungarian origin?', 'Az apai nagyapám, Bernstein Edward magyar volt. Polenában született 1901-ben. 1920-ban emigrált Amerikába.', 'interview', 'Larry', 'interview,essential,origin'],
     ['Tudja, miért emigrált a nagyapja Amerikába?', 'Do you know why your grandfather emigrated to America?', 'Trianon és az antiszemitizmus miatt, mert zsidó volt.', 'interview', 'Larry', 'interview,essential,origin,history'],
 
     // --- Where You Live ---
