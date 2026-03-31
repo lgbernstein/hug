@@ -2027,36 +2027,39 @@ recognition.onstart = function() {
     startVolume();
     recTimeout = setTimeout(function() {
         if (isListening) recognition.stop();
-    }, 8000);
+    }, 15000);
 };
 
+var pendingResult = null;
+
 recognition.onresult = function(event) {
-    // Echo guard removed — 350ms post-TTS gap is sufficient
     if (!isListening) return;
-    clearTimeout(recTimeout);
-    recognition.stop();
+    // Don't stop yet — accumulate results, let VAD silence handle stopping
+    // Store the latest result — VAD silence or timeout will trigger processing
+    var fullTranscript = '';
+    var alternatives = [];
+    for (var r = 0; r < event.results.length; r++) {
+        fullTranscript += event.results[r][0].transcript;
+        for (var a = 0; a < event.results[r].length; a++) {
+            var alt = event.results[r][a].transcript.trim();
+            if (alt && alternatives.indexOf(alt) === -1) alternatives.push(alt);
+        }
+    }
+    pendingResult = { result: fullTranscript.trim(), alternatives: alternatives };
+    return;
+};
+
+// Process speech result — called from recognition.onend after VAD stops
+function processSpeechResult() {
+    if (!pendingResult) return;
+    var result = pendingResult.result;
+    var alternatives = pendingResult.alternatives;
+    pendingResult = null;
+
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         try { mediaRecorder.stop(); } catch(e) {}
     }
     stopVolume();
-
-    var lastResult = event.results[event.results.length - 1];
-    var result = lastResult[0].transcript.trim();
-    var alternatives = [];
-    for (var i = 0; i < lastResult.length; i++) {
-        var alt = lastResult[i].transcript.trim();
-        if (alt && alternatives.indexOf(alt) === -1) alternatives.push(alt);
-    }
-    isListening = false;
-    indicator.className = 'status-dot dot-off';
-    var rbReset = document.getElementById('recordBtn');
-    if (rbReset) {
-        rbReset.classList.remove('mic-active', 'bg-red-600', 'hover:bg-red-500', 'glow-red');
-        rbReset.classList.add('bg-green-600', 'hover:bg-green-500', 'glow-green');
-    }
-    var rl = document.getElementById('recordLabel'); if (rl) rl.textContent = 'Mic';
-
-    if (typeof setRecordIcon === 'function') setRecordIcon('mic');
 
     if (isPractice) {
         isPractice = false;
@@ -2254,8 +2257,6 @@ recognition.onresult = function(event) {
 recognition.onend = function() {
     clearTimeout(recTimeout);
     isListening = false;
-    isPractice  = false;
-    cleanupAudio();
     indicator.className = 'status-dot dot-off';
     var rbReset = document.getElementById('recordBtn');
     if (rbReset) {
@@ -2265,6 +2266,11 @@ recognition.onend = function() {
     var rl = document.getElementById('recordLabel');
     if (rl) rl.textContent = 'Mic';
     try { setRecordIcon('mic'); } catch(e) {}
+    // Process accumulated speech results now that recording is done
+    if (pendingResult) {
+        processSpeechResult();
+    }
+    isPractice = false;
 };
 
 function toggleMic() {
@@ -2718,8 +2724,17 @@ document.addEventListener('keydown', function(e) {
         if (trans) trans.style.filter = trans.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)';
         else { var d = document.getElementById('revealDetails'); if (d) d.open = !d.open; }
     } else if (e.key === 'Escape') {
-        if (isListening) recognition.stop();
+        // Stop everything
+        e.preventDefault();
+        window.speechSynthesis.cancel();
+        if (isListening) { try { recognition.stop(); } catch(e2) {} }
+        clearTimeout(recTimeout);
+        clearTimeout(advanceTimeout);
+        cleanupAudio();
+        isListening = false;
+        var toast = document.getElementById('evalToast'); if (toast) toast.remove();
         closeBreakdownDrawer();
+        indicator.className = 'status-dot dot-off';
     }
 });
 
