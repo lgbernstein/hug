@@ -3175,7 +3175,7 @@ function renderBreakdown(data, container) {
         var drawer = document.createElement('div');
         drawer.id = 'breakdownDrawer';
         drawer.className = 'w-80 max-w-[85vw] h-full overflow-y-auto p-5 space-y-3';
-        drawer.style.background = document.body.classList.contains('light') ? '#fff' : '#0f172a';
+        drawer.style.background = '#f5f5f5';
         drawer.style.borderLeft = '1px solid rgba(99,102,241,0.15)';
         drawer.style.transform = 'translateX(100%)';
         drawer.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
@@ -3186,12 +3186,12 @@ function renderBreakdown(data, container) {
     }
 
     var drawer = document.getElementById('breakdownDrawer');
-    drawer.style.background = document.body.classList.contains('light') ? '#fff' : '#0f172a';
+    drawer.style.background = '#f5f5f5';
     drawer.textContent = '';
 
     // Close X top-right
     var closeBtn = document.createElement('button');
-    closeBtn.className = 'absolute top-3 right-3 text-slate-400 hover:text-white text-lg leading-none';
+    closeBtn.className = 'absolute top-3 right-3 text-slate-500 hover:text-slate-800 text-lg leading-none';
     closeBtn.textContent = '✕';
     closeBtn.onclick = closeBreakdownDrawer;
     drawer.style.position = 'relative';
@@ -3201,23 +3201,29 @@ function renderBreakdown(data, container) {
     if (data.words && data.words.length) {
         data.words.forEach(function(w) {
             var row = document.createElement('div');
-            row.className = 'py-2.5 border-b border-white/5';
+            row.className = 'py-2.5 border-b border-slate-200';
 
             // Word + base + meaning
             var line1 = document.createElement('div');
             line1.className = 'flex items-baseline gap-2 flex-wrap';
+            var speakBtn = document.createElement('button');
+            speakBtn.className = 'text-indigo-500 hover:text-indigo-700 transition-colors';
+            speakBtn.textContent = '🔊';
+            speakBtn.style.cssText = 'font-size:14px;cursor:pointer;border:none;background:none;padding:0';
+            (function(word) { speakBtn.onclick = function(e) { e.stopPropagation(); elevenSpeak(word); }; })(w.word);
+            line1.appendChild(speakBtn);
             var hu = document.createElement('span');
-            hu.className = 'text-base font-bold text-sky-300';
+            hu.className = 'text-base font-bold text-indigo-700';
             hu.textContent = w.word;
             line1.appendChild(hu);
             if (w.base && w.base !== w.word) {
                 var base = document.createElement('span');
-                base.className = 'text-xs text-slate-500';
+                base.className = 'text-xs text-slate-600';
                 base.textContent = '← ' + w.base;
                 line1.appendChild(base);
             }
             var meaning = document.createElement('span');
-            meaning.className = 'text-xs text-slate-300';
+            meaning.className = 'text-xs text-slate-700';
             meaning.textContent = '= ' + w.meaning;
             line1.appendChild(meaning);
             row.appendChild(line1);
@@ -3225,7 +3231,7 @@ function renderBreakdown(data, container) {
             // Pronunciation
             if (w.pronunciation) {
                 var pron = document.createElement('div');
-                pron.className = 'text-[11px] text-teal-400 mt-1 font-mono';
+                pron.className = 'text-[11px] text-teal-700 mt-1 font-mono';
                 pron.textContent = '🔊 ' + w.pronunciation;
                 row.appendChild(pron);
             }
@@ -3233,7 +3239,7 @@ function renderBreakdown(data, container) {
             // Suffixes
             if (w.suffixes && w.suffixes !== 'none' && w.suffixes !== 'N/A') {
                 var suf = document.createElement('div');
-                suf.className = 'text-[11px] text-sky-200/80 mt-1';
+                suf.className = 'text-[11px] text-indigo-600 mt-1';
                 suf.textContent = w.suffixes;
                 row.appendChild(suf);
             }
@@ -3243,7 +3249,7 @@ function renderBreakdown(data, container) {
     // Type badge
     if (data.type) {
         var typeBadge = document.createElement('div');
-        typeBadge.className = 'mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-500/15 text-teal-400';
+        typeBadge.className = 'mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-teal-100 text-teal-800';
         typeBadge.textContent = data.type;
         drawer.appendChild(typeBadge);
     }
@@ -3251,13 +3257,13 @@ function renderBreakdown(data, container) {
     // Grammar note
     if (data.grammar_note) {
         var gn = document.createElement('div');
-        gn.className = 'mt-3 p-3 rounded-lg bg-sky-500/5 border border-sky-400/15';
+        gn.className = 'mt-3 p-3 rounded-lg bg-white border border-slate-200';
         var gnLabel = document.createElement('div');
-        gnLabel.className = 'text-[10px] font-bold text-sky-400 uppercase tracking-wider mb-1';
+        gnLabel.className = 'text-[10px] font-bold text-indigo-600 uppercase tracking-wider mb-1';
         gnLabel.textContent = 'Grammar';
         gn.appendChild(gnLabel);
         var gnText = document.createElement('p');
-        gnText.className = 'text-xs text-slate-300 leading-relaxed';
+        gnText.className = 'text-xs text-slate-700 leading-relaxed';
         gnText.textContent = data.grammar_note;
         gn.appendChild(gnText);
         drawer.appendChild(gn);
@@ -3266,7 +3272,7 @@ function renderBreakdown(data, container) {
     // Tip
     if (data.tip) {
         var tip = document.createElement('p');
-        tip.className = 'text-xs text-teal-300/80 mt-3 italic';
+        tip.className = 'text-xs text-teal-700 mt-3 italic';
         tip.textContent = '💡 ' + data.tip;
         drawer.appendChild(tip);
     }
