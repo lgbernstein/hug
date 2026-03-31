@@ -3624,30 +3624,17 @@ function renderSessionStep() {
 function renderAudioStep(step, content, controls) {
     var isPron = (step.mode || 'pronunciation') === 'pronunciation';
 
-    // Two-column layout: phrase left, buttons right
-    var layout = document.createElement('div');
-    layout.className = 'flex flex-col md:flex-row gap-4 items-start w-full';
-
-    // Left: phrase area
-    var phraseCol = document.createElement('div');
-    phraseCol.className = 'flex-1 text-center md:text-left';
-
-    var modeLabel = document.createElement('div');
-    modeLabel.className = 'mb-2 inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold ' +
-        (isPron ? 'bg-blue-500/15 text-blue-400' : 'bg-pink-500/15 text-pink-400');
-    modeLabel.textContent = isPron ? '🎤 Repeat aloud' : '💬 Answer in Hungarian';
-    phraseCol.appendChild(modeLabel);
-
+    // Phrase area — full width, top
     var q = document.createElement('h1');
     q.id = 'questionText';
-    q.className = 'question-text text-white mb-1';
+    q.className = 'question-text text-white mb-1 text-center';
     q.textContent = step.q;
     if (listenMode) { q.classList.add('listen-blur'); q.onclick = function() { q.classList.remove('listen-blur'); }; }
-    phraseCol.appendChild(q);
+    content.appendChild(q);
 
-    // Translation — blurred, tap EN to reveal
+    // Translation — blurred, tap to reveal
     var transRow = document.createElement('div');
-    transRow.className = 'mb-2 flex items-center gap-1.5 justify-center md:justify-start';
+    transRow.className = 'mb-2 flex items-center gap-1.5 justify-center';
     var transText = document.createElement('span');
     transText.className = 'text-blue-300/70 text-sm italic';
     transText.textContent = step.a;
@@ -3661,28 +3648,11 @@ function renderAudioStep(step, content, controls) {
     transToggle.onclick = toggleTrans;
     transRow.appendChild(transText);
     transRow.appendChild(transToggle);
-    phraseCol.appendChild(transRow);
+    content.appendChild(transRow);
 
-    // Reveal expected answer (interview mode)
-    if (!isPron && step.a_hu) {
-        var revealWrap = document.createElement('details');
-        revealWrap.id = 'revealDetails';
-        revealWrap.className = 'mb-2';
-        var revealSummary = document.createElement('summary');
-        revealSummary.className = 'text-xs text-slate-500 cursor-pointer hover:text-white';
-        revealSummary.textContent = 'Show expected answer';
-        revealWrap.appendChild(revealSummary);
-        var revealText = document.createElement('p');
-        revealText.id = 'answerText';
-        revealText.className = 'text-sm text-accent-light font-semibold mt-1';
-        revealText.textContent = step.a_hu;
-        revealWrap.appendChild(revealText);
-        phraseCol.appendChild(revealWrap);
-    }
-
-    // Status dot + volume
+    // Status dot + volume (centered, small)
     var statusRow = document.createElement('div');
-    statusRow.className = 'flex items-center gap-2 justify-center md:justify-start';
+    statusRow.className = 'flex items-center gap-2 justify-center mb-2';
     var readyDot = document.createElement('div');
     readyDot.id = 'readyIndicator';
     readyDot.className = 'status-dot dot-off';
@@ -3696,18 +3666,35 @@ function renderAudioStep(step, content, controls) {
     volTrack.appendChild(volFillEl);
     statusRow.appendChild(readyDot);
     statusRow.appendChild(volTrack);
-    phraseCol.appendChild(statusRow);
+    content.appendChild(statusRow);
 
-    layout.appendChild(phraseCol);
+    // Reveal expected answer (interview mode)
+    if (!isPron && step.a_hu) {
+        var revealWrap = document.createElement('details');
+        revealWrap.id = 'revealDetails';
+        revealWrap.className = 'mb-2 text-center';
+        var revealSummary = document.createElement('summary');
+        revealSummary.className = 'text-xs text-slate-500 cursor-pointer hover:text-white';
+        revealSummary.textContent = 'Show expected answer';
+        revealWrap.appendChild(revealSummary);
+        var revealText = document.createElement('p');
+        revealText.id = 'answerText';
+        revealText.className = 'text-sm text-accent-light font-semibold mt-1';
+        revealText.textContent = step.a_hu;
+        revealWrap.appendChild(revealText);
+        content.appendChild(revealWrap);
+    }
 
-    // Right: button grid (2 columns)
+    // Button grid — right-aligned, 2 columns
+    var btnWrap = document.createElement('div');
+    btnWrap.className = 'flex justify-end';
     var btnGrid = document.createElement('div');
-    btnGrid.className = 'grid grid-cols-2 gap-2 w-full md:w-auto md:min-w-[240px]';
-    var btnClass = 'py-2.5 px-3 rounded-lg text-xs font-bold transition-all active:scale-[0.97] text-center';
+    btnGrid.className = 'grid grid-cols-2 gap-1.5 w-[260px]';
+    var btn = 'py-2 px-2 rounded-lg text-[11px] font-bold transition-all active:scale-[0.97] text-center';
 
     var listenBtn = document.createElement('button');
-    listenBtn.className = btnClass + ' col-span-2 bg-accent text-white hover:bg-accent-dark';
-    listenBtn.textContent = isPron ? '🎤 Listen & Repeat' : '🎤 Listen & Answer';
+    listenBtn.className = btn + ' col-span-2 bg-accent text-white hover:bg-accent-dark';
+    listenBtn.textContent = '🎤 Listen & Repeat';
     listenBtn.onclick = function() {
         targetQ = step.q; targetA = step.a; targetAH = step.a_hu || '';
         currentMode = step.mode || 'pronunciation';
@@ -3716,7 +3703,7 @@ function renderAudioStep(step, content, controls) {
     btnGrid.appendChild(listenBtn);
 
     var nextBtn = document.createElement('button');
-    nextBtn.className = btnClass + ' col-span-2 bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
+    nextBtn.className = btn + ' col-span-2 bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
     nextBtn.textContent = 'Next →';
     nextBtn.onclick = function() {
         if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); }
@@ -3725,8 +3712,8 @@ function renderAudioStep(step, content, controls) {
     btnGrid.appendChild(nextBtn);
 
     var hearAgainBtn = document.createElement('button');
-    hearAgainBtn.className = btnClass + ' bg-surface-50 border border-white/10 text-slate-300 hover:text-white';
-    hearAgainBtn.textContent = '🔊 Listen Again';
+    hearAgainBtn.className = btn + ' bg-surface-50 border border-white/10 text-slate-300 hover:text-white';
+    hearAgainBtn.textContent = '🔊 Again';
     hearAgainBtn.onclick = function() {
         targetQ = step.q; targetA = step.a; targetAH = step.a_hu || '';
         currentMode = step.mode || 'pronunciation';
@@ -3736,7 +3723,7 @@ function renderAudioStep(step, content, controls) {
 
     var hearMeBtn = document.createElement('button');
     hearMeBtn.id = 'gridHearMe';
-    hearMeBtn.className = btnClass + ' bg-surface-50 border border-white/10 text-slate-400';
+    hearMeBtn.className = btn + ' bg-surface-50 border border-white/10 text-slate-400';
     hearMeBtn.textContent = '🎧 Hear Me';
     hearMeBtn.disabled = true;
     hearMeBtn.style.opacity = '0.35';
@@ -3744,16 +3731,13 @@ function renderAudioStep(step, content, controls) {
     btnGrid.appendChild(hearMeBtn);
 
     var breakdownBtn = document.createElement('button');
-    var skipRow = { appendChild: function(child) { /* breakdown appends here */ } };
-    breakdownBtn.className = btnClass + ' col-span-2 bg-yellow-500/10 border border-yellow-500/15 text-yellow-300 hover:bg-yellow-500/20';
+    breakdownBtn.className = btn + ' col-span-2 bg-yellow-500/10 border border-yellow-500/15 text-yellow-300 hover:bg-yellow-500/20';
     breakdownBtn.textContent = '📖 Break it Down';
     var breakdownLoaded = false;
-
-    controls.appendChild(layout);
-
-    // Breakdown button added to grid after skipRow setup below
     btnGrid.appendChild(breakdownBtn);
-    layout.appendChild(btnGrid);
+
+    btnWrap.appendChild(btnGrid);
+    controls.appendChild(btnWrap);
 
     // Wire breakdown button onclick
     breakdownBtn.onclick = function(e) {
