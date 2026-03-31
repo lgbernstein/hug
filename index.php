@@ -861,6 +861,7 @@ tailwind.config = {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, sans-serif; }
+html { -webkit-font-smoothing: auto !important; -moz-osx-font-smoothing: auto !important; }
 body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -890,26 +891,26 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 .pill-inactive { color: #b0ada6; border: 1px solid rgba(255,255,255,0.15); }
 .pill-inactive:hover { color: #f5f4ef; background: rgba(255,255,255,0.08); }
 /* Buttons — 3 tiers */
-.btn-primary { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #6366f1; color: white; transition: all 0.15s; cursor: pointer; }
+.btn-primary { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #6366f1; color: #fff; transition: background 0.15s; cursor: pointer; }
 .btn-primary:hover { background: #4f46e5; }
 .btn-primary:active { transform: scale(0.97); }
-.btn-secondary { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: rgba(255,255,255,0.1); color: #d4d1ca; border: 1px solid rgba(255,255,255,0.12); transition: all 0.15s; cursor: pointer; }
-.btn-secondary:hover { color: #f5f4ef; border-color: rgba(255,255,255,0.3); }
+.btn-secondary { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #9ca3af; color: #1f2937; border: none; transition: background 0.15s; cursor: pointer; }
+.btn-secondary:hover { background: #b0b7c3; }
 .btn-secondary:active { transform: scale(0.97); }
 .btn-ghost { padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #9ca3af; background: transparent; border: none; transition: all 0.15s; cursor: pointer; }
 .btn-ghost:hover { color: #f5f4ef; background: rgba(255,255,255,0.08); }
 .btn-ghost:disabled { opacity: 0.35; cursor: default; }
-.btn-next { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0ea5e9; color: white; transition: all 0.15s; cursor: pointer; }
+.btn-next { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0ea5e9; color: #fff; transition: background 0.15s; cursor: pointer; }
 .btn-next:hover { background: #0284c7; }
 .btn-next:active { transform: scale(0.97); }
-.btn-teal { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #14b8a6; color: white; transition: all 0.15s; cursor: pointer; }
+.btn-teal { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #14b8a6; color: #fff; transition: background 0.15s; cursor: pointer; }
 .btn-teal:hover { background: #0d9488; }
 .btn-teal:active { transform: scale(0.97); }
-.btn-purple { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #7c3aed !important; color: #ffffff !important; transition: all 0.15s; cursor: pointer; }
+.btn-purple { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #7c3aed; color: #fff; transition: background 0.15s; cursor: pointer; }
 .btn-purple:hover { background: #6d28d9 !important; }
 .btn-purple:active { transform: scale(0.97); }
 .btn-purple.is-disabled { background: #5b21b6 !important; color: #c4b5fd !important; cursor: default; opacity: 0.6; }
-.btn-sky { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0369a1; color: #bae6fd; transition: all 0.15s; cursor: pointer; }
+.btn-sky { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0284c7; color: #fff; transition: background 0.15s; cursor: pointer; }
 .btn-sky:hover { background: #075985; }
 .btn-sky:active { transform: scale(0.97); }
 /* Results */
@@ -3774,7 +3775,7 @@ function renderAudioStep(step, content, controls) {
     var b2 = document.createElement('button'); b2.className = 'btn-next'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
     var b4 = document.createElement('button'); b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice;
-    b4.style.cssText = 'padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:default;transition:all 0.15s;background:#5b21b6;color:#c4b5fd;opacity:0.6';
+    b4.style.cssText = 'padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:default;background:#7c3aed;color:#ffffff;opacity:0.45';
     grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
     var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 English';
