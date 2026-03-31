@@ -473,7 +473,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
 
     $sentenceEsc = addslashes($sentence);
     $englishEsc = addslashes($english);
-    $prompt = "Break down this Hungarian phrase word by word.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"meaning\": \"1-3 word English meaning\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. OHR-vosh)\",\n      \"note\": \"Max 6 words. Only for suffixes or non-obvious grammar. Examples: '-ban = in', '-ból = out of', '-om = my'. Never use grammar terms like locative, possessive, accusative, dative — just show what the suffix means. Omit for simple/obvious words.\"\n    }\n  ],\n  \"tip\": \"Plain English translation of the full phrase\"\n}\n\nBe extremely brief. No full sentences in notes — fragments only. Skip note for names, articles, conjunctions.";
+    $prompt = "Break down this Hungarian phrase word by word for an American learner.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears in the phrase\",\n      \"meaning\": \"1-3 word English meaning\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. NEH-veh)\",\n      \"parts\": [\n        {\"part\": \"root or suffix\", \"means\": \"what it means\"}\n      ],\n      \"examples\": [\n        {\"hu\": \"example sentence\", \"pron\": \"pronunciation guide\", \"en\": \"English translation\"}\n      ]\n    }\n  ],\n  \"tip\": \"Plain English translation of the full phrase\"\n}\n\nRules:\n- 'parts': break the word into root + suffixes. E.g. neve → [{\"part\":\"név\",\"means\":\"name\"},{\"part\":\"-e\",\"means\":\"his/her\"}]. Skip for simple words (names, articles, conjunctions).\n- 'examples': 1-2 short example sentences using this word. Skip for obvious words.\n- Never use grammar terms like locative, possessive, accusative, dative — just show what suffixes mean in plain English.\n- Keep everything brief.";
 
     $apiKey = $env['GEMINI_KEY'];
     $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
@@ -3283,40 +3283,75 @@ function renderBreakdown(data, container) {
         var table = document.createElement('div');
         table.style.cssText = 'background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden';
         data.words.forEach(function(w, i) {
-            var row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:7px 12px' + (i > 0 ? ';border-top:1px solid #f3f4f6' : '') + (w.note ? ';cursor:pointer' : '');
+            var cell = document.createElement('div');
+            cell.style.cssText = 'padding:10px 12px' + (i > 0 ? ';border-top:1px solid #e5e7eb' : '');
 
+            // Top line: speaker + word + meaning + pronunciation
+            var top = document.createElement('div');
+            top.style.cssText = 'display:flex;align-items:center;gap:6px';
             var speakBtn = document.createElement('button');
             speakBtn.style.cssText = 'font-size:12px;cursor:pointer;border:none;background:none;padding:0;color:#6366f1;flex-shrink:0';
             (function(word) { speakBtn.onclick = function(e) { e.stopPropagation(); elevenSpeak(word); }; })(w.word);
             speakBtn.textContent = '🔊';
-            row.appendChild(speakBtn);
-
+            top.appendChild(speakBtn);
             var hu = document.createElement('span');
-            hu.style.cssText = 'font-size:14px;font-weight:700;color:#312e81;width:100px;flex-shrink:0';
+            hu.style.cssText = 'font-size:15px;font-weight:700;color:#312e81;min-width:90px';
             hu.textContent = w.word;
-            row.appendChild(hu);
-
+            top.appendChild(hu);
             var eq = document.createElement('span');
             eq.style.cssText = 'font-size:13px;color:#374151;flex:1';
             eq.textContent = w.meaning;
-            row.appendChild(eq);
-
+            top.appendChild(eq);
             if (w.pronunciation) {
                 var pron = document.createElement('span');
                 pron.style.cssText = 'font-size:10px;color:#0f766e;font-family:monospace;flex-shrink:0';
                 pron.textContent = w.pronunciation;
-                row.appendChild(pron);
+                top.appendChild(pron);
+            }
+            cell.appendChild(top);
+
+            // Parts breakdown (root + suffixes)
+            if (w.parts && w.parts.length > 0) {
+                var partsDiv = document.createElement('div');
+                partsDiv.style.cssText = 'margin-top:4px;padding-left:24px;font-size:12px;color:#475569;line-height:1.5';
+                w.parts.forEach(function(p) {
+                    var line = document.createElement('div');
+                    var partSpan = document.createElement('span');
+                    partSpan.style.cssText = 'font-weight:600;color:#312e81';
+                    partSpan.textContent = p.part;
+                    line.appendChild(partSpan);
+                    line.appendChild(document.createTextNode(' \u2192 "' + p.means + '"'));
+                    partsDiv.appendChild(line);
+                });
+                cell.appendChild(partsDiv);
             }
 
-            table.appendChild(row);
-
-            if (w.note) {
-                var noteRow = document.createElement('div');
-                noteRow.style.cssText = 'padding:0 12px 6px 30px;font-size:11px;color:#4338ca;line-height:1.3';
-                noteRow.textContent = w.note;
-                table.appendChild(noteRow);
+            // Examples
+            if (w.examples && w.examples.length > 0) {
+                var exDiv = document.createElement('div');
+                exDiv.style.cssText = 'margin-top:5px;padding-left:24px;font-size:11px;line-height:1.6';
+                w.examples.forEach(function(ex) {
+                    var huLine = document.createElement('div');
+                    var huBold = document.createElement('span');
+                    huBold.style.cssText = 'font-weight:600;color:#312e81';
+                    huBold.textContent = ex.hu;
+                    huLine.appendChild(huBold);
+                    if (ex.pron) {
+                        var pronSpan = document.createElement('span');
+                        pronSpan.style.cssText = 'color:#0f766e;font-family:monospace;font-size:10px;margin-left:4px';
+                        pronSpan.textContent = '(' + ex.pron + ')';
+                        huLine.appendChild(pronSpan);
+                    }
+                    exDiv.appendChild(huLine);
+                    var enLine = document.createElement('div');
+                    enLine.style.cssText = 'color:#6b7280';
+                    enLine.textContent = '\u2192 ' + ex.en;
+                    exDiv.appendChild(enLine);
+                });
+                cell.appendChild(exDiv);
             }
+
+            table.appendChild(cell);
         });
         drawer.appendChild(table);
     }
