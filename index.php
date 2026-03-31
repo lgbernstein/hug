@@ -9,6 +9,18 @@ $cat = in_array($cat, ['all','prep','bios']) ? $cat : 'all';
 // Columns added in v5/v6 migrations — always present
 $hasAnswerHu = true;
 
+// v9 migration: add SRS columns if missing
+$v9check = $conn->query("SHOW COLUMNS FROM study_history LIKE 'recall_count'");
+if ($v9check && $v9check->num_rows === 0) {
+    $conn->query("ALTER TABLE study_history ADD COLUMN consecutive_fails INT NOT NULL DEFAULT 0, ADD COLUMN recall_count INT NOT NULL DEFAULT 0, ADD COLUMN difficulty_mult FLOAT NOT NULL DEFAULT 1.0, ADD COLUMN is_leech TINYINT(1) NOT NULL DEFAULT 0");
+}
+$v9type = $conn->query("SHOW COLUMNS FROM study_history LIKE 'item_type'");
+if ($v9type && $r9 = $v9type->fetch_assoc()) {
+    if (stripos($r9['Type'], 'enum') !== false) {
+        $conn->query("ALTER TABLE study_history MODIFY item_type VARCHAR(20) NOT NULL DEFAULT 'phrase'");
+    }
+}
+
 $who_safe   = $conn->real_escape_string($who);
 $bio_filter = ($who !== 'All')
     ? "WHERE subject_name = '$who_safe' AND fact_label_hu LIKE '%?'"

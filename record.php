@@ -37,10 +37,17 @@ $conn->query("CREATE TABLE IF NOT EXISTS study_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
 // Add new columns if missing (safe migration)
-$conn->query("ALTER TABLE study_history ADD COLUMN IF NOT EXISTS consecutive_fails INT NOT NULL DEFAULT 0");
-$conn->query("ALTER TABLE study_history ADD COLUMN IF NOT EXISTS recall_count INT NOT NULL DEFAULT 0");
-$conn->query("ALTER TABLE study_history ADD COLUMN IF NOT EXISTS difficulty_mult FLOAT NOT NULL DEFAULT 1.0");
-$conn->query("ALTER TABLE study_history ADD COLUMN IF NOT EXISTS is_leech TINYINT(1) NOT NULL DEFAULT 0");
+$v9check = $conn->query("SHOW COLUMNS FROM study_history LIKE 'recall_count'");
+if ($v9check && $v9check->num_rows === 0) {
+    $conn->query("ALTER TABLE study_history ADD COLUMN consecutive_fails INT NOT NULL DEFAULT 0, ADD COLUMN recall_count INT NOT NULL DEFAULT 0, ADD COLUMN difficulty_mult FLOAT NOT NULL DEFAULT 1.0, ADD COLUMN is_leech TINYINT(1) NOT NULL DEFAULT 0");
+}
+// Widen item_type from ENUM to VARCHAR to support 'flashcard' and future types
+$colCheck = $conn->query("SHOW COLUMNS FROM study_history LIKE 'item_type'");
+if ($colCheck && $row = $colCheck->fetch_assoc()) {
+    if (stripos($row['Type'], 'enum') !== false) {
+        $conn->query("ALTER TABLE study_history MODIFY item_type VARCHAR(20) NOT NULL DEFAULT 'phrase'");
+    }
+}
 
 // Look up existing row
 $row = null;
