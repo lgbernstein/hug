@@ -116,20 +116,29 @@ if ($mode === 'interview') {
             . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"short feedback","correct":"the exact target phrase","pronunciation_poor":true/false}';
 }
 
-// Build payload — include audio if provided for direct pronunciation eval
+// Build payload — include audio if provided for direct eval (both modes)
 $audioData = $_POST['audio'] ?? '';
 $parts = [['text' => $prompt]];
-if ($audioData && $mode === 'pronunciation') {
-    // Audio is base64 webm — send to Gemini for direct listening
-    $parts = [
-        ['inlineData' => ['mimeType' => 'audio/webm', 'data' => $audioData]],
-        ['text' => 'Listen to this audio recording of a learner trying to say: "' . $target . '". '
-            . 'GRADING LEVEL (' . $strictness . '/5): ' . $strictnessGuide[$strictness] . ' '
-            . 'PASS if the spoken words are recognizably the right Hungarian words. Minor accent is fine. '
-            . 'FAIL if key words are missing or so distorted a Hungarian speaker would not understand. '
-            . 'The speech recognition transcript was: "' . $transcript . '" — but evaluate the AUDIO, not the transcript (speech recognition for accented Hungarian is unreliable). '
-            . 'Reply ONLY with JSON: {"pass":true/false,"feedback":"1 sentence max","correct":"' . $target . '","pronunciation_poor":true/false}']
-    ];
+if ($audioData) {
+    if ($mode === 'pronunciation') {
+        $parts = [
+            ['inlineData' => ['mimeType' => 'audio/webm', 'data' => $audioData]],
+            ['text' => 'Listen to this audio recording of a learner trying to say: "' . $target . '". '
+                . 'GRADING LEVEL (' . $strictness . '/5): ' . $strictnessGuide[$strictness] . ' '
+                . 'PASS if the spoken words are recognizably the right Hungarian words. Minor accent is fine. '
+                . 'FAIL if key words are missing or so distorted a Hungarian speaker would not understand. '
+                . 'The speech recognition transcript was: "' . $transcript . '" — but evaluate the AUDIO, not the transcript (speech recognition for accented Hungarian is unreliable). '
+                . 'Reply ONLY with JSON: {"pass":true/false,"feedback":"1 sentence max","correct":"' . $target . '","pronunciation_poor":true/false}']
+        ];
+    } else {
+        // Interview mode — send audio so Gemini hears the actual speech
+        $parts = [
+            ['inlineData' => ['mimeType' => 'audio/webm', 'data' => $audioData]],
+            ['text' => $prompt . "\n\n" . 'IMPORTANT: The transcript above came from Web Speech API which is unreliable for accented Hungarian. '
+                . 'Listen to the AUDIO recording to determine what the learner actually said. '
+                . 'If the audio clearly says something different from the transcript, grade based on what you HEAR.']
+        ];
+    }
 }
 $payload = json_encode([
     'contents' => [['parts' => $parts]],
@@ -137,7 +146,7 @@ $payload = json_encode([
 ]);
 
 // Use flash (not lite) when audio is included — lite doesn't support audio
-$model = ($audioData && $mode === 'pronunciation') ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
+$model = $audioData ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
 $ch = curl_init('https://generativelanguage.googleapis.com/v1/models/' . $model . ':generateContent?key=' . $apiKey);
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,

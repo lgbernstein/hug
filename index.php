@@ -2118,9 +2118,9 @@ recognition.onresult = function(event) {
     fd.append('strictness', strictness);
     if (targetAH) fd.append('expected_hu', targetAH);
 
-    // Send audio to Gemini for direct pronunciation eval (bypasses bad Web Speech API transcription)
+    // Send audio to Gemini for direct eval (bypasses unreliable Web Speech API transcription)
     var audioPromise = Promise.resolve();
-    if (lastRecordingBlob && currentMode === 'pronunciation') {
+    if (lastRecordingBlob) {
         audioPromise = new Promise(function(resolve) {
             var reader = new FileReader();
             reader.onload = function() {
@@ -2234,11 +2234,7 @@ recognition.onresult = function(event) {
 
             // Repeat correct on fail
             if (!isPass && repeatOnFail && correctAnswer) {
-                setTimeout(function() {
-                    var msg = new SpeechSynthesisUtterance(correctAnswer);
-                    msg.lang = 'hu-HU'; msg.rate = 0.8;
-                    window.speechSynthesis.speak(msg);
-                }, 1500);
+                setTimeout(function() { elevenSpeak(correctAnswer); }, 1500);
             }
 
             // SRS tracking
