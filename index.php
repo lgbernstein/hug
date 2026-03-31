@@ -433,7 +433,7 @@ Give exactly 3 examples and 3 quiz questions. Make them relevant to daily life a
     $url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=$apiKey";
     $payload = json_encode([
         'contents' => [['parts' => [['text' => $prompt]]]],
-        'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048, 'responseMimeType' => 'application/json']
+        'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048]
     ]);
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -601,7 +601,7 @@ Give exactly 3 key facts and 3 quiz questions. Key facts should be in Hungarian 
     $url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=$apiKey";
     $payload = json_encode([
         'contents' => [['parts' => [['text' => $prompt]]]],
-        'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048, 'responseMimeType' => 'application/json']
+        'generationConfig' => ['temperature' => 0.4, 'maxOutputTokens' => 2048]
     ]);
     $ch = curl_init($url);
     curl_setopt_array($ch, [
@@ -2140,72 +2140,63 @@ recognition.onresult = function(event) {
             var fb = (data.feedback || '').split(/\.\s/)[0];
             if (fb.length > 80) fb = fb.substring(0, 77) + '...';
 
-            // Replace content area with clean result panel at eye level
-            var content = document.getElementById('sessionContent');
-            var controls = document.getElementById('sessionControls');
-            if (content && activeSession) {
-                content.textContent = '';
-                controls.textContent = '';
+            // Show result as a small floating popup — don't change the page
+            var oldPopup = document.getElementById('evalPopup');
+            if (oldPopup) oldPopup.remove();
 
-                // Pass/Fail badge — big and centered
-                var badge = document.createElement('div');
-                badge.className = 'text-center mb-3';
-                var badgeSpan = document.createElement('span');
-                badgeSpan.className = 'inline-flex items-center px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wider ' +
-                    (isPass ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
-                badgeSpan.textContent = isPass ? '✓ Pass' : '✗ Try Again';
-                badge.appendChild(badgeSpan);
-                content.appendChild(badge);
+            var popup = document.createElement('div');
+            popup.id = 'evalPopup';
+            popup.className = 'fixed top-1/3 left-1/2 z-50 rounded-2xl p-5 shadow-2xl text-center max-w-sm w-[90%]';
+            popup.style.cssText = 'transform:translate(-50%,-50%);animation:fadeIn 0.2s ease-out;' +
+                (isPass ? 'background:#0f2818;border:1px solid rgba(34,197,94,0.3)' : 'background:#281010;border:1px solid rgba(239,68,68,0.3)');
 
-                // The phrase
-                var phrase = document.createElement('h1');
-                phrase.className = 'question-text text-white mb-1 text-center';
-                phrase.textContent = targetQ;
-                content.appendChild(phrase);
+            // Badge
+            var badgeSpan = document.createElement('div');
+            badgeSpan.className = 'text-lg font-bold mb-2 ' + (isPass ? 'text-green-400' : 'text-red-400');
+            badgeSpan.textContent = isPass ? '✓ Pass' : '✗ Try Again';
+            popup.appendChild(badgeSpan);
 
-                // Short feedback
-                if (fb) {
-                    var fbEl = document.createElement('p');
-                    fbEl.className = 'text-xs text-center mb-3 ' + (isPass ? 'text-green-400/70' : 'text-red-400/70');
-                    fbEl.textContent = fb;
-                    content.appendChild(fbEl);
-                }
+            // Feedback
+            if (fb) {
+                var fbEl = document.createElement('p');
+                fbEl.className = 'text-xs mb-2 ' + (isPass ? 'text-green-300/70' : 'text-red-300/70');
+                fbEl.textContent = fb;
+                popup.appendChild(fbEl);
+            }
 
-                // What you said (small)
-                var said = document.createElement('p');
-                said.className = 'text-xs text-slate-500 text-center italic mb-4';
-                said.textContent = 'You said: "' + result + '"';
-                content.appendChild(said);
+            // What you said
+            var said = document.createElement('p');
+            said.className = 'text-[11px] text-slate-500 italic mb-3';
+            said.textContent = 'You said: "' + result + '"';
+            popup.appendChild(said);
 
-                // Action buttons — one row
-                var btnRow = document.createElement('div');
-                btnRow.className = 'flex items-center justify-center gap-3';
+            // Buttons row
+            var btnRow = document.createElement('div');
+            btnRow.className = 'flex items-center justify-center gap-2';
 
-                var listenBtn = document.createElement('button');
-                listenBtn.className = 'px-5 py-2.5 rounded-xl text-sm font-bold transition-all bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
-                listenBtn.textContent = '🔊 Listen Again';
-                listenBtn.onclick = function() { speak(currentSpeed, false); };
-                btnRow.appendChild(listenBtn);
+            var retryBtn = document.createElement('button');
+            retryBtn.className = 'btn-primary text-xs';
+            retryBtn.textContent = isPass ? 'Next →' : '🎤 Retry';
+            retryBtn.onclick = function() {
+                popup.remove();
+                if (isPass) { sessionIdx++; renderSessionStep(); }
+                else { speak(currentSpeed); }
+            };
+            btnRow.appendChild(retryBtn);
 
-                if (lastRecordingBlob) {
-                    var hearBtn = document.createElement('button');
-                    hearBtn.className = 'px-4 py-2.5 rounded-xl text-sm font-bold transition-all bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
-                    hearBtn.textContent = '🎤 Hear Myself';
-                    hearBtn.onclick = playMyVoice;
-                    btnRow.appendChild(hearBtn);
-                }
+            // Enable Hear Me if recording exists
+            var ghm = document.getElementById('gridHearMe');
+            if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.style.opacity = '1'; }
 
-                var nextBtn = document.createElement('button');
-                nextBtn.className = 'px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all ' +
-                    (isPass ? 'bg-accent hover:bg-accent-dark' : 'bg-red-500/80 hover:bg-red-500');
-                nextBtn.textContent = isPass ? 'Next →' : '🎤 Retry';
-                nextBtn.onclick = function() {
-                    if (isPass) { sessionIdx++; renderSessionStep(); }
-                    else { renderSessionStep(); }
-                };
-                btnRow.appendChild(nextBtn);
-                controls.appendChild(btnRow);
-            } else {
+            popup.appendChild(btnRow);
+            document.body.appendChild(popup);
+
+            // Auto-dismiss on pass after 2s
+            if (isPass && activeSession) {
+                setTimeout(function() { if (document.getElementById('evalPopup')) { popup.remove(); sessionIdx++; renderSessionStep(); } }, 2500);
+            }
+
+            if (!activeSession) {
                 // Non-session fallback — use existing resultCard
                 scoreDisplay.textContent = '';
                 var topRow = document.createElement('div');
