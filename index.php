@@ -3549,6 +3549,31 @@ function renderAudioStep(step, content, controls) {
         }
     };
     skipRow.appendChild(skipBtn);
+
+    // Grammar breakdown button
+    var breakdownBtn = document.createElement('button');
+    breakdownBtn.className = 'text-[11px] text-yellow-400/70 hover:text-yellow-300 transition-colors underline decoration-dotted underline-offset-2 ml-4';
+    breakdownBtn.textContent = '📖 Break it down';
+    breakdownBtn.onclick = function(e) {
+        e.stopPropagation();
+        breakdownBtn.textContent = '📖 Loading...';
+        breakdownBtn.disabled = true;
+        var fd = new FormData();
+        fd.append('sentence', step.a_hu || step.q);
+        fd.append('english', step.a || '');
+        fetch('?ajax=1&action=breakdown', { method: 'POST', body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                breakdownBtn.classList.add('hidden');
+                var bdContainer = document.createElement('div');
+                bdContainer.className = 'mt-3';
+                skipRow.parentNode.insertBefore(bdContainer, skipRow.nextSibling);
+                renderBreakdown(data, bdContainer);
+            })
+            .catch(function() { breakdownBtn.textContent = '📖 Error — try again'; breakdownBtn.disabled = false; });
+    };
+    skipRow.appendChild(breakdownBtn);
+
     controls.appendChild(skipRow);
 
     // Result area (filled after eval — session-aware)
