@@ -905,10 +905,10 @@ body { background: #111827; color: #f1f5f9; overflow-x: hidden; }
 .btn-teal { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #14b8a6; color: white; transition: all 0.15s; cursor: pointer; }
 .btn-teal:hover { background: #0d9488; }
 .btn-teal:active { transform: scale(0.97); }
-.btn-purple { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #a78bfa; color: #1e1b4b; transition: all 0.15s; cursor: pointer; }
-.btn-purple:hover { background: #8b5cf6; color: white; }
+.btn-purple { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #7c3aed; color: #fff; transition: all 0.15s; cursor: pointer; }
+.btn-purple:hover { background: #6d28d9; }
 .btn-purple:active { transform: scale(0.97); }
-.btn-purple:disabled { background: #6d28d9; color: #a78bfa; opacity: 0.5; cursor: default; }
+.btn-purple:disabled { background: #5b21b6; color: #c4b5fd; opacity: 0.5; cursor: default; }
 .btn-sky { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0369a1; color: #bae6fd; transition: all 0.15s; cursor: pointer; }
 .btn-sky:hover { background: #075985; }
 .btn-sky:active { transform: scale(0.97); }
@@ -3718,18 +3718,18 @@ function renderAudioStep(step, content, controls) {
     var wrap = document.createElement('div');
     wrap.className = 'flex justify-end mt-2';
     var grid = document.createElement('div');
-    grid.className = 'grid grid-cols-2 gap-2';
+    grid.className = 'flex flex-col gap-2';
     grid.style.width = '280px';
 
     function doSpeak() { targetQ = step.q; targetA = step.a; targetAH = step.a_hu || ''; currentMode = step.mode || 'pronunciation'; speak(currentSpeed); }
     function doNext() { if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); } else { nextQuestion(); } }
 
-    var b1 = document.createElement('button'); b1.className = 'btn-primary col-span-2'; b1.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer'; b1.onclick = doSpeak; grid.appendChild(b1);
-    var b2 = document.createElement('button'); b2.className = 'btn-next col-span-2'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
+    var b1 = document.createElement('button'); b1.className = 'btn-primary'; b1.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer'; b1.onclick = doSpeak; grid.appendChild(b1);
+    var b2 = document.createElement('button'); b2.className = 'btn-next'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
     var b4 = document.createElement('button'); b4.className = 'btn-purple'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = function() { playMyVoice(); }; grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
-    var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 English';
+    var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 Show English';
     enBtn.onclick = function() { var t = document.querySelector('#sessionContent span[style*="blur"]'); if (t) { t.style.filter = t.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)'; } };
     grid.appendChild(enBtn);
 
