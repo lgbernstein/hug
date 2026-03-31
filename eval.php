@@ -123,12 +123,7 @@ if ($audioData) {
     if ($mode === 'pronunciation') {
         $parts = [
             ['inlineData' => ['mimeType' => 'audio/webm', 'data' => $audioData]],
-            ['text' => 'Listen to this audio recording of a learner trying to say: "' . $target . '". '
-                . 'GRADING LEVEL (' . $strictness . '/5): ' . $strictnessGuide[$strictness] . ' '
-                . 'PASS if the spoken words are recognizably the right Hungarian words. Minor accent is fine. '
-                . 'FAIL if key words are missing or so distorted a Hungarian speaker would not understand. '
-                . 'Ignore the browser transcript ("' . $transcript . '") — it is unreliable. Listen to the AUDIO only. '
-                . 'Reply ONLY with JSON: {"pass":true/false,"feedback":"1 sentence max","correct":"' . $target . '","pronunciation_poor":true/false,"heard":"what you actually heard them say in Hungarian, your best transcription"}']
+            ['text' => 'Target: "' . $target . '". Grade ' . $strictness . '/5. PASS=recognizable, FAIL=missing/wrong words. JSON only: {"pass":bool,"feedback":"<10 words","heard":"transcription","pronunciation_poor":bool}']
         ];
     } else {
         // Interview mode
@@ -142,7 +137,7 @@ if ($audioData) {
 }
 $payload = json_encode([
     'contents' => [['parts' => $parts]],
-    'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 2048]
+    'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => ($audioData ? 256 : 2048)]
 ]);
 
 // Use flash (not lite) when audio is included — lite doesn't support audio

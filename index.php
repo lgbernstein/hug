@@ -899,6 +899,19 @@ body { background: #111827; color: #f1f5f9; overflow-x: hidden; }
 .btn-ghost { padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #94a3b8; background: transparent; border: none; transition: all 0.15s; cursor: pointer; }
 .btn-ghost:hover { color: #e2e8f0; background: rgba(255,255,255,0.05); }
 .btn-ghost:disabled { opacity: 0.35; cursor: default; }
+.btn-next { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0ea5e9; color: white; transition: all 0.15s; cursor: pointer; }
+.btn-next:hover { background: #0284c7; }
+.btn-next:active { transform: scale(0.97); }
+.btn-teal { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #14b8a6; color: white; transition: all 0.15s; cursor: pointer; }
+.btn-teal:hover { background: #0d9488; }
+.btn-teal:active { transform: scale(0.97); }
+.btn-purple { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #8b5cf6; color: white; transition: all 0.15s; cursor: pointer; }
+.btn-purple:hover { background: #7c3aed; }
+.btn-purple:active { transform: scale(0.97); }
+.btn-purple:disabled { background: #4c1d95; opacity: 0.4; cursor: default; }
+.btn-sky { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0369a1; color: #bae6fd; transition: all 0.15s; cursor: pointer; }
+.btn-sky:hover { background: #075985; }
+.btn-sky:active { transform: scale(0.97); }
 /* Results */
 .result-pass { border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.12); }
 .result-fail { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.12); }
@@ -1098,11 +1111,9 @@ select option { background: #1a2236; color: #f1f5f9; }
             <div class="flex items-center justify-between px-4 py-1.5 border-b border-white/5">
                 <span id="sessionBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
                 <div class="flex items-center gap-2">
-                    <button id="listenModeBtn" onclick="toggleListenMode()" title="Blur text" class="px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all"></button>
                     <span id="sessionProgress" class="text-[10px] text-slate-500 font-medium tabular-nums"></span>
-                    <button onclick="exitSession()" class="p-1 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
-                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                    </button>
+                    <button id="pauseSessionBtn" onclick="togglePauseSession()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500/15 text-teal-400 hover:bg-teal-500/25 transition-all" title="Pause (P)">Pause</button>
+                    <button onclick="exitSession()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-all" title="Stop & exit (Esc)">Stop</button>
                 </div>
             </div>
             <div id="sessionToolbar" class="hidden"></div>
@@ -2723,18 +2734,23 @@ document.addEventListener('keydown', function(e) {
         var trans = document.querySelector('#sessionContent span[style*="blur"]');
         if (trans) trans.style.filter = trans.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)';
         else { var d = document.getElementById('revealDetails'); if (d) d.open = !d.open; }
-    } else if (e.key === 'Escape') {
-        // Stop everything
+    } else if (e.key === 'p' || e.key === 'P') {
+        // P = Pause/Resume
         e.preventDefault();
-        window.speechSynthesis.cancel();
-        if (isListening) { try { recognition.stop(); } catch(e2) {} }
-        clearTimeout(recTimeout);
-        clearTimeout(advanceTimeout);
-        cleanupAudio();
-        isListening = false;
-        var toast = document.getElementById('evalToast'); if (toast) toast.remove();
+        if (activeSession) togglePauseSession();
+    } else if (e.key === 'Escape') {
+        // Esc = Stop and exit session
+        e.preventDefault();
+        if (activeSession) { exitSession(); }
+        else {
+            window.speechSynthesis.cancel();
+            if (isListening) { try { recognition.stop(); } catch(e2) {} }
+            clearTimeout(recTimeout);
+            cleanupAudio();
+            isListening = false;
+        }
         closeBreakdownDrawer();
-        indicator.className = 'status-dot dot-off';
+        var toast = document.getElementById('evalToast'); if (toast) toast.remove();
     }
 });
 
@@ -3709,10 +3725,10 @@ function renderAudioStep(step, content, controls) {
     function doNext() { if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); } else { nextQuestion(); } }
 
     var b1 = document.createElement('button'); b1.className = 'btn-primary col-span-2'; b1.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer'; b1.onclick = doSpeak; grid.appendChild(b1);
-    var b2 = document.createElement('button'); b2.className = 'btn-secondary col-span-2'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
-    var b3 = document.createElement('button'); b3.className = 'btn-secondary'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
-    var b4 = document.createElement('button'); b4.className = 'btn-secondary'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.style.opacity = '0.35'; b4.onclick = function() { playMyVoice(); }; grid.appendChild(b4);
-    var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-ghost col-span-2 text-sky-400'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
+    var b2 = document.createElement('button'); b2.className = 'btn-next col-span-2'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
+    var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
+    var b4 = document.createElement('button'); b4.className = 'btn-purple'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = function() { playMyVoice(); }; grid.appendChild(b4);
+    var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky col-span-2'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
 
     wrap.appendChild(grid); controls.appendChild(wrap);
 
@@ -3939,10 +3955,44 @@ function closeSessionSummary() {
     loadDailyPlan();
 }
 
+var sessionPaused = false;
+
+function togglePauseSession() {
+    sessionPaused = !sessionPaused;
+    var btn = document.getElementById('pauseSessionBtn');
+    if (sessionPaused) {
+        // Pause: stop all audio, recording, timers
+        window.speechSynthesis.cancel();
+        if (isListening) { try { recognition.stop(); } catch(e) {} }
+        clearTimeout(recTimeout);
+        clearTimeout(advanceTimeout);
+        cleanupAudio();
+        isListening = false;
+        var toast = document.getElementById('evalToast'); if (toast) toast.remove();
+        if (btn) { btn.textContent = 'Resume'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all'; }
+    } else {
+        // Resume: re-speak current phrase
+        if (btn) { btn.textContent = 'Pause'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500/15 text-teal-400 hover:bg-teal-500/25 transition-all'; }
+        speak(currentSpeed);
+    }
+}
+
 function exitSession() {
+    // Stop everything first
+    sessionPaused = false;
+    window.speechSynthesis.cancel();
+    if (isListening) { try { recognition.stop(); } catch(e) {} }
+    clearTimeout(recTimeout);
+    clearTimeout(advanceTimeout);
+    cleanupAudio();
+    isListening = false;
+    var toast = document.getElementById('evalToast'); if (toast) toast.remove();
+
     activeSession = false;
     document.getElementById('sessionCard').classList.add('hidden');
     document.getElementById('planBlockList').classList.remove('hidden');
+    var btn = document.getElementById('pauseSessionBtn');
+    if (btn) { btn.textContent = 'Pause'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500/15 text-teal-400 hover:bg-teal-500/25 transition-all'; }
     // Log partial progress
     if (sessionBlockInfo && sessionTotalCount > 0) {
         var elapsed = Math.round((new Date() - sessionStartTime) / 60000);
