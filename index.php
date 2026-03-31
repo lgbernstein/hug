@@ -473,7 +473,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
 
     $sentenceEsc = addslashes($sentence);
     $englishEsc = addslashes($english);
-    $prompt = "You are a Hungarian language tutor. Break down this Hungarian sentence word-by-word for an English speaker.\n\nSentence: **{$sentenceEsc}**" . ($english ? "\nEnglish meaning: {$englishEsc}" : "") . "\n\nFor EACH word or particle, explain:\n1. The base word and its meaning\n2. Any suffixes, cases, or conjugation endings and what they do\n3. Why this form is used here\n\nKeep explanations SHORT and practical. Use this JSON format:\n{\n  \"words\": [\n    {\"word\": \"the Hungarian word\", \"base\": \"dictionary form\", \"meaning\": \"English meaning\", \"suffixes\": \"explanation of endings/suffixes or none\", \"role\": \"its role in the sentence\"}\n  ],\n  \"structure\": \"One sentence explaining the overall sentence structure.\",\n  \"tip\": \"One practical tip for remembering this pattern.\"\n}\n\nBe concise. Focus on suffixes and grammar mechanics.";
+    $prompt = "Break down this Hungarian sentence for a beginner. Be ULTRA BRIEF — max 5 words per field.\n\nSentence: {$sentenceEsc}" . ($english ? " ({$englishEsc})" : "") . "\n\nJSON format:\n{\"words\":[{\"word\":\"hungarian\",\"base\":\"dict form\",\"meaning\":\"english\",\"suffixes\":\"suffix info or none\"}],\"tip\":\"one short tip\"}\n\nRules: suffixes field = just the suffix and what it does (e.g. \"-ban = in\"). No role field. No structure field. Keep meaning to 1-2 words. Keep tip under 10 words.";
 
     $apiKey = $env['GEMINI_KEY'];
     $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
@@ -1631,7 +1631,7 @@ function startVolume() {
             analyser.getByteFrequencyData(data);
             var vol = Math.min(100, (data.reduce(function(a, b) { return a + b; }) / data.length) * 5);
             volFill.style.width = vol + '%';
-            if (!isListening || (Date.now() - listenStartTime) < 200) return;
+            if (!isListening) return;
             if (vol > VAD_THRESHOLD) {
                 vadLastSpeech = Date.now();
                 vadSpeaked    = true;
@@ -1646,9 +1646,13 @@ function startVolume() {
             mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) audioChunks.push(e.data); };
             mediaRecorder.onstop = function() {
                 lastRecordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                // Enable grid Hear Me button
+                var ghm = document.getElementById('gridHearMe');
+                if (ghm) { ghm.disabled = false; ghm.style.opacity = '1'; }
                 if (showPlaybackWhenReady) {
                     showPlaybackWhenReady = false;
-                    document.getElementById('playbackBtn').classList.remove('hidden');
+                    var pb = document.getElementById('playbackBtn');
+                    if (pb) pb.classList.remove('hidden');
                 }
             };
             mediaRecorder.start();
@@ -2010,7 +2014,7 @@ recognition.onstart = function() {
 };
 
 recognition.onresult = function(event) {
-    if (Date.now() - listenStartTime < 200) return;
+    // Echo guard removed — 350ms post-TTS gap is sufficient
     if (!isListening) return;
     clearTimeout(recTimeout);
     recognition.stop();
@@ -3120,7 +3124,7 @@ function renderBreakdown(data, container) {
         drawer.style.background = document.body.classList.contains('light') ? '#fff' : '#0f172a';
         drawer.style.borderLeft = '1px solid rgba(99,102,241,0.15)';
         drawer.style.transform = 'translateX(100%)';
-        drawer.style.transition = 'transform 0.25s ease-out';
+        drawer.style.transition = 'transform 0.15s ease-out';
         overlay.appendChild(drawer);
 
         // Tap backdrop to close
@@ -3131,64 +3135,48 @@ function renderBreakdown(data, container) {
     drawer.style.background = document.body.classList.contains('light') ? '#fff' : '#0f172a';
     drawer.textContent = '';
 
-    // Close button
+    // Close X top-right
     var closeBtn = document.createElement('button');
-    closeBtn.className = 'mb-2 text-slate-400 hover:text-white text-xs font-bold';
-    closeBtn.textContent = '✕ Close';
+    closeBtn.className = 'absolute top-3 right-3 text-slate-400 hover:text-white text-lg leading-none';
+    closeBtn.textContent = '✕';
     closeBtn.onclick = closeBreakdownDrawer;
+    drawer.style.position = 'relative';
     drawer.appendChild(closeBtn);
 
-    // Title
-    var title = document.createElement('h3');
-    title.className = 'text-sm font-bold text-yellow-400 mb-3';
-    title.textContent = '📖 Grammar Breakdown';
-    drawer.appendChild(title);
-
+    // Compact word list
     if (data.words && data.words.length) {
         data.words.forEach(function(w) {
-            var wordDiv = document.createElement('div');
-            wordDiv.className = 'border-b border-white/5 pb-2.5 mb-2.5';
-            var wordTitle = document.createElement('div');
-            wordTitle.className = 'flex items-baseline gap-2 flex-wrap';
+            var row = document.createElement('div');
+            row.className = 'py-2 border-b border-white/5';
+            var line1 = document.createElement('div');
+            line1.className = 'flex items-baseline gap-1.5';
             var hu = document.createElement('span');
             hu.className = 'text-sm font-bold text-yellow-300';
             hu.textContent = w.word;
-            wordTitle.appendChild(hu);
+            line1.appendChild(hu);
             if (w.base && w.base !== w.word) {
                 var base = document.createElement('span');
-                base.className = 'text-xs text-slate-400';
+                base.className = 'text-[11px] text-slate-500';
                 base.textContent = '← ' + w.base;
-                wordTitle.appendChild(base);
+                line1.appendChild(base);
             }
             var meaning = document.createElement('span');
-            meaning.className = 'text-xs text-slate-300';
-            meaning.textContent = '"' + w.meaning + '"';
-            wordTitle.appendChild(meaning);
-            wordDiv.appendChild(wordTitle);
-            if (w.suffixes && w.suffixes !== 'none') {
-                var suf = document.createElement('p');
-                suf.className = 'text-[11px] text-amber-200/80 mt-1';
+            meaning.className = 'text-[11px] text-slate-300';
+            meaning.textContent = w.meaning;
+            line1.appendChild(meaning);
+            row.appendChild(line1);
+            if (w.suffixes && w.suffixes !== 'none' && w.suffixes !== 'N/A') {
+                var suf = document.createElement('div');
+                suf.className = 'text-[10px] text-amber-300/80 mt-0.5';
                 suf.textContent = w.suffixes;
-                wordDiv.appendChild(suf);
+                row.appendChild(suf);
             }
-            if (w.role) {
-                var role = document.createElement('span');
-                role.className = 'inline-block mt-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/5 text-slate-500';
-                role.textContent = w.role;
-                wordDiv.appendChild(role);
-            }
-            drawer.appendChild(wordDiv);
+            drawer.appendChild(row);
         });
-    }
-    if (data.structure) {
-        var struct = document.createElement('p');
-        struct.className = 'text-xs text-slate-300 italic';
-        struct.textContent = data.structure;
-        drawer.appendChild(struct);
     }
     if (data.tip) {
         var tip = document.createElement('p');
-        tip.className = 'text-xs text-yellow-200/70 mt-2';
+        tip.className = 'text-[11px] text-yellow-200/70 mt-3 italic';
         tip.textContent = '💡 ' + data.tip;
         drawer.appendChild(tip);
     }
@@ -3635,11 +3623,26 @@ function renderAudioStep(step, content, controls) {
     if (listenMode) { q.classList.add('listen-blur'); q.onclick = function() { q.classList.remove('listen-blur'); }; }
     content.appendChild(q);
 
-    // Translation (small)
-    var trans = document.createElement('p');
-    trans.className = 'text-blue-300/70 text-sm italic mb-4';
-    trans.textContent = step.a;
-    content.appendChild(trans);
+    // Translation — tap to reveal
+    var transRow = document.createElement('div');
+    transRow.className = 'mb-3 flex items-center justify-center gap-1.5';
+    var transText = document.createElement('span');
+    transText.className = 'text-blue-300/70 text-sm italic';
+    transText.textContent = step.a;
+    transText.style.filter = 'blur(6px)';
+    transText.style.cursor = 'pointer';
+    transText.style.transition = 'filter 0.2s';
+    var transToggle = document.createElement('button');
+    transToggle.className = 'text-[10px] text-blue-400/50 hover:text-blue-300 font-bold px-1.5 py-0.5 rounded border border-blue-400/20';
+    transToggle.textContent = 'EN';
+    transToggle.title = 'Show/hide English';
+    var transVisible = false;
+    function toggleTrans() { transVisible = !transVisible; transText.style.filter = transVisible ? 'none' : 'blur(6px)'; }
+    transText.onclick = toggleTrans;
+    transToggle.onclick = toggleTrans;
+    transRow.appendChild(transText);
+    transRow.appendChild(transToggle);
+    content.appendChild(transRow);
 
     // Reveal answer (for interview mode)
     if (!isPron && step.a_hu) {
@@ -3677,54 +3680,51 @@ function renderAudioStep(step, content, controls) {
     content.appendChild(statusRow);
 
     // Listen & Speak button (above result card so it's always visible)
-    var listenBtn = document.createElement('button');
-    // Compact button row: Listen & Repeat | Repeat | Next | Breakdown
-    var btnRow = document.createElement('div');
-    btnRow.className = 'flex items-center justify-center gap-2';
+    // Button stack: all full-width, clear labels
+    var stack = document.createElement('div');
+    stack.className = 'flex flex-col gap-2 max-w-sm mx-auto w-full';
+    var btnClass = 'w-full py-2.5 rounded-lg text-sm font-bold transition-all active:scale-[0.98]';
 
-    listenBtn.className = 'flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-accent text-white hover:bg-accent-dark transition-all active:scale-95';
-    var speakerIcon = document.createElement('i');
-    speakerIcon.setAttribute('data-lucide', 'volume-2');
-    speakerIcon.className = 'w-3.5 h-3.5';
-    listenBtn.appendChild(speakerIcon);
-    var btnLabel = document.createElement('span');
-    btnLabel.textContent = isPron ? 'Listen & Repeat' : 'Listen & Answer';
-    listenBtn.appendChild(btnLabel);
+    var listenBtn = document.createElement('button');
+    listenBtn.className = btnClass + ' bg-accent text-white hover:bg-accent-dark';
+    listenBtn.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer';
     listenBtn.onclick = function() {
-        targetQ = step.q;
-        targetA = step.a;
-        targetAH = step.a_hu || '';
+        targetQ = step.q; targetA = step.a; targetAH = step.a_hu || '';
         currentMode = step.mode || 'pronunciation';
         speak(currentSpeed);
     };
-    btnRow.appendChild(listenBtn);
+    stack.appendChild(listenBtn);
 
-    var repeatBtn = document.createElement('button');
-    repeatBtn.className = 'flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold bg-surface-50 border border-white/10 text-slate-300 hover:text-white transition-all active:scale-95';
-    repeatBtn.textContent = '🔁';
-    repeatBtn.title = 'Repeat (no recording)';
-    repeatBtn.onclick = function() { speak(currentSpeed, false); };
-    btnRow.appendChild(repeatBtn);
-
-    var nextNavBtn = document.createElement('button');
-    nextNavBtn.className = 'flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold bg-surface-50 border border-white/10 text-slate-300 hover:text-white transition-all active:scale-95';
-    nextNavBtn.textContent = '→';
-    nextNavBtn.title = 'Next phrase';
-    nextNavBtn.onclick = function() {
-        if (activeSession && sessionSteps.length > 0) {
-            sessionIdx++;
-            sessionTotalCount++;
-            renderSessionStep();
-        } else {
-            nextQuestion();
-        }
+    var nextBtn = document.createElement('button');
+    nextBtn.className = btnClass + ' bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30';
+    nextBtn.textContent = 'Next →';
+    nextBtn.onclick = function() {
+        if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); }
+        else { nextQuestion(); }
     };
-    btnRow.appendChild(nextNavBtn);
+    stack.appendChild(nextBtn);
 
-    controls.appendChild(btnRow);
+    var hearAgainBtn = document.createElement('button');
+    hearAgainBtn.className = btnClass + ' bg-surface-50 border border-white/10 text-slate-300 hover:text-white';
+    hearAgainBtn.textContent = '🔊  Hear Again';
+    hearAgainBtn.onclick = function() { speak(currentSpeed, false); };
+    stack.appendChild(hearAgainBtn);
 
-    var skipRow = document.createElement('div');
-    skipRow.className = 'flex items-center justify-center mt-2';
+    var hearMeBtn = document.createElement('button');
+    hearMeBtn.id = 'gridHearMe';
+    hearMeBtn.className = btnClass + ' bg-surface-50 border border-white/10 text-slate-400';
+    hearMeBtn.textContent = '🎧  Hear Me';
+    hearMeBtn.disabled = true;
+    hearMeBtn.style.opacity = '0.35';
+    hearMeBtn.onclick = function() { playMyVoice(); };
+    stack.appendChild(hearMeBtn);
+
+    var breakdownRow = document.createElement('div');
+    breakdownRow.className = 'flex justify-center';
+    var skipRow = breakdownRow;
+    stack.appendChild(breakdownRow);
+
+    controls.appendChild(stack);
 
     // Grammar breakdown toggle button
     var breakdownBtn = document.createElement('button');
