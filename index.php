@@ -1056,6 +1056,15 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
         $availableMin -= $blockDuration;
     }
 
+    // ── 8b. Mock Interview — full 15-min conversation (once per day) ──
+    if ($availableMin >= 15 && empty($todayBlocks['mock_interview'])) {
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'mock_interview',
+            'title' => 'Mock Interview', 'subtitle' => '15-min conversation practice',
+            'duration' => 15, 'icon' => 'message-circle',
+            'session' => ['mode' => 'mock_interview']];
+        $availableMin -= 15;
+    }
+
     // ── 9. Add external resources — rotate all apps as passive blocks ──
     // Interleave external apps between active blocks: listening, vocab apps, lesson review
     $extApps = [
@@ -4049,7 +4058,8 @@ function renderDailyPlan(data) {
         if (bt.indexOf('mixed_') === 0) return 'border-indigo-500/20 bg-indigo-500/5';
         if (bt.indexOf('break') === 0) return 'border-slate-500/20 bg-slate-500/5';
         var m = { 'phrase_review': 'border-blue-500/20 bg-blue-500/5', 'grammar_lesson': 'border-purple-500/20 bg-purple-500/5',
-            'interview_sim': 'border-pink-500/20 bg-pink-500/5', 'knowledge_review': 'border-amber-500/20 bg-teal-500/5',
+            'interview_sim': 'border-pink-500/20 bg-pink-500/5', 'mock_interview': 'border-pink-500/20 bg-pink-500/5',
+            'knowledge_review': 'border-amber-500/20 bg-teal-500/5',
             'phrase_practice': 'border-green-500/20 bg-green-500/5', 'free_practice': 'border-accent/20 bg-accent/5' };
         return m[bt] || 'border-white/5 bg-surface-100 hover:border-accent/30';
     }
@@ -4057,7 +4067,8 @@ function renderDailyPlan(data) {
         if (bt.indexOf('mixed_') === 0) return 'bg-indigo-500/20 text-indigo-400';
         if (bt.indexOf('break') === 0) return 'bg-slate-500/15 text-slate-400';
         var m = { 'phrase_review': 'bg-blue-500/20 text-blue-400', 'grammar_lesson': 'bg-purple-500/20 text-purple-400',
-            'interview_sim': 'bg-pink-500/20 text-pink-400', 'knowledge_review': 'bg-teal-500/15 text-teal-400',
+            'interview_sim': 'bg-pink-500/20 text-pink-400', 'mock_interview': 'bg-pink-500/20 text-pink-400',
+            'knowledge_review': 'bg-teal-500/15 text-teal-400',
             'phrase_practice': 'bg-green-500/20 text-green-400' };
         return m[bt] || 'bg-white/5 text-slate-400';
     }
@@ -4253,6 +4264,12 @@ function startSessionBlock(block, blockIdx) {
                 });
                 setTimeout(renderSessionStep, 1800);
             });
+    } else if (mode === 'mock_interview') {
+        // Launch mock interview directly — exit the session framework
+        activeSession = false;
+        document.getElementById('sessionCard').classList.add('hidden');
+        startMockInterview(false);
+        return;
     } else if (mode === 'interleaved') {
         // Items pre-built by the orchestrator — convert to session steps
         var rawItems = block.session.items || [];
