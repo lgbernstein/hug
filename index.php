@@ -1805,6 +1805,7 @@ function webSpeechFallback(text, rate, onEnd) {
 }
 
 function speak(rate, autoRecord) {
+    if (breakdownOpen) return;
     if (autoRecord === undefined) autoRecord = true;
     window.speechSynthesis.cancel();
     isListening = false;
@@ -1955,6 +1956,7 @@ function setMode(mode) {
 function $set(id, prop, val) { var el = document.getElementById(id); if (el) { if (prop === 'text') el.textContent = val; else if (prop === 'hide') el.classList.add('hidden'); else if (prop === 'show') el.classList.remove('hidden'); else if (prop === 'removeClass') el.classList.remove(val); else if (prop === 'removeAttr') el.removeAttribute(val); } }
 
 function nextQuestion() {
+    if (breakdownOpen) return;
     isListening       = false;
     questionAttempted = false;
     showPlaybackWhenReady = false;
@@ -2264,17 +2266,19 @@ function processSpeechResult() {
             var ghm = document.getElementById('gridHearMe');
             if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.style.background = '#7c3aed'; ghm.style.color = '#fff'; ghm.style.cursor = 'pointer'; }
 
-            // Hands-free auto-flow — no clicking needed
+            // Hands-free auto-flow — no clicking needed (paused when breakdown is open)
             if (activeSession) {
                 if (isPass) {
                     // Pass: green flash 1.5s → next phrase
                     setTimeout(function() {
+                        if (breakdownOpen) return;
                         var t = document.getElementById('evalToast'); if (t) t.remove();
                         sessionIdx++; renderSessionStep();
                     }, 1500);
                 } else {
                     // Fail: show feedback 3s → auto re-speak → auto-listen
                     setTimeout(function() {
+                        if (breakdownOpen) return;
                         var t = document.getElementById('evalToast'); if (t) t.remove();
                         speak(currentSpeed);
                     }, 3000);
@@ -3357,12 +3361,15 @@ function renderBreakdown(data, container) {
     }
 
     // Open the drawer
+    breakdownOpen = true;
     overlay.style.opacity = '1';
     overlay.style.pointerEvents = 'auto';
     requestAnimationFrame(function() { drawer.style.transform = 'translateX(0)'; });
 }
 
+var breakdownOpen = false;
 function closeBreakdownDrawer() {
+    breakdownOpen = false;
     var overlay = document.getElementById('breakdownOverlay');
     var drawer = document.getElementById('breakdownDrawer');
     if (!overlay) return;
@@ -3848,7 +3855,7 @@ function renderAudioStep(step, content, controls) {
     grid.style.width = '280px';
 
     function doSpeak() { targetQ = step.q; targetA = step.a; targetAH = step.a_hu || ''; currentMode = step.mode || 'pronunciation'; speak(currentSpeed); }
-    function doNext() { if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); } else { nextQuestion(); } }
+    function doNext() { if (breakdownOpen) return; if (activeSession && sessionSteps.length > 0) { sessionIdx++; sessionTotalCount++; renderSessionStep(); } else { nextQuestion(); } }
 
     var b1 = document.createElement('button'); b1.className = 'btn-primary'; b1.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer'; b1.onclick = doSpeak; grid.appendChild(b1);
     var b2 = document.createElement('button'); b2.className = 'btn-next'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
