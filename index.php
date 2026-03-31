@@ -1426,11 +1426,14 @@ select option { background: #4a525a; color: #e8e6df; }
                                 <div id="fcFill" class="h-full bg-amber-500 rounded-full transition-all duration-300" style="width:0%"></div>
                             </div>
                         </div>
-                        <!-- Card + controls side by side -->
-                        <div class="p-5 flex gap-4 items-stretch flex-col md:flex-row">
-                            <div id="fcCardArea" class="flex-1 min-h-[280px] flex flex-col items-center justify-center">
-                            </div>
-                            <div id="fcControls" class="flex md:flex-col gap-2 md:w-[140px] md:justify-center shrink-0">
+                        <!-- Word list left + card right -->
+                        <div class="p-4 flex gap-4 items-start">
+                            <div id="fcWordList" class="hidden md:block w-[200px] shrink-0 max-h-[420px] overflow-y-auto text-sm space-y-0"></div>
+                            <div class="flex-1 flex flex-col items-center">
+                                <div id="fcCardArea" class="w-full min-h-[240px] flex flex-col items-center justify-center">
+                                </div>
+                                <div id="fcControls" class="flex gap-2 w-full mt-3">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -5701,91 +5704,58 @@ function renderFcCard() {
     wrapper.appendChild(inner);
     area.appendChild(wrapper);
 
-    // Speaker + Show All buttons
-    var speakRow = document.createElement('div');
-    speakRow.style.cssText = 'display:flex;justify-content:center;gap:10px;margin-top:12px';
+    // Speaker button
     var speakBtn = document.createElement('button');
-    speakBtn.style.cssText = 'padding:8px 20px;border-radius:10px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px';
+    speakBtn.style.cssText = 'margin-top:10px;padding:6px 16px;border-radius:8px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;font-size:13px;font-weight:600;cursor:pointer';
     speakBtn.textContent = '🔊 Listen';
     speakBtn.onclick = function(e) { e.stopPropagation(); elevenSpeak(card.front); };
-    speakRow.appendChild(speakBtn);
-    var showAllBtn = document.createElement('button');
-    showAllBtn.style.cssText = 'padding:8px 20px;border-radius:10px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;font-size:14px;font-weight:600;cursor:pointer';
-    showAllBtn.textContent = 'Show All';
-    showAllBtn.onclick = function(e) {
-        e.stopPropagation();
-        var existing = document.getElementById('fcAllTable');
-        if (existing) { existing.remove(); showAllBtn.textContent = 'Show All'; return; }
-        showAllBtn.textContent = 'Hide';
-        var tbl = document.createElement('div');
-        tbl.id = 'fcAllTable';
-        tbl.style.cssText = 'margin-top:16px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;max-height:400px;overflow-y:auto';
+    area.appendChild(speakBtn);
+
+    // Got It / Missed — always visible, right below card
+    var gotBtn = document.createElement('button');
+    gotBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-green-600 hover:bg-green-700 text-white';
+    gotBtn.textContent = '✓ Got It';
+    gotBtn.onclick = function(e) { e.stopPropagation(); fcGot++; fcIdx++; renderFcCard(); };
+
+    var missBtn = document.createElement('button');
+    missBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-red-600 hover:bg-red-700 text-white';
+    missBtn.textContent = '✗ Missed';
+    missBtn.onclick = function(e) { e.stopPropagation(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); fcIdx++; renderFcCard(); };
+
+    controls.appendChild(gotBtn);
+    controls.appendChild(missBtn);
+
+    // Populate left word list (desktop)
+    var wordList = document.getElementById('fcWordList');
+    if (wordList) {
+        wordList.textContent = '';
         var activeDeck = fcDecks.find(function(d) { return d.cards === fcCards; }) || fcDecks.find(function(d) {
             return d.cards.some(function(c) { return c.front === fcCards[0].front; });
         });
         var allCards = activeDeck ? activeDeck.cards : fcCards;
         allCards.forEach(function(c, i) {
             var row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;padding:6px 12px;gap:8px' + (i > 0 ? ';border-top:1px solid rgba(255,255,255,0.05)' : '') + (c.front === card.front ? ';background:rgba(99,102,241,0.15)' : '');
+            row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer' +
+                (c.front === card.front ? ';background:rgba(99,102,241,0.15)' : '');
             var spk = document.createElement('button');
-            spk.style.cssText = 'border:none;background:none;cursor:pointer;font-size:11px;color:#6366f1;flex-shrink:0;padding:0';
+            spk.style.cssText = 'border:none;background:none;cursor:pointer;font-size:10px;color:#6366f1;flex-shrink:0;padding:0';
             spk.textContent = '🔊';
             (function(txt) { spk.onclick = function(ev) { ev.stopPropagation(); elevenSpeak(txt); }; })(c.front);
             row.appendChild(spk);
             var hu = document.createElement('span');
-            hu.style.cssText = 'font-size:14px;font-weight:700;color:#fff;min-width:120px';
+            hu.style.cssText = 'font-size:12px;font-weight:600;color:#e2e8f0';
             hu.appendChild(highlightSuffix(c.front));
             row.appendChild(hu);
-            var en = document.createElement('span');
-            en.style.cssText = 'font-size:13px;color:#94a3b8;flex:1';
-            en.textContent = c.back;
-            row.appendChild(en);
-            tbl.appendChild(row);
+            // Click row to jump to that card
+            (function(idx) {
+                row.onclick = function() { fcIdx = idx; renderFcCard(); };
+            })(i);
+            wordList.appendChild(row);
         });
-        area.appendChild(tbl);
-    };
-    speakRow.appendChild(showAllBtn);
-    area.appendChild(speakRow);
-
-    // Navigation arrows + Got It / Missed
-    var navRow = document.createElement('div');
-    navRow.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%';
-
-    var prevBtn = document.createElement('button');
-    prevBtn.style.cssText = 'padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;font-size:18px;cursor:pointer';
-    prevBtn.textContent = '←';
-    prevBtn.onclick = function(e) { e.stopPropagation(); if (fcIdx > 0) { fcIdx--; renderFcCard(); } };
-    if (fcIdx === 0) { prevBtn.style.opacity = '0.3'; prevBtn.style.cursor = 'default'; }
-
-    var gotBtn = document.createElement('button');
-    gotBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-green-600 hover:bg-green-700 text-white';
-    gotBtn.textContent = '✓ Got It';
-    gotBtn.id = 'fcGotBtn';
-    gotBtn.style.display = 'none';
-    gotBtn.onclick = function(e) { e.stopPropagation(); fcGot++; fcIdx++; renderFcCard(); };
-
-    var missBtn = document.createElement('button');
-    missBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-red-600 hover:bg-red-700 text-white';
-    missBtn.textContent = '✗ Missed';
-    missBtn.id = 'fcMissBtn';
-    missBtn.style.display = 'none';
-    missBtn.onclick = function(e) { e.stopPropagation(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); fcIdx++; renderFcCard(); };
-
-    var nextBtn = document.createElement('button');
-    nextBtn.style.cssText = 'padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;font-size:18px;cursor:pointer';
-    nextBtn.textContent = '→';
-    nextBtn.onclick = function(e) { e.stopPropagation(); if (fcIdx < fcCards.length - 1) { fcIdx++; renderFcCard(); } };
-
-    navRow.appendChild(prevBtn);
-    controls.appendChild(gotBtn);
-    controls.appendChild(missBtn);
-    controls.appendChild(document.createTextNode(' '));
-    // Put arrows outside controls, in area
-    var arrowRow = document.createElement('div');
-    arrowRow.style.cssText = 'display:flex;justify-content:space-between;width:100%;margin-top:8px';
-    arrowRow.appendChild(prevBtn);
-    arrowRow.appendChild(nextBtn);
-    area.appendChild(arrowRow);
+        // Scroll current into view
+        var activeRow = wordList.children[fcIdx];
+        if (activeRow) activeRow.scrollIntoView({ block: 'nearest' });
+    }
 }
 
 // Touch swipe for flashcards
@@ -5808,10 +5778,6 @@ function flipFc() {
     if (!el) return;
     el.classList.toggle('flipped');
     fcFlipped = !fcFlipped;
-    if (fcFlipped) {
-        document.getElementById('fcGotBtn').style.display = '';
-        document.getElementById('fcMissBtn').style.display = '';
-    }
 }
 
 function renderFcSummary(area, controls) {
