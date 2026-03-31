@@ -1426,17 +1426,16 @@ select option { background: #4a525a; color: #e8e6df; }
                                 <div id="fcFill" class="h-full bg-amber-500 rounded-full transition-all duration-300" style="width:0%"></div>
                             </div>
                         </div>
-                        <!-- Card left + buttons right -->
-                        <div class="p-4 flex gap-4 items-center">
-                            <div class="flex-1 flex flex-col items-center">
-                                <div id="fcCardArea" class="w-full min-h-[240px] flex flex-col items-center justify-center">
+                        <!-- Show All left + Card center + buttons right -->
+                        <div class="p-4 flex gap-3 items-start">
+                            <div id="fcShowAllArea" class="hidden md:block w-[340px] shrink-0 max-h-[500px] overflow-y-auto"></div>
+                            <div class="flex-1 flex flex-col items-center justify-center min-h-[280px]">
+                                <div id="fcCardArea" class="w-full flex flex-col items-center justify-center">
                                 </div>
                             </div>
-                            <div id="fcControls" class="flex flex-col gap-2 w-[130px] shrink-0">
+                            <div id="fcControls" class="flex flex-col gap-2 w-[120px] shrink-0 pt-8">
                             </div>
                         </div>
-                        <!-- Show All table area -->
-                        <div id="fcShowAllArea" class="px-4 pb-4"></div>
                     </div>
                     <!-- Score tally -->
                     <div class="flex items-center justify-center gap-6 mt-3">
@@ -5607,6 +5606,7 @@ function startFcDeck(deckId) {
     fcMiss = 0;
     fcFlipped = false;
     fcMissedPile = [];
+    fcShowAllOpen = !!deck.groups;
 
     document.getElementById('fcDeckPicker').classList.add('hidden');
     document.getElementById('fcSession').classList.remove('hidden');
@@ -5769,7 +5769,8 @@ function renderFcShowAll() {
     var area = document.getElementById('fcShowAllArea');
     if (!area) return;
     area.textContent = '';
-    if (!fcShowAllOpen) return;
+    if (!fcShowAllOpen) { area.style.display = ''; return; }
+    area.style.display = 'block';
 
     var activeDeck = fcDecks.find(function(d) { return d.cards === fcCards; }) || fcDecks.find(function(d) {
         return d.cards.some(function(c) { return c.front === fcCards[0].front; });
@@ -5783,13 +5784,13 @@ function renderFcShowAll() {
         groups.forEach(function(g) {
             // Group header
             var header = document.createElement('div');
-            header.style.cssText = 'font-size:11px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 4px;margin-top:8px';
+            header.style.cssText = 'font-size:10px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:0.5px;padding:5px 0 2px;margin-top:4px';
             header.textContent = g.label;
             area.appendChild(header);
 
             // 2-column grid: én/te/ő left, mi/ti/ők right
             var grid = document.createElement('div');
-            grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:2px 16px';
+            grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:1px 8px';
             var cards = allCards.slice(g.start, g.start + g.count);
             var half = Math.ceil(cards.length / 2);
             var leftCol = cards.slice(0, half);
@@ -5820,7 +5821,7 @@ function renderFcShowAll() {
     } else {
         // No groups — simple 2-column list
         var grid = document.createElement('div');
-        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:2px 16px';
+        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:1px 8px';
         allCards.forEach(function(c, i) {
             var cell = document.createElement('div');
             cell.style.cssText = 'display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:12px' +
