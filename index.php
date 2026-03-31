@@ -429,28 +429,38 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'teach_me') {
     $explanation = trim($_POST['explanation'] ?? '');
     if (!$pattern) { echo json_encode(['error' => 'No pattern']); exit; }
 
-    $prompt = "You are a Hungarian language tutor helping an English speaker prepare for the simplified naturalization interview (egyszerűsített honosítás).
+    $prompt = "You are a Hungarian tutor for an American preparing for the citizenship interview.
 
-Teach this grammar pattern: **$pattern**
-" . ($suffix ? "Example words/suffixes: $suffix\n" : "") . ($explanation ? "Brief explanation: $explanation\n" : "") . "
+Teach: **$pattern**
+" . ($suffix ? "Words/suffixes: $suffix\n" : "") . ($explanation ? "Note: $explanation\n" : "") . "
 
-Respond in JSON with this exact structure:
+Return JSON with this EXACT structure. Be concise — learner wants quick, structured info, not paragraphs.
+
 {
-  \"lesson\": \"A clear, concise explanation (2-3 sentences) of what this pattern means and when to use it. Use simple English.\",
-  \"examples\": [
-    {\"hu\": \"Hungarian example sentence\", \"en\": \"English translation\", \"highlight\": \"the word(s) showing the pattern\"},
-    {\"hu\": \"...\", \"en\": \"...\", \"highlight\": \"...\"},
-    {\"hu\": \"...\", \"en\": \"...\", \"highlight\": \"...\"}
+  \"summary\": \"One sentence: what this pattern does and why it matters. Max 15 words.\",
+  \"roots\": [
+    {\"word\": \"base word\", \"meaning\": \"English meaning\", \"think\": \"short mnemonic like 'K = karakter (person)'\"}
   ],
+  \"buildups\": [
+    {\"form\": \"built form (e.g. mit)\", \"parts\": \"mi + -t\", \"meaning\": \"what (object)\", \"example_hu\": \"Mit csinál?\", \"example_en\": \"What are you doing?\"}
+  ],
+  \"table\": {
+    \"headers\": [\"Ending\", \"Column1\", \"Column2\"],
+    \"rows\": [[\"ending\", \"form1\", \"form2\"]]
+  },
+  \"memory_trick\": \"One memorable rule or mnemonic. Max 20 words.\",
   \"quiz\": [
-    {\"prompt\": \"Fill in: Budapesten ___. (I live)\", \"answer\": \"lakom\", \"hint\": \"Use the -k ending for 'I'\"},
-    {\"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\"},
-    {\"prompt\": \"...\", \"answer\": \"...\", \"hint\": \"...\"}
-  ],
-  \"tip\": \"One practical tip or mnemonic to remember this pattern.\"
+    {\"prompt\": \"Short fill-in question\", \"answer\": \"correct\", \"choices\": [\"correct\", \"wrong1\", \"wrong2\", \"wrong3\"]}
+  ]
 }
 
-Give exactly 3 examples and 3 quiz questions. Make them relevant to daily life and interview topics (family, work, where you live, why you want citizenship). Keep quiz prompts as fill-in-the-blank.";
+RULES:
+- roots: 1-3 base words this pattern builds from. Skip if not applicable (e.g. for verb conjugation, just show the endings).
+- buildups: 3-6 forms showing root + ending = meaning. Each with one interview-relevant example sentence.
+- table: a comparison grid (e.g. person vs thing columns, or pronoun conjugation). Make headers descriptive. Skip if not useful.
+- quiz: exactly 3 multiple-choice questions. Shuffle choices so answer is NOT always first. Use interview-relevant vocabulary.
+- No long paragraphs anywhere. Every field should be scannable.
+- Keep all example sentences relevant to: family, work, living situation, citizenship, Hungary.";
 
     $apiKey = $env['GEMINI_KEY'];
     $url = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=$apiKey";
@@ -4879,28 +4889,105 @@ function renderGrammarTeachStep(step, content, controls) {
             if (data.error) { content.textContent = data.error; return; }
             content.textContent = '';
 
-            // Pattern title
+            var wrap = document.createElement('div');
+            wrap.className = 'text-left space-y-4 w-full';
+
+            // 1. Title + one-line summary at top
             if (patternName) {
                 var titleEl = document.createElement('h2');
-                titleEl.className = 'text-lg font-bold text-purple-300 text-center mb-3';
+                titleEl.className = 'text-lg font-bold text-purple-300 text-center mb-1';
                 titleEl.textContent = patternName;
-                content.appendChild(titleEl);
+                wrap.appendChild(titleEl);
+            }
+            if (data.summary) {
+                var sumEl = document.createElement('p');
+                sumEl.className = 'text-xs text-slate-400 text-center mb-2';
+                sumEl.textContent = data.summary;
+                wrap.appendChild(sumEl);
+            }
+            // Fallback: legacy "lesson" field as summary
+            if (!data.summary && data.lesson) {
+                var legacySum = document.createElement('p');
+                legacySum.className = 'text-xs text-slate-400 text-center mb-2';
+                legacySum.textContent = data.lesson.substring(0, 120);
+                wrap.appendChild(legacySum);
             }
 
-            // Render lesson content
-            var lessonEl = document.createElement('div');
-            lessonEl.className = 'text-left space-y-3 w-full';
+            // 2. Roots — the base words this pattern builds from
+            if (data.roots && data.roots.length) {
+                var rootsEl = document.createElement('div');
+                rootsEl.className = 'flex flex-wrap gap-2 justify-center';
+                data.roots.forEach(function(r) {
+                    var chip = document.createElement('div');
+                    chip.className = 'bg-purple-500/15 border border-purple-500/30 rounded-lg px-3 py-2 text-center';
+                    var wordEl = document.createElement('div');
+                    wordEl.className = 'text-base font-bold text-purple-300';
+                    wordEl.textContent = r.word;
+                    var meanEl = document.createElement('div');
+                    meanEl.className = 'text-xs text-slate-400';
+                    meanEl.textContent = r.meaning;
+                    chip.appendChild(wordEl);
+                    chip.appendChild(meanEl);
+                    if (r.think) {
+                        var thinkEl = document.createElement('div');
+                        thinkEl.className = 'text-[10px] text-purple-400/70 mt-0.5';
+                        thinkEl.textContent = r.think;
+                        chip.appendChild(thinkEl);
+                    }
+                    rootsEl.appendChild(chip);
+                });
+                wrap.appendChild(rootsEl);
+            }
 
-            var lessonText = data.lesson || '';
-            var paragraphs = lessonText.split('\n').filter(function(p) { return p.trim(); });
-            paragraphs.forEach(function(para) {
-                var pEl = document.createElement('p');
-                pEl.className = 'text-sm text-slate-200 leading-relaxed';
-                renderMarkdownText(pEl, para);
-                lessonEl.appendChild(pEl);
-            });
+            // 3. Build-ups — root + ending = meaning + example
+            if (data.buildups && data.buildups.length) {
+                var buEl = document.createElement('div');
+                buEl.className = 'space-y-1.5';
+                data.buildups.forEach(function(b) {
+                    var row = document.createElement('div');
+                    row.className = 'bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-700/40 flex items-start gap-3';
+                    // Left: form + parts
+                    var left = document.createElement('div');
+                    left.className = 'min-w-[90px]';
+                    var formEl = document.createElement('div');
+                    formEl.className = 'text-sm font-bold text-white';
+                    formEl.textContent = b.form;
+                    var partsEl = document.createElement('div');
+                    partsEl.className = 'text-[10px] text-purple-400';
+                    partsEl.textContent = b.parts;
+                    left.appendChild(formEl);
+                    left.appendChild(partsEl);
+                    // Right: meaning + example
+                    var right = document.createElement('div');
+                    right.className = 'flex-1';
+                    var meanEl = document.createElement('div');
+                    meanEl.className = 'text-xs text-slate-300';
+                    meanEl.textContent = b.meaning;
+                    right.appendChild(meanEl);
+                    if (b.example_hu) {
+                        var exEl = document.createElement('div');
+                        exEl.className = 'text-xs mt-0.5';
+                        var huPart = document.createElement('span');
+                        huPart.className = 'text-cyan-300';
+                        huPart.textContent = b.example_hu;
+                        exEl.appendChild(huPart);
+                        if (b.example_en) {
+                            var enPart = document.createElement('span');
+                            enPart.className = 'text-slate-500 ml-1.5';
+                            enPart.textContent = '— ' + b.example_en;
+                            exEl.appendChild(enPart);
+                        }
+                        right.appendChild(exEl);
+                    }
+                    row.appendChild(left);
+                    row.appendChild(right);
+                    buEl.appendChild(row);
+                });
+                wrap.appendChild(buEl);
+            }
 
-            if (data.examples && data.examples.length) {
+            // Fallback: legacy "examples" array
+            if (!data.buildups && data.examples && data.examples.length) {
                 var exList = document.createElement('div');
                 exList.className = 'bg-slate-800/60 rounded-lg p-3 space-y-1.5 border border-slate-700/50';
                 data.examples.forEach(function(ex) {
@@ -4918,23 +5005,57 @@ function renderGrammarTeachStep(step, content, controls) {
                     }
                     exList.appendChild(exRow);
                 });
-                lessonEl.appendChild(exList);
+                wrap.appendChild(exList);
             }
 
-            if (data.tip) {
-                var tip = document.createElement('p');
-                tip.className = 'text-xs text-sky-200 bg-sky-500/5 rounded-lg p-3 border border-sky-400/15';
-                renderMarkdownText(tip, data.tip);
-                lessonEl.appendChild(tip);
+            // 4. Comparison table
+            if (data.table && data.table.headers && data.table.rows) {
+                var tblWrap = document.createElement('div');
+                tblWrap.className = 'overflow-x-auto';
+                var tbl = document.createElement('table');
+                tbl.className = 'w-full text-xs border-collapse';
+                var thead = document.createElement('thead');
+                var hRow = document.createElement('tr');
+                data.table.headers.forEach(function(h) {
+                    var th = document.createElement('th');
+                    th.className = 'px-3 py-1.5 text-left text-purple-400 font-bold border-b border-slate-700/50 bg-slate-800/40';
+                    th.textContent = h;
+                    hRow.appendChild(th);
+                });
+                thead.appendChild(hRow);
+                tbl.appendChild(thead);
+                var tbody = document.createElement('tbody');
+                data.table.rows.forEach(function(row) {
+                    var tr = document.createElement('tr');
+                    row.forEach(function(cell, ci) {
+                        var td = document.createElement('td');
+                        td.className = 'px-3 py-1.5 border-b border-slate-800/50 ' + (ci === 0 ? 'text-slate-400 font-medium' : 'text-white');
+                        td.textContent = cell;
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                tbl.appendChild(tbody);
+                tblWrap.appendChild(tbl);
+                wrap.appendChild(tblWrap);
             }
-            content.appendChild(lessonEl);
 
-            // Interactive quiz section
+            // 5. Memory trick
+            if (data.memory_trick || data.tip) {
+                var trick = document.createElement('div');
+                trick.className = 'text-xs text-sky-200 bg-sky-500/5 rounded-lg px-3 py-2 border border-sky-400/15 text-center';
+                trick.textContent = (data.memory_trick || data.tip);
+                wrap.appendChild(trick);
+            }
+
+            content.appendChild(wrap);
+
+            // 6. Quiz — multiple choice, no typing needed
             if (data.quiz && data.quiz.length) {
                 var quizEl = document.createElement('div');
                 quizEl.className = 'mt-4 space-y-3';
                 var quizTitle = document.createElement('div');
-                quizTitle.className = 'text-xs font-bold uppercase tracking-wider text-purple-400';
+                quizTitle.className = 'text-xs font-bold uppercase tracking-wider text-purple-400 text-center';
                 quizTitle.textContent = 'Quick Quiz';
                 quizEl.appendChild(quizTitle);
                 data.quiz.forEach(function(q) {
@@ -4944,37 +5065,63 @@ function renderGrammarTeachStep(step, content, controls) {
                     prompt.className = 'text-sm text-slate-200 mb-2';
                     prompt.textContent = q.prompt;
                     qRow.appendChild(prompt);
-                    var answerWrap = document.createElement('div');
-                    answerWrap.className = 'flex items-center gap-2';
-                    var input = document.createElement('input');
-                    input.type = 'text';
-                    input.className = 'flex-1 bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50';
-                    input.placeholder = q.hint || 'Type answer...';
-                    var checkBtn = document.createElement('button');
-                    checkBtn.className = 'px-3 py-1.5 bg-purple-600/60 hover:bg-purple-600 rounded-lg text-xs font-bold text-white transition-all';
-                    checkBtn.textContent = 'Check';
-                    var feedback = document.createElement('div');
-                    feedback.className = 'text-xs mt-1.5 hidden';
-                    checkBtn.onclick = (function(inp, fb, ans) {
-                        return function() {
-                            var userAns = inp.value.trim().toLowerCase();
-                            var correct = ans.toLowerCase();
-                            if (userAns === correct) {
-                                fb.textContent = 'Correct!';
-                                fb.className = 'text-xs mt-1.5 text-green-400';
-                                inp.className = inp.className.replace('border-slate-600/50', 'border-green-500/50');
-                            } else {
-                                fb.textContent = 'Answer: ' + ans;
-                                fb.className = 'text-xs mt-1.5 text-amber-400';
-                                inp.className = inp.className.replace('border-slate-600/50', 'border-amber-500/50');
-                            }
-                        };
-                    })(input, feedback, q.answer);
-                    input.onkeydown = (function(btn) { return function(e) { if (e.key === 'Enter') btn.click(); }; })(checkBtn);
-                    answerWrap.appendChild(input);
-                    answerWrap.appendChild(checkBtn);
-                    qRow.appendChild(answerWrap);
-                    qRow.appendChild(feedback);
+
+                    if (q.choices && q.choices.length) {
+                        // Multiple choice — no typing
+                        var choiceWrap = document.createElement('div');
+                        choiceWrap.className = 'grid grid-cols-2 gap-1.5';
+                        var shuffled = q.choices.slice().sort(function() { return Math.random() - 0.5; });
+                        shuffled.forEach(function(choice) {
+                            var btn = document.createElement('button');
+                            btn.className = 'px-3 py-2 bg-slate-700/60 hover:bg-slate-600/80 border border-slate-600/40 rounded-lg text-sm text-white font-medium transition-all text-left';
+                            btn.textContent = choice;
+                            btn.onclick = (function(b, correct, wrap) {
+                                return function() {
+                                    // Disable all buttons
+                                    var btns = wrap.querySelectorAll('button');
+                                    btns.forEach(function(bb) { bb.disabled = true; bb.classList.remove('hover:bg-slate-600/80'); bb.style.cursor = 'default'; });
+                                    if (choice.toLowerCase() === correct.toLowerCase()) {
+                                        b.className = b.className.replace('bg-slate-700/60', 'bg-green-600/40').replace('border-slate-600/40', 'border-green-500/50');
+                                    } else {
+                                        b.className = b.className.replace('bg-slate-700/60', 'bg-red-600/30').replace('border-slate-600/40', 'border-red-500/50');
+                                        // Highlight correct
+                                        btns.forEach(function(bb) {
+                                            if (bb.textContent.toLowerCase() === correct.toLowerCase()) {
+                                                bb.className = bb.className.replace('bg-slate-700/60', 'bg-green-600/40').replace('border-slate-600/40', 'border-green-500/50');
+                                            }
+                                        });
+                                    }
+                                };
+                            })(btn, q.answer, choiceWrap);
+                            choiceWrap.appendChild(btn);
+                        });
+                        qRow.appendChild(choiceWrap);
+                    } else {
+                        // Fallback: text input for legacy responses
+                        var answerWrap = document.createElement('div');
+                        answerWrap.className = 'flex items-center gap-2';
+                        var input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'flex-1 bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50';
+                        input.placeholder = q.hint || 'Type answer...';
+                        var checkBtn = document.createElement('button');
+                        checkBtn.className = 'px-4 py-2 bg-purple-600/60 hover:bg-purple-600 rounded-lg text-xs font-bold text-white transition-all';
+                        checkBtn.textContent = 'Check';
+                        var feedback = document.createElement('div');
+                        feedback.className = 'text-xs mt-1.5 hidden';
+                        checkBtn.onclick = (function(inp, fb, ans) {
+                            return function() {
+                                var userAns = inp.value.trim().toLowerCase();
+                                if (userAns === ans.toLowerCase()) { fb.textContent = 'Correct!'; fb.className = 'text-xs mt-1.5 text-green-400'; }
+                                else { fb.textContent = 'Answer: ' + ans; fb.className = 'text-xs mt-1.5 text-amber-400'; }
+                            };
+                        })(input, feedback, q.answer);
+                        input.onkeydown = (function(btn) { return function(e) { if (e.key === 'Enter') btn.click(); }; })(checkBtn);
+                        answerWrap.appendChild(input);
+                        answerWrap.appendChild(checkBtn);
+                        qRow.appendChild(answerWrap);
+                        qRow.appendChild(feedback);
+                    }
                     quizEl.appendChild(qRow);
                 });
                 content.appendChild(quizEl);
