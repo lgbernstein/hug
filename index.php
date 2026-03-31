@@ -3099,15 +3099,54 @@ function updateSpeedBar(bar) {
 }
 
 function renderBreakdown(data, container) {
-    var panel = document.createElement('div');
-    panel.className = 'bg-yellow-400/5 rounded-xl p-4 border border-yellow-400/15 text-left space-y-3';
+    // Slide-out panel from the right
+    var overlay = document.getElementById('breakdownOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'breakdownOverlay';
+        overlay.className = 'fixed inset-0 z-50 flex justify-end';
+        overlay.style.background = 'rgba(0,0,0,0.3)';
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.2s';
+        overlay.style.pointerEvents = 'none';
+        document.body.appendChild(overlay);
+
+        var drawer = document.createElement('div');
+        drawer.id = 'breakdownDrawer';
+        drawer.className = 'w-80 max-w-[85vw] h-full overflow-y-auto p-5 space-y-3';
+        drawer.style.background = document.body.classList.contains('light') ? '#fff' : '#0f172a';
+        drawer.style.borderLeft = '1px solid rgba(99,102,241,0.15)';
+        drawer.style.transform = 'translateX(100%)';
+        drawer.style.transition = 'transform 0.25s ease-out';
+        overlay.appendChild(drawer);
+
+        // Tap backdrop to close
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) closeBreakdownDrawer(); });
+    }
+
+    var drawer = document.getElementById('breakdownDrawer');
+    drawer.style.background = document.body.classList.contains('light') ? '#fff' : '#0f172a';
+    drawer.textContent = '';
+
+    // Close button
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'mb-2 text-slate-400 hover:text-white text-xs font-bold';
+    closeBtn.textContent = '✕ Close';
+    closeBtn.onclick = closeBreakdownDrawer;
+    drawer.appendChild(closeBtn);
+
+    // Title
+    var title = document.createElement('h3');
+    title.className = 'text-sm font-bold text-yellow-400 mb-3';
+    title.textContent = '📖 Grammar Breakdown';
+    drawer.appendChild(title);
 
     if (data.words && data.words.length) {
         data.words.forEach(function(w) {
             var wordDiv = document.createElement('div');
-            wordDiv.className = 'border-b border-white/5 pb-2';
+            wordDiv.className = 'border-b border-white/5 pb-2.5 mb-2.5';
             var wordTitle = document.createElement('div');
-            wordTitle.className = 'flex items-baseline gap-2';
+            wordTitle.className = 'flex items-baseline gap-2 flex-wrap';
             var hu = document.createElement('span');
             hu.className = 'text-sm font-bold text-yellow-300';
             hu.textContent = w.word;
@@ -3123,7 +3162,6 @@ function renderBreakdown(data, container) {
             meaning.textContent = '"' + w.meaning + '"';
             wordTitle.appendChild(meaning);
             wordDiv.appendChild(wordTitle);
-
             if (w.suffixes && w.suffixes !== 'none') {
                 var suf = document.createElement('p');
                 suf.className = 'text-[11px] text-amber-200/80 mt-1';
@@ -3136,23 +3174,35 @@ function renderBreakdown(data, container) {
                 role.textContent = w.role;
                 wordDiv.appendChild(role);
             }
-            panel.appendChild(wordDiv);
+            drawer.appendChild(wordDiv);
         });
     }
-
     if (data.structure) {
         var struct = document.createElement('p');
         struct.className = 'text-xs text-slate-300 italic';
         struct.textContent = data.structure;
-        panel.appendChild(struct);
+        drawer.appendChild(struct);
     }
     if (data.tip) {
         var tip = document.createElement('p');
-        tip.className = 'text-xs text-yellow-200/70';
+        tip.className = 'text-xs text-yellow-200/70 mt-2';
         tip.textContent = '💡 ' + data.tip;
-        panel.appendChild(tip);
+        drawer.appendChild(tip);
     }
-    container.appendChild(panel);
+
+    // Open the drawer
+    overlay.style.opacity = '1';
+    overlay.style.pointerEvents = 'auto';
+    requestAnimationFrame(function() { drawer.style.transform = 'translateX(0)'; });
+}
+
+function closeBreakdownDrawer() {
+    var overlay = document.getElementById('breakdownOverlay');
+    var drawer = document.getElementById('breakdownDrawer');
+    if (!overlay) return;
+    drawer.style.transform = 'translateX(100%)';
+    overlay.style.opacity = '0';
+    setTimeout(function() { overlay.style.pointerEvents = 'none'; }, 250);
 }
 
 function scoreQuizItem(item, passed) {
@@ -3637,28 +3687,33 @@ function renderAudioStep(step, content, controls) {
     };
     skipRow.appendChild(skipBtn);
 
-    // Grammar breakdown button
+    // Grammar breakdown toggle button
     var breakdownBtn = document.createElement('button');
     breakdownBtn.className = 'text-[11px] text-yellow-400/70 hover:text-yellow-300 transition-colors underline decoration-dotted underline-offset-2 ml-4';
     breakdownBtn.textContent = '📖 Break it down';
+    var breakdownLoaded = false;
     breakdownBtn.onclick = function(e) {
         e.stopPropagation();
+        var overlay = document.getElementById('breakdownOverlay');
+        // If already loaded, just toggle
+        if (breakdownLoaded) {
+            if (overlay && overlay.style.pointerEvents === 'auto') { closeBreakdownDrawer(); }
+            else { overlay.style.opacity = '1'; overlay.style.pointerEvents = 'auto'; document.getElementById('breakdownDrawer').style.transform = 'translateX(0)'; }
+            return;
+        }
         breakdownBtn.textContent = '📖 Loading...';
-        breakdownBtn.disabled = true;
         var fd = new FormData();
         fd.append('sentence', step.a_hu || step.q);
         fd.append('english', step.a || '');
         fetch('?ajax=1&action=breakdown', { method: 'POST', body: fd })
             .then(function(r) { return r.json(); })
             .then(function(data) {
-                if (data.error) { breakdownBtn.textContent = '📖 ' + data.error + ' — tap to retry'; breakdownBtn.disabled = false; return; }
-                breakdownBtn.classList.add('hidden');
-                var bdContainer = document.createElement('div');
-                bdContainer.className = 'mt-3';
-                skipRow.parentNode.insertBefore(bdContainer, skipRow.nextSibling);
-                renderBreakdown(data, bdContainer);
+                breakdownBtn.textContent = '📖 Break it down';
+                if (data.error) { breakdownBtn.textContent = '📖 Error — try again'; return; }
+                breakdownLoaded = true;
+                renderBreakdown(data, null);
             })
-            .catch(function() { breakdownBtn.textContent = '📖 Connection error — tap to retry'; breakdownBtn.disabled = false; });
+            .catch(function() { breakdownBtn.textContent = '📖 Error — try again'; });
     };
     skipRow.appendChild(breakdownBtn);
 
