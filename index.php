@@ -2164,10 +2164,11 @@ recognition.onresult = function(event) {
                 popup.appendChild(fbEl);
             }
 
-            // What you said
+            // What Gemini heard (much more accurate than Web Speech API)
+            var heardText = data.heard || result;
             var said = document.createElement('p');
             said.className = 'text-[11px] text-slate-500 italic mb-3';
-            said.textContent = 'You said: "' + result + '"';
+            said.textContent = 'Heard: "' + heardText + '"';
             popup.appendChild(said);
 
             // Buttons row

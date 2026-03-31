@@ -127,16 +127,16 @@ if ($audioData) {
                 . 'GRADING LEVEL (' . $strictness . '/5): ' . $strictnessGuide[$strictness] . ' '
                 . 'PASS if the spoken words are recognizably the right Hungarian words. Minor accent is fine. '
                 . 'FAIL if key words are missing or so distorted a Hungarian speaker would not understand. '
-                . 'The speech recognition transcript was: "' . $transcript . '" — but evaluate the AUDIO, not the transcript (speech recognition for accented Hungarian is unreliable). '
-                . 'Reply ONLY with JSON: {"pass":true/false,"feedback":"1 sentence max","correct":"' . $target . '","pronunciation_poor":true/false}']
+                . 'Ignore the browser transcript ("' . $transcript . '") — it is unreliable. Listen to the AUDIO only. '
+                . 'Reply ONLY with JSON: {"pass":true/false,"feedback":"1 sentence max","correct":"' . $target . '","pronunciation_poor":true/false,"heard":"what you actually heard them say in Hungarian, your best transcription"}']
         ];
     } else {
-        // Interview mode — send audio so Gemini hears the actual speech
+        // Interview mode
         $parts = [
             ['inlineData' => ['mimeType' => 'audio/webm', 'data' => $audioData]],
-            ['text' => $prompt . "\n\n" . 'IMPORTANT: The transcript above came from Web Speech API which is unreliable for accented Hungarian. '
-                . 'Listen to the AUDIO recording to determine what the learner actually said. '
-                . 'If the audio clearly says something different from the transcript, grade based on what you HEAR.']
+            ['text' => $prompt . "\n\n" . 'IMPORTANT: Ignore the browser transcript — it is unreliable for accented Hungarian. '
+                . 'Listen to the AUDIO to determine what the learner actually said. '
+                . 'Add a "heard" field to your JSON response with your best transcription of what they said.']
         ];
     }
 }
