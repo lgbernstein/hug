@@ -1181,18 +1181,18 @@ select option { background: #4a525a; color: #e8e6df; }
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div id="view-study" class="view-section hidden space-y-4">
 
-        <!-- Sub-nav -->
-        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-            <button onclick="showStudySub('scenarios')" id="studySub-scenarios" class="pill pill-active whitespace-nowrap">Scenarios</button>
-            <button onclick="showStudySub('flashcards')" id="studySub-flashcards" class="pill pill-inactive whitespace-nowrap">Flashcards</button>
-            <button onclick="showStudySub('grammar')" id="studySub-grammar" class="pill pill-inactive whitespace-nowrap">Grammar</button>
-            <button onclick="showStudySub('knowledge')" id="studySub-knowledge" class="pill pill-inactive whitespace-nowrap">Knowledge</button>
-            <button onclick="showStudySub('resources')" id="studySub-resources" class="pill pill-inactive whitespace-nowrap">Resources</button>
-            <button onclick="showStudySub('phrases')" id="studySub-phrases" class="pill pill-inactive whitespace-nowrap">Phrases</button>
+        <!-- Hidden sub-tab buttons (still functional for Today plan sessions) -->
+        <div style="display:none">
+            <button id="studySub-flashcards"></button>
+            <button id="studySub-scenarios"></button>
+            <button id="studySub-grammar"></button>
+            <button id="studySub-knowledge"></button>
+            <button id="studySub-resources"></button>
+            <button id="studySub-phrases"></button>
         </div>
 
-        <!-- ═══ Scenarios sub-view (NEW default) ═══ -->
-        <div id="study-sub-scenarios">
+        <!-- ═══ Scenarios sub-view (hidden, used by Today plan) ═══ -->
+        <div id="study-sub-scenarios" style="display:none">
 
         <!-- Must Nail section -->
         <div id="mustNailSection">
@@ -1333,7 +1333,7 @@ select option { background: #4a525a; color: #e8e6df; }
         </div><!-- end study-sub-scenarios -->
 
         <!-- ═══ Flashcards sub-view ═══ -->
-        <div id="study-sub-flashcards" style="display:none">
+        <div id="study-sub-flashcards">
             <div class="space-y-4">
                 <!-- Deck picker (shown when no deck active) -->
                 <div id="fcDeckPicker">
@@ -2840,7 +2840,7 @@ function showView(view) {
         }
     });
     if (view === 'today') loadDailyPlan();
-    if (view === 'study') { loadScenarios(); loadMustNail(); loadRecommendedGrammar(); }
+    if (view === 'study') { renderFcDecks(); }
     if (view === 'progress') { loadProgressDashboard(); loadProgressPhrases(); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     lucide.createIcons();
@@ -3370,7 +3370,7 @@ function renderDrillSummary() {
 }
 
 // Study tab sub-nav
-var studySub = 'scenarios';
+var studySub = 'flashcards';
 function showStudySub(sub) {
     studySub = sub;
     ['scenarios', 'flashcards', 'grammar', 'knowledge', 'resources', 'phrases'].forEach(function(s) {
