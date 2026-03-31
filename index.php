@@ -26,6 +26,11 @@ if ($annaCheck && $annaCheck->num_rows === 0) {
     $conn->query("INSERT INTO learning_resources (category, name, url, icon, sort_order) VALUES
         ('Lessons', 'Anna\\'s Lessons', 'https://drive.google.com/drive/u/0/folders/1B0YucQ3xCLWhx8KroZrmC7nXlQG8XtKD', '👩‍🏫', 3)");
 }
+$hungaraCheck = $conn->query("SELECT 1 FROM learning_resources WHERE name='Hungarea' LIMIT 1");
+if ($hungaraCheck && $hungaraCheck->num_rows === 0) {
+    $conn->query("INSERT INTO learning_resources (category, name, url, icon, sort_order) VALUES
+        ('Listening', 'Hungarea', 'https://www.youtube.com/@hungarea', '🇭🇺', 3)");
+}
 
 $who_safe   = $conn->real_escape_string($who);
 $bio_filter = ($who !== 'All')
@@ -949,6 +954,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
         ['name' => 'HungarianPod101',  'duration' => 20, 'subtitle' => 'Podcast lesson'],
         ['name' => 'Quizlet',          'duration' => 15, 'subtitle' => 'Flashcard review'],
         ['name' => 'Duolingo',         'duration' => 10, 'subtitle' => 'Quick grammar practice'],
+        ['name' => 'Hungarea',          'duration' => 15, 'subtitle' => 'Sándor\'s Hungarian YouTube'],
         ['name' => 'Aktív MagyarOK',   'duration' => 15, 'subtitle' => 'Textbook exercises'],
     ];
     $extAdded = 0;
