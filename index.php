@@ -5809,17 +5809,17 @@ function renderFcCard() {
     if (fcQuizMode && suffix) {
         // Quiz mode — show stem + ___ and suffix choices
         var quizCard = document.createElement('div');
-        quizCard.style.cssText = 'width:100%;max-width:480px;min-height:280px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(217,119,6,0.06));border:1px solid rgba(245,158,11,0.25)';
+        quizCard.className = 'glass rounded-2xl border border-white/10 w-full max-w-[480px] min-h-[280px] flex flex-col items-center justify-center p-6';
 
         // English meaning hint
         var hint = document.createElement('div');
-        hint.className = 'text-sm text-amber-300/70 mb-3';
+        hint.className = 'text-sm text-slate-400 mb-2';
         hint.textContent = card.back;
         quizCard.appendChild(hint);
 
         // Stem + blank
         var stemEl = document.createElement('div');
-        stemEl.className = 'text-2xl font-bold text-white text-center mb-5';
+        stemEl.className = 'text-3xl font-bold text-white text-center mb-6';
         stemEl.textContent = stem + '____';
         quizCard.appendChild(stemEl);
 
@@ -5839,11 +5839,11 @@ function renderFcCard() {
         var choices = wrongs.concat([suffix]).sort(function() { return Math.random() - 0.5; });
 
         var choiceGrid = document.createElement('div');
-        choiceGrid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:300px';
+        choiceGrid.className = 'grid grid-cols-2 gap-3 w-full max-w-[320px]';
         var quizAnswered = false;
         choices.forEach(function(ch) {
             var btn = document.createElement('button');
-            btn.style.cssText = 'padding:12px;border-radius:10px;font-size:16px;font-weight:700;border:2px solid rgba(245,158,11,0.3);background:rgba(245,158,11,0.08);color:#fef3c7;cursor:pointer;transition:all 0.15s';
+            btn.className = 'py-3 px-4 rounded-xl text-lg font-bold border-2 border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20 transition-all cursor-pointer';
             btn.textContent = '-' + ch;
             btn.onclick = function() {
                 if (quizAnswered) return;
@@ -5852,9 +5852,10 @@ function renderFcCard() {
                 var btns = choiceGrid.querySelectorAll('button');
                 btns.forEach(function(b) {
                     b.style.cursor = 'default';
-                    if (b.textContent === '-' + suffix) { b.style.background = '#166534'; b.style.borderColor = '#22c55e'; b.style.color = '#fff'; }
-                    else if (b === btn && !correct) { b.style.background = '#7f1d1d'; b.style.borderColor = '#ef4444'; b.style.color = '#fca5a5'; }
-                    else { b.style.opacity = '0.3'; }
+                    b.classList.remove('hover:bg-indigo-500/20');
+                    if (b.textContent === '-' + suffix) { b.className = 'py-3 px-4 rounded-xl text-lg font-bold border-2 border-green-500 bg-green-600 text-white'; }
+                    else if (b === btn && !correct) { b.className = 'py-3 px-4 rounded-xl text-lg font-bold border-2 border-red-500 bg-red-600/80 text-red-100'; }
+                    else { b.style.opacity = '0.25'; }
                 });
                 stemEl.textContent = frontText.replace(/[A-ZÁÉÍÓÖŐÚÜŰ]{2,}/, suffix);
                 elevenSpeak(frontText.replace(/[A-ZÁÉÍÓÖŐÚÜŰ]+/g, function(m) { return m.toLowerCase(); }));
