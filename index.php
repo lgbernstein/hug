@@ -5700,14 +5700,50 @@ function renderFcCard() {
     wrapper.appendChild(inner);
     area.appendChild(wrapper);
 
-    // Speaker button — below card
+    // Speaker + Show All buttons
     var speakRow = document.createElement('div');
-    speakRow.style.cssText = 'display:flex;justify-content:center;gap:12px;margin-top:12px';
+    speakRow.style.cssText = 'display:flex;justify-content:center;gap:10px;margin-top:12px';
     var speakBtn = document.createElement('button');
     speakBtn.style.cssText = 'padding:8px 20px;border-radius:10px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px';
     speakBtn.textContent = '🔊 Listen';
     speakBtn.onclick = function(e) { e.stopPropagation(); elevenSpeak(card.front); };
     speakRow.appendChild(speakBtn);
+    var showAllBtn = document.createElement('button');
+    showAllBtn.style.cssText = 'padding:8px 20px;border-radius:10px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;font-size:14px;font-weight:600;cursor:pointer';
+    showAllBtn.textContent = 'Show All';
+    showAllBtn.onclick = function(e) {
+        e.stopPropagation();
+        var existing = document.getElementById('fcAllTable');
+        if (existing) { existing.remove(); showAllBtn.textContent = 'Show All'; return; }
+        showAllBtn.textContent = 'Hide';
+        var tbl = document.createElement('div');
+        tbl.id = 'fcAllTable';
+        tbl.style.cssText = 'margin-top:16px;background:rgba(15,23,42,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;max-height:400px;overflow-y:auto';
+        var activeDeck = fcDecks.find(function(d) { return d.cards === fcCards; }) || fcDecks.find(function(d) {
+            return d.cards.some(function(c) { return c.front === fcCards[0].front; });
+        });
+        var allCards = activeDeck ? activeDeck.cards : fcCards;
+        allCards.forEach(function(c, i) {
+            var row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;padding:6px 12px;gap:8px' + (i > 0 ? ';border-top:1px solid rgba(255,255,255,0.05)' : '') + (c.front === card.front ? ';background:rgba(99,102,241,0.15)' : '');
+            var spk = document.createElement('button');
+            spk.style.cssText = 'border:none;background:none;cursor:pointer;font-size:11px;color:#6366f1;flex-shrink:0;padding:0';
+            spk.textContent = '🔊';
+            (function(txt) { spk.onclick = function(ev) { ev.stopPropagation(); elevenSpeak(txt); }; })(c.front);
+            row.appendChild(spk);
+            var hu = document.createElement('span');
+            hu.style.cssText = 'font-size:14px;font-weight:700;color:#fff;min-width:120px';
+            hu.appendChild(highlightSuffix(c.front));
+            row.appendChild(hu);
+            var en = document.createElement('span');
+            en.style.cssText = 'font-size:13px;color:#94a3b8;flex:1';
+            en.textContent = c.back;
+            row.appendChild(en);
+            tbl.appendChild(row);
+        });
+        area.appendChild(tbl);
+    };
+    speakRow.appendChild(showAllBtn);
     area.appendChild(speakRow);
 
     // Navigation arrows + Got It / Missed
