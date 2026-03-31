@@ -865,9 +865,9 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 3px; }
-.glass { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
-.glass-strong { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
-.glow-accent { box-shadow: 0 0 20px rgba(99,102,241,0.12); }
+.glass { background: #525a62; border: 1px solid #5e666e; box-shadow: none; }
+.glass-strong { background: #555d65; border: 1px solid #636b73; box-shadow: none; }
+.glow-accent { box-shadow: none; }
 .glow-red { box-shadow: 0 0 20px rgba(239,68,68,0.25); }
 .glow-green { box-shadow: 0 0 20px rgba(34,197,94,0.25); }
 @keyframes mic-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } }
