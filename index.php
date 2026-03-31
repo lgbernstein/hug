@@ -905,10 +905,10 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 .btn-teal { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #14b8a6; color: white; transition: all 0.15s; cursor: pointer; }
 .btn-teal:hover { background: #0d9488; }
 .btn-teal:active { transform: scale(0.97); }
-.btn-purple { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #7c3aed; color: #fff; transition: all 0.15s; cursor: pointer; }
-.btn-purple:hover { background: #6d28d9; }
+.btn-purple { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #7c3aed !important; color: #ffffff !important; transition: all 0.15s; cursor: pointer; }
+.btn-purple:hover { background: #6d28d9 !important; }
 .btn-purple:active { transform: scale(0.97); }
-.btn-purple:disabled { background: #4c1d95; color: #8b5cf6; cursor: default; }
+.btn-purple.is-disabled { background: #5b21b6 !important; color: #c4b5fd !important; cursor: default; opacity: 0.6; }
 .btn-sky { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0369a1; color: #bae6fd; transition: all 0.15s; cursor: pointer; }
 .btn-sky:hover { background: #075985; }
 .btn-sky:active { transform: scale(0.97); }
@@ -1055,11 +1055,11 @@ select option { background: #4a525a; color: #e8e6df; }
             <i data-lucide="sun" class="w-5 h-5"></i>
             <span class="text-[10px] font-semibold">Today</span>
         </button>
-        <button onclick="showView('study')" id="nav-study" class="flex flex-col items-center gap-0.5 px-4 py-2 text-slate-300 hover:text-white transition-all">
+        <button onclick="showView('study')" id="nav-study" class="flex flex-col items-center gap-0.5 px-4 py-2 text-white/70 hover:text-white transition-all">
             <i data-lucide="book-open" class="w-5 h-5"></i>
             <span class="text-[10px] font-semibold">Study</span>
         </button>
-        <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 px-4 py-2 text-slate-300 hover:text-white transition-all">
+        <button onclick="showView('progress')" id="nav-progress" class="flex flex-col items-center gap-0.5 px-4 py-2 text-white/70 hover:text-white transition-all">
             <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
             <span class="text-[10px] font-semibold">Progress</span>
         </button>
@@ -1112,8 +1112,8 @@ select option { background: #4a525a; color: #e8e6df; }
                 <span id="sessionBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
                 <div class="flex items-center gap-2">
                     <span id="sessionProgress" class="text-[10px] text-slate-500 font-medium tabular-nums"></span>
-                    <button id="pauseSessionBtn" onclick="togglePauseSession()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500/15 text-teal-400 hover:bg-teal-500/25 transition-all" title="Pause (P)">Pause</button>
-                    <button onclick="exitSession()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-all" title="Stop & exit (Esc)">Stop</button>
+                    <button id="pauseSessionBtn" onclick="togglePauseSession()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500 text-white hover:bg-teal-600 transition-all" title="Pause (P)">Pause</button>
+                    <button onclick="exitSession()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500 text-white hover:bg-red-600 transition-all" title="Stop & exit (Esc)">Stop</button>
                 </div>
             </div>
             <div id="sessionToolbar" class="hidden"></div>
@@ -1647,7 +1647,7 @@ function startVolume() {
                 lastRecordingBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 // Enable grid Hear Me button
                 var ghm = document.getElementById('gridHearMe');
-                if (ghm) { ghm.disabled = false; }
+                if (ghm) { ghm.disabled = false; ghm.classList.remove('is-disabled'); }
                 if (showPlaybackWhenReady) {
                     showPlaybackWhenReady = false;
                     var pb = document.getElementById('playbackBtn');
@@ -2196,7 +2196,7 @@ function processSpeechResult() {
 
             // Enable Hear Me button
             var ghm = document.getElementById('gridHearMe');
-            if (ghm && lastRecordingBlob) { ghm.disabled = false; }
+            if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.classList.remove('is-disabled'); }
 
             // Hands-free auto-flow — no clicking needed
             if (activeSession) {
@@ -3773,7 +3773,7 @@ function renderAudioStep(step, content, controls) {
     var b1 = document.createElement('button'); b1.className = 'btn-primary'; b1.textContent = isPron ? '🎤  Listen & Repeat' : '🎤  Listen & Answer'; b1.onclick = doSpeak; grid.appendChild(b1);
     var b2 = document.createElement('button'); b2.className = 'btn-next'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
-    var b4 = document.createElement('button'); b4.className = 'btn-purple'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice; grid.appendChild(b4);
+    var b4 = document.createElement('button'); b4.className = 'btn-purple is-disabled'; b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice; grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
     var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 English';
     enBtn.onclick = function() {
@@ -4025,10 +4025,10 @@ function togglePauseSession() {
         cleanupAudio();
         isListening = false;
         var toast = document.getElementById('evalToast'); if (toast) toast.remove();
-        if (btn) { btn.textContent = 'Resume'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all'; }
+        if (btn) { btn.textContent = 'Resume'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-green-500 text-white hover:bg-green-600 transition-all'; }
     } else {
         // Resume: re-speak current phrase
-        if (btn) { btn.textContent = 'Pause'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500/15 text-teal-400 hover:bg-teal-500/25 transition-all'; }
+        if (btn) { btn.textContent = 'Pause'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500 text-white hover:bg-teal-600 transition-all'; }
         speak(currentSpeed);
     }
 }
@@ -4049,7 +4049,7 @@ function exitSession() {
     document.getElementById('planBlockList').classList.remove('hidden');
     var qa = document.getElementById('quickActions'); if (qa) qa.classList.remove('hidden');
     var btn = document.getElementById('pauseSessionBtn');
-    if (btn) { btn.textContent = 'Pause'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500/15 text-teal-400 hover:bg-teal-500/25 transition-all'; }
+    if (btn) { btn.textContent = 'Pause'; btn.className = 'px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500 text-white hover:bg-teal-600 transition-all'; }
     // Log partial progress
     if (sessionBlockInfo && sessionTotalCount > 0) {
         var elapsed = Math.round((new Date() - sessionStartTime) / 60000);
