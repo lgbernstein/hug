@@ -674,7 +674,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     // Block 1: SRS Review (active, always first)
     if ($totalDue > 0 && empty($todayBlocks['phrase_review'])) {
         $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_review', 'title' => 'Review Due Items', 'subtitle' => $totalDue . ' items due', 'duration' => min(20, max(10, $totalDue * 2)), 'icon' => 'rotate-ccw',
-            'session' => ['mode' => 'review', 'limit' => min(10, $totalDue)]];
+            'session' => ['mode' => 'review', 'limit' => min(10, $totalDue), 'tag' => 'essential']];
     }
 
     // Block 2: External — Pimsleur (passive listening)
@@ -2065,16 +2065,18 @@ recognition.onresult = function(event) {
             scoreDisplay.textContent = '';
             var isPass = data.pass;
 
-            // Row 1: badge + short feedback on same line
+            // Row 1: badge + short feedback (truncated to first sentence)
             var topRow = document.createElement('div');
             topRow.className = 'flex items-center gap-2 justify-center flex-wrap';
             var badge = document.createElement('span');
             badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ' +
                 (isPass ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400');
             badge.textContent = isPass ? 'Pass' : 'Retry';
+            var fb = (data.feedback || '').split(/\.\s/)[0];
+            if (fb.length > 60) fb = fb.substring(0, 57) + '...';
             var hint = document.createElement('span');
             hint.className = 'text-xs ' + (isPass ? 'text-green-400/70' : 'text-red-400/70');
-            hint.textContent = data.feedback || '';
+            hint.textContent = fb;
             topRow.appendChild(badge);
             topRow.appendChild(hint);
             scoreDisplay.appendChild(topRow);
@@ -3546,27 +3548,7 @@ function renderAudioStep(step, content, controls) {
     statusRow.appendChild(volTrack);
     content.appendChild(statusRow);
 
-    // Result card (pre-created, hidden until eval completes)
-    var resultCard = document.createElement('div');
-    resultCard.id = 'resultCard';
-    resultCard.className = 'hidden glass rounded-2xl p-4 border mb-4';
-    var transcriptEl = document.createElement('p');
-    transcriptEl.id = 'transcript';
-    transcriptEl.className = 'text-sm text-slate-300 italic mb-2';
-    resultCard.appendChild(transcriptEl);
-    var scoreEl = document.createElement('div');
-    scoreEl.id = 'matchScore';
-    scoreEl.className = 'text-center';
-    resultCard.appendChild(scoreEl);
-    var playBtn = document.createElement('button');
-    playBtn.id = 'playbackBtn';
-    playBtn.className = 'hidden mt-2 px-3 py-1.5 rounded-lg bg-surface-50 text-[11px] font-semibold text-slate-300 hover:text-white';
-    playBtn.textContent = '🔊 Hear myself';
-    playBtn.onclick = function() { playMyVoice(); };
-    resultCard.appendChild(playBtn);
-    content.appendChild(resultCard);
-
-    // Listen & Speak button
+    // Listen & Speak button (above result card so it's always visible)
     var listenBtn = document.createElement('button');
     listenBtn.className = 'w-full bg-surface-50 border-2 border-accent/30 rounded-2xl py-5 flex flex-col items-center gap-2 group hover:bg-surface-200 hover:border-accent/50 transition-all active:scale-[0.98] shadow-lg shadow-accent/5';
     var speakerIcon = document.createElement('i');
@@ -3636,6 +3618,26 @@ function renderAudioStep(step, content, controls) {
     skipRow.appendChild(breakdownBtn);
 
     controls.appendChild(skipRow);
+
+    // Result card (hidden until eval completes — below controls so Listen & Repeat stays visible)
+    var resultCard = document.createElement('div');
+    resultCard.id = 'resultCard';
+    resultCard.className = 'hidden glass rounded-2xl p-3 border mt-3';
+    var transcriptEl = document.createElement('p');
+    transcriptEl.id = 'transcript';
+    transcriptEl.className = 'text-xs text-slate-400 italic mb-1 truncate';
+    resultCard.appendChild(transcriptEl);
+    var scoreEl = document.createElement('div');
+    scoreEl.id = 'matchScore';
+    scoreEl.className = 'text-center';
+    resultCard.appendChild(scoreEl);
+    var playBtn = document.createElement('button');
+    playBtn.id = 'playbackBtn';
+    playBtn.className = 'hidden mt-1 px-3 py-1 rounded-lg bg-surface-50 text-[11px] font-semibold text-slate-300 hover:text-white';
+    playBtn.textContent = '🔊 Hear myself';
+    playBtn.onclick = function() { playMyVoice(); };
+    resultCard.appendChild(playBtn);
+    controls.appendChild(resultCard);
 
     // Result area (filled after eval — session-aware)
     var resultArea = document.createElement('div');
