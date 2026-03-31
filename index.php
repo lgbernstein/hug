@@ -4887,138 +4887,131 @@ function renderGrammarTeachStep(step, content, controls) {
 
     teachPromise.then(function(data) {
             if (data.error) { content.textContent = data.error; return; }
-            content.textContent = '';
 
-            var wrap = document.createElement('div');
-            wrap.className = 'text-left space-y-4 w-full';
+            // Build pages — each is a digestible chunk
+            var pages = [];
 
-            // 1. Title + one-line summary at top
+            // Page 1: Title + Summary + Roots
+            var page1 = document.createElement('div');
+            page1.className = 'text-left space-y-4 w-full';
             if (patternName) {
-                var titleEl = document.createElement('h2');
-                titleEl.className = 'text-lg font-bold text-purple-300 text-center mb-1';
-                titleEl.textContent = patternName;
-                wrap.appendChild(titleEl);
+                var t = document.createElement('h2');
+                t.className = 'text-xl font-bold text-purple-300 text-center';
+                t.textContent = patternName;
+                page1.appendChild(t);
             }
-            if (data.summary) {
-                var sumEl = document.createElement('p');
-                sumEl.className = 'text-xs text-slate-400 text-center mb-2';
-                sumEl.textContent = data.summary;
-                wrap.appendChild(sumEl);
+            var summary = data.summary || (data.lesson ? data.lesson.substring(0, 120) : '');
+            if (summary) {
+                var s = document.createElement('p');
+                s.className = 'text-sm text-slate-400 text-center';
+                s.textContent = summary;
+                page1.appendChild(s);
             }
-            // Fallback: legacy "lesson" field as summary
-            if (!data.summary && data.lesson) {
-                var legacySum = document.createElement('p');
-                legacySum.className = 'text-xs text-slate-400 text-center mb-2';
-                legacySum.textContent = data.lesson.substring(0, 120);
-                wrap.appendChild(legacySum);
-            }
-
-            // 2. Roots — the base words this pattern builds from
             if (data.roots && data.roots.length) {
                 var rootsEl = document.createElement('div');
-                rootsEl.className = 'flex flex-wrap gap-2 justify-center';
+                rootsEl.className = 'flex flex-wrap gap-3 justify-center mt-4';
                 data.roots.forEach(function(r) {
                     var chip = document.createElement('div');
-                    chip.className = 'bg-purple-500/15 border border-purple-500/30 rounded-lg px-3 py-2 text-center';
-                    var wordEl = document.createElement('div');
-                    wordEl.className = 'text-base font-bold text-purple-300';
-                    wordEl.textContent = r.word;
-                    var meanEl = document.createElement('div');
-                    meanEl.className = 'text-xs text-slate-400';
-                    meanEl.textContent = r.meaning;
-                    chip.appendChild(wordEl);
-                    chip.appendChild(meanEl);
+                    chip.className = 'bg-purple-500/15 border border-purple-500/30 rounded-xl px-5 py-3 text-center';
+                    var w = document.createElement('div');
+                    w.className = 'text-2xl font-bold text-purple-300';
+                    w.textContent = r.word;
+                    var m = document.createElement('div');
+                    m.className = 'text-sm text-slate-400 mt-1';
+                    m.textContent = r.meaning;
+                    chip.appendChild(w);
+                    chip.appendChild(m);
                     if (r.think) {
-                        var thinkEl = document.createElement('div');
-                        thinkEl.className = 'text-[10px] text-purple-400/70 mt-0.5';
-                        thinkEl.textContent = r.think;
-                        chip.appendChild(thinkEl);
+                        var th = document.createElement('div');
+                        th.className = 'text-xs text-purple-400/70 mt-1';
+                        th.textContent = r.think;
+                        chip.appendChild(th);
                     }
                     rootsEl.appendChild(chip);
                 });
-                wrap.appendChild(rootsEl);
+                page1.appendChild(rootsEl);
             }
+            if (data.memory_trick || data.tip) {
+                var trick = document.createElement('div');
+                trick.className = 'text-xs text-sky-200 bg-sky-500/5 rounded-lg px-3 py-2 border border-sky-400/15 text-center mt-4';
+                trick.textContent = (data.memory_trick || data.tip);
+                page1.appendChild(trick);
+            }
+            pages.push(page1);
 
-            // 3. Build-ups — root + ending = meaning + example
-            if (data.buildups && data.buildups.length) {
-                var buEl = document.createElement('div');
-                buEl.className = 'space-y-1.5';
-                data.buildups.forEach(function(b) {
+            // Page 2+: Build-ups — split into groups of 3
+            var buildups = data.buildups || [];
+            // Fallback: legacy examples
+            if (!buildups.length && data.examples && data.examples.length) {
+                buildups = data.examples.map(function(ex) {
+                    return { form: (ex.highlight || ''), parts: '', meaning: ex.en || '', example_hu: ex.hu || (typeof ex === 'string' ? ex : ''), example_en: ex.en || '' };
+                });
+            }
+            for (var bi = 0; bi < buildups.length; bi += 3) {
+                var chunk = buildups.slice(bi, bi + 3);
+                var pg = document.createElement('div');
+                pg.className = 'text-left space-y-3 w-full';
+                var pgLabel = document.createElement('div');
+                pgLabel.className = 'text-xs font-bold uppercase tracking-wider text-purple-400 text-center mb-2';
+                pgLabel.textContent = 'Building Forms' + (buildups.length > 3 ? ' (' + (bi + 1) + '–' + Math.min(bi + 3, buildups.length) + ' of ' + buildups.length + ')' : '');
+                pg.appendChild(pgLabel);
+                chunk.forEach(function(b) {
                     var row = document.createElement('div');
-                    row.className = 'bg-slate-800/50 rounded-lg px-3 py-2 border border-slate-700/40 flex items-start gap-3';
-                    // Left: form + parts
-                    var left = document.createElement('div');
-                    left.className = 'min-w-[90px]';
-                    var formEl = document.createElement('div');
-                    formEl.className = 'text-sm font-bold text-white';
+                    row.className = 'bg-slate-800/50 rounded-xl px-4 py-3 border border-slate-700/40';
+                    var top = document.createElement('div');
+                    top.className = 'flex items-baseline gap-3 mb-1';
+                    var formEl = document.createElement('span');
+                    formEl.className = 'text-lg font-bold text-white';
                     formEl.textContent = b.form;
-                    var partsEl = document.createElement('div');
-                    partsEl.className = 'text-[10px] text-purple-400';
-                    partsEl.textContent = b.parts;
-                    left.appendChild(formEl);
-                    left.appendChild(partsEl);
-                    // Right: meaning + example
-                    var right = document.createElement('div');
-                    right.className = 'flex-1';
-                    var meanEl = document.createElement('div');
-                    meanEl.className = 'text-xs text-slate-300';
+                    top.appendChild(formEl);
+                    if (b.parts) {
+                        var partsEl = document.createElement('span');
+                        partsEl.className = 'text-xs text-purple-400';
+                        partsEl.textContent = b.parts;
+                        top.appendChild(partsEl);
+                    }
+                    var meanEl = document.createElement('span');
+                    meanEl.className = 'text-sm text-slate-400 ml-auto';
                     meanEl.textContent = b.meaning;
-                    right.appendChild(meanEl);
+                    top.appendChild(meanEl);
+                    row.appendChild(top);
                     if (b.example_hu) {
-                        var exEl = document.createElement('div');
-                        exEl.className = 'text-xs mt-0.5';
-                        var huPart = document.createElement('span');
-                        huPart.className = 'text-cyan-300';
-                        huPart.textContent = b.example_hu;
-                        exEl.appendChild(huPart);
+                        var ex = document.createElement('div');
+                        ex.className = 'text-sm mt-1 pl-1 border-l-2 border-cyan-500/30 ml-1';
+                        var hu = document.createElement('span');
+                        hu.className = 'text-cyan-300';
+                        hu.textContent = b.example_hu;
+                        ex.appendChild(hu);
                         if (b.example_en) {
-                            var enPart = document.createElement('span');
-                            enPart.className = 'text-slate-500 ml-1.5';
-                            enPart.textContent = '— ' + b.example_en;
-                            exEl.appendChild(enPart);
+                            var en = document.createElement('span');
+                            en.className = 'text-slate-500 ml-2';
+                            en.textContent = '— ' + b.example_en;
+                            ex.appendChild(en);
                         }
-                        right.appendChild(exEl);
+                        row.appendChild(ex);
                     }
-                    row.appendChild(left);
-                    row.appendChild(right);
-                    buEl.appendChild(row);
+                    pg.appendChild(row);
                 });
-                wrap.appendChild(buEl);
+                pages.push(pg);
             }
 
-            // Fallback: legacy "examples" array
-            if (!data.buildups && data.examples && data.examples.length) {
-                var exList = document.createElement('div');
-                exList.className = 'bg-slate-800/60 rounded-lg p-3 space-y-1.5 border border-slate-700/50';
-                data.examples.forEach(function(ex) {
-                    var exRow = document.createElement('div');
-                    exRow.className = 'text-sm';
-                    var huSpan = document.createElement('span');
-                    huSpan.className = 'text-white font-medium';
-                    renderMarkdownText(huSpan, ex.hu || ex);
-                    exRow.appendChild(huSpan);
-                    if (ex.en) {
-                        var enSpan = document.createElement('span');
-                        enSpan.className = 'text-slate-400';
-                        enSpan.textContent = ' — ' + ex.en;
-                        exRow.appendChild(enSpan);
-                    }
-                    exList.appendChild(exRow);
-                });
-                wrap.appendChild(exList);
-            }
-
-            // 4. Comparison table
-            if (data.table && data.table.headers && data.table.rows) {
+            // Page: Comparison table (if present)
+            if (data.table && data.table.headers && data.table.rows && data.table.rows.length) {
+                var tPg = document.createElement('div');
+                tPg.className = 'w-full space-y-3';
+                var tLabel = document.createElement('div');
+                tLabel.className = 'text-xs font-bold uppercase tracking-wider text-purple-400 text-center mb-2';
+                tLabel.textContent = 'Quick Reference';
+                tPg.appendChild(tLabel);
                 var tblWrap = document.createElement('div');
                 tblWrap.className = 'overflow-x-auto';
                 var tbl = document.createElement('table');
-                tbl.className = 'w-full text-xs border-collapse';
+                tbl.className = 'w-full text-sm border-collapse';
                 var thead = document.createElement('thead');
                 var hRow = document.createElement('tr');
                 data.table.headers.forEach(function(h) {
                     var th = document.createElement('th');
-                    th.className = 'px-3 py-1.5 text-left text-purple-400 font-bold border-b border-slate-700/50 bg-slate-800/40';
+                    th.className = 'px-3 py-2 text-left text-purple-400 font-bold border-b border-slate-700/50 bg-slate-800/40';
                     th.textContent = h;
                     hRow.appendChild(th);
                 });
@@ -5029,7 +5022,7 @@ function renderGrammarTeachStep(step, content, controls) {
                     var tr = document.createElement('tr');
                     row.forEach(function(cell, ci) {
                         var td = document.createElement('td');
-                        td.className = 'px-3 py-1.5 border-b border-slate-800/50 ' + (ci === 0 ? 'text-slate-400 font-medium' : 'text-white');
+                        td.className = 'px-3 py-2 border-b border-slate-800/50 ' + (ci === 0 ? 'text-slate-400 font-medium' : 'text-white font-medium');
                         td.textContent = cell;
                         tr.appendChild(td);
                     });
@@ -5037,133 +5030,141 @@ function renderGrammarTeachStep(step, content, controls) {
                 });
                 tbl.appendChild(tbody);
                 tblWrap.appendChild(tbl);
-                wrap.appendChild(tblWrap);
+                tPg.appendChild(tblWrap);
+                pages.push(tPg);
             }
 
-            // 5. Memory trick
-            if (data.memory_trick || data.tip) {
-                var trick = document.createElement('div');
-                trick.className = 'text-xs text-sky-200 bg-sky-500/5 rounded-lg px-3 py-2 border border-sky-400/15 text-center';
-                trick.textContent = (data.memory_trick || data.tip);
-                wrap.appendChild(trick);
-            }
-
-            content.appendChild(wrap);
-
-            // 6. Quiz — multiple choice, no typing needed
+            // Page: Quiz (if present)
             if (data.quiz && data.quiz.length) {
-                var quizEl = document.createElement('div');
-                quizEl.className = 'mt-4 space-y-3';
-                var quizTitle = document.createElement('div');
-                quizTitle.className = 'text-xs font-bold uppercase tracking-wider text-purple-400 text-center';
-                quizTitle.textContent = 'Quick Quiz';
-                quizEl.appendChild(quizTitle);
+                var qPg = document.createElement('div');
+                qPg.className = 'w-full space-y-3';
+                var qLabel = document.createElement('div');
+                qLabel.className = 'text-xs font-bold uppercase tracking-wider text-purple-400 text-center mb-2';
+                qLabel.textContent = 'Quick Quiz';
+                qPg.appendChild(qLabel);
                 data.quiz.forEach(function(q) {
                     var qRow = document.createElement('div');
-                    qRow.className = 'bg-slate-800/40 rounded-lg p-3 border border-slate-700/30';
+                    qRow.className = 'bg-slate-800/40 rounded-xl p-4 border border-slate-700/30';
                     var prompt = document.createElement('p');
-                    prompt.className = 'text-sm text-slate-200 mb-2';
+                    prompt.className = 'text-sm text-slate-200 mb-3 font-medium';
                     prompt.textContent = q.prompt;
                     qRow.appendChild(prompt);
-
                     if (q.choices && q.choices.length) {
-                        // Multiple choice — no typing
-                        var choiceWrap = document.createElement('div');
-                        choiceWrap.className = 'grid grid-cols-2 gap-1.5';
+                        var cWrap = document.createElement('div');
+                        cWrap.className = 'grid grid-cols-2 gap-2';
                         var shuffled = q.choices.slice().sort(function() { return Math.random() - 0.5; });
                         shuffled.forEach(function(choice) {
                             var btn = document.createElement('button');
-                            btn.className = 'px-3 py-2 bg-slate-700/60 hover:bg-slate-600/80 border border-slate-600/40 rounded-lg text-sm text-white font-medium transition-all text-left';
+                            btn.className = 'px-4 py-2.5 bg-slate-700/60 hover:bg-slate-600/80 border border-slate-600/40 rounded-lg text-sm text-white font-medium transition-all text-left';
                             btn.textContent = choice;
                             btn.onclick = (function(b, correct, wrap) {
                                 return function() {
-                                    // Disable all buttons
                                     var btns = wrap.querySelectorAll('button');
                                     btns.forEach(function(bb) { bb.disabled = true; bb.classList.remove('hover:bg-slate-600/80'); bb.style.cursor = 'default'; });
                                     if (choice.toLowerCase() === correct.toLowerCase()) {
                                         b.className = b.className.replace('bg-slate-700/60', 'bg-green-600/40').replace('border-slate-600/40', 'border-green-500/50');
                                     } else {
                                         b.className = b.className.replace('bg-slate-700/60', 'bg-red-600/30').replace('border-slate-600/40', 'border-red-500/50');
-                                        // Highlight correct
                                         btns.forEach(function(bb) {
-                                            if (bb.textContent.toLowerCase() === correct.toLowerCase()) {
+                                            if (bb.textContent.toLowerCase() === correct.toLowerCase())
                                                 bb.className = bb.className.replace('bg-slate-700/60', 'bg-green-600/40').replace('border-slate-600/40', 'border-green-500/50');
-                                            }
                                         });
                                     }
                                 };
-                            })(btn, q.answer, choiceWrap);
-                            choiceWrap.appendChild(btn);
+                            })(btn, q.answer, cWrap);
+                            cWrap.appendChild(btn);
                         });
-                        qRow.appendChild(choiceWrap);
-                    } else {
-                        // Fallback: text input for legacy responses
-                        var answerWrap = document.createElement('div');
-                        answerWrap.className = 'flex items-center gap-2';
-                        var input = document.createElement('input');
-                        input.type = 'text';
-                        input.className = 'flex-1 bg-slate-700/50 border border-slate-600/50 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50';
-                        input.placeholder = q.hint || 'Type answer...';
-                        var checkBtn = document.createElement('button');
-                        checkBtn.className = 'px-4 py-2 bg-purple-600/60 hover:bg-purple-600 rounded-lg text-xs font-bold text-white transition-all';
-                        checkBtn.textContent = 'Check';
-                        var feedback = document.createElement('div');
-                        feedback.className = 'text-xs mt-1.5 hidden';
-                        checkBtn.onclick = (function(inp, fb, ans) {
-                            return function() {
-                                var userAns = inp.value.trim().toLowerCase();
-                                if (userAns === ans.toLowerCase()) { fb.textContent = 'Correct!'; fb.className = 'text-xs mt-1.5 text-green-400'; }
-                                else { fb.textContent = 'Answer: ' + ans; fb.className = 'text-xs mt-1.5 text-amber-400'; }
-                            };
-                        })(input, feedback, q.answer);
-                        input.onkeydown = (function(btn) { return function(e) { if (e.key === 'Enter') btn.click(); }; })(checkBtn);
-                        answerWrap.appendChild(input);
-                        answerWrap.appendChild(checkBtn);
-                        qRow.appendChild(answerWrap);
-                        qRow.appendChild(feedback);
+                        qRow.appendChild(cWrap);
                     }
-                    quizEl.appendChild(qRow);
+                    qPg.appendChild(qRow);
                 });
-                content.appendChild(quizEl);
+                pages.push(qPg);
             }
 
-            // Got It / Need Practice buttons
-            controls.textContent = '';
-            var btnRow = document.createElement('div');
-            btnRow.className = 'flex gap-2';
+            // Render paginated flow
+            var gramPage = 0;
+            function showGrammarPage() {
+                content.textContent = '';
+                controls.textContent = '';
 
-            var gotBtn = document.createElement('button');
-            gotBtn.className = 'flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all';
-            gotBtn.textContent = 'Got It — Next →';
-            gotBtn.onclick = function() {
-                sessionPassCount++;
-                sessionTotalCount++;
-                recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, true);
-                sessionIdx++;
-                renderSessionStep();
-            };
+                // Page counter
+                var counter = document.createElement('div');
+                counter.className = 'text-[10px] text-slate-500 text-center mb-2';
+                counter.textContent = 'Step ' + (gramPage + 1) + ' of ' + pages.length;
+                content.appendChild(counter);
 
-            var missBtn = document.createElement('button');
-            missBtn.className = 'flex-1 py-3 bg-red-600/80 hover:bg-red-600 rounded-xl text-sm font-bold text-white transition-all';
-            missBtn.textContent = '← Need Practice';
-            missBtn.onclick = function() {
-                sessionTotalCount++;
-                recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, false);
-                sessionIdx++;
-                renderSessionStep();
-            };
+                // Page content with fade animation
+                var pageWrap = document.createElement('div');
+                pageWrap.style.animation = 'fadeIn 0.25s ease-out';
+                pageWrap.appendChild(pages[gramPage]);
+                content.appendChild(pageWrap);
 
-            btnRow.appendChild(missBtn);
-            btnRow.appendChild(gotBtn);
-            controls.appendChild(btnRow);
-            // Keyboard: Enter or right arrow = Got It, left arrow = Need Practice
-            function grammarKeyHandler(e) {
+                var isLastPage = gramPage === pages.length - 1;
+                var btnRow = document.createElement('div');
+                btnRow.className = 'flex gap-2';
+
+                if (isLastPage) {
+                    // Final page: Got It / Need Practice
+                    var missBtn = document.createElement('button');
+                    missBtn.className = 'flex-1 py-3 bg-red-600/80 hover:bg-red-600 rounded-xl text-sm font-bold text-white transition-all';
+                    missBtn.textContent = '← Need Practice';
+                    missBtn.onclick = function() {
+                        sessionTotalCount++;
+                        recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, false);
+                        document.removeEventListener('keydown', gramKeyNav);
+                        sessionIdx++;
+                        renderSessionStep();
+                    };
+                    var gotBtn = document.createElement('button');
+                    gotBtn.className = 'flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all';
+                    gotBtn.textContent = 'Got It — Next →';
+                    gotBtn.onclick = function() {
+                        sessionPassCount++;
+                        sessionTotalCount++;
+                        recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, true);
+                        document.removeEventListener('keydown', gramKeyNav);
+                        sessionIdx++;
+                        renderSessionStep();
+                    };
+                    btnRow.appendChild(missBtn);
+                    btnRow.appendChild(gotBtn);
+                } else {
+                    // Continue button
+                    var contBtn = document.createElement('button');
+                    contBtn.className = 'flex-1 py-3 bg-purple-600 hover:bg-purple-500 rounded-xl text-sm font-bold text-white transition-all';
+                    contBtn.textContent = 'Continue →';
+                    contBtn.onclick = function() { gramPage++; showGrammarPage(); };
+                    btnRow.appendChild(contBtn);
+                }
+                controls.appendChild(btnRow);
+            }
+
+            // Keyboard navigation for grammar pages
+            function gramKeyNav(e) {
                 if (e.target.tagName === 'INPUT') return;
-                if (e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); document.removeEventListener('keydown', grammarKeyHandler); gotBtn.click(); }
-                else if (e.key === 'ArrowLeft') { e.preventDefault(); document.removeEventListener('keydown', grammarKeyHandler); missBtn.click(); }
+                var isLast = gramPage === pages.length - 1;
+                if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    if (isLast) {
+                        // Got It
+                        sessionPassCount++; sessionTotalCount++;
+                        recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, true);
+                        document.removeEventListener('keydown', gramKeyNav);
+                        sessionIdx++; renderSessionStep();
+                    } else { gramPage++; showGrammarPage(); }
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    if (isLast) {
+                        // Need Practice
+                        sessionTotalCount++;
+                        recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, false);
+                        document.removeEventListener('keydown', gramKeyNav);
+                        sessionIdx++; renderSessionStep();
+                    } else if (gramPage > 0) { gramPage--; showGrammarPage(); }
+                }
             }
-            document.addEventListener('keydown', grammarKeyHandler);
-            gotBtn.focus();
+            document.addEventListener('keydown', gramKeyNav);
+            showGrammarPage();
         })
         .catch(function(err) { content.textContent = 'Error loading lesson: ' + err.message; });
 }
