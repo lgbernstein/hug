@@ -5590,6 +5590,70 @@ var fcDecks = [
     { front: 'a munkahelyemEN', back: 'at my workplace', note: 'munkahely + em + en = at my workplace' },
     { front: 'az utcáBAN', back: 'on the street', note: 'utca = street, -ban = in/on' },
   ]},
+  // ── Notion: Grammar Patterns as flashcards ──
+  { id: 'notion_grammar', emoji: '📐', title: 'Grammar Patterns (Notion)', desc: 'All 42 patterns from your Notion database', color: 'purple', cards: [
+    { front: 'Question Words', back: 'ki/kit/kinek; mi/mit/minek; melyik; hány, mennyi, hol/hova/honnan', note: 'Core question words and their case forms' },
+    { front: 'Time expressions — quarter/half', back: 'negyed (quarter), fél (half), háromnegyed (three-quarter)', note: 'Before the upcoming hour. Used before 12:00.' },
+    { front: 'Afternoon time', back: 'After 12:00 use délután + regular time', note: 'Quarter/half system not used in afternoon' },
+    { front: 'Possessive chains', back: '-nak/-nek + possessive endings (-ja/-je etc.)', note: 'Add -nak/-nek to possessor, suffix to possessed noun' },
+    { front: 'Ordinals', back: '-adik/-edik/-ödik', note: 'First is irregular: első. Then második, harmadik...' },
+    { front: 'On the Xth of a month', back: '-án/-én (from -a/-e + -n)', note: 'Ordinal day + locative -n' },
+    { front: 'Numbers — counting and years', back: 'tíz, tizen-; száz-; ezer- patterns', note: 'Cardinals, tens, hundreds, thousands, birth years' },
+    { front: 'Seasons and months', back: '-i adjective (téli, tavaszi, nyári, őszi)', note: 'Map months to seasons with -i suffix' },
+    { front: 'Months + ordinals', back: '<sorszám> + hónap; hónap + <évszak>-i', note: 'Two-sentence month + season drill' },
+    { front: 'Noun plurals', back: '-k with linking vowel -o/-e/-ö', note: 'Plural -k with vowel harmony' },
+    { front: 'Allative -hoz/-hez/-höz', back: 'To or toward someone/something', note: 'Vowel harmony: back/front/rounded' },
+    { front: 'Inessive -ban/-ben', back: 'In/inside a location', note: '-ban = back vowel, -ben = front vowel' },
+    { front: '-val/-vel assimilation', back: 'With/by — v assimilates after consonants', note: 'tejjel, vonattal, buszszal — v becomes the consonant' },
+    { front: 'Weather adjectives', back: '-s/-os/-es/-ös', note: 'Noun → Adjective: nap → napos, eső → esős' },
+    { front: 'Dates with ordinals', back: '-án/-én (via -a/-e + -n)', note: 'Ordinal day plus locative suffix' },
+    { front: 'Ordinal formation', back: '-adik/-edik/-ödik', note: 'első, második, harmadik, negyedik...' },
+    { front: 'Demonstratives + article', back: 'ez/az + a + N; ezek/azok + a + N-pl', note: 'ez a ház = this house, az a könyv = that book' },
+    { front: 'hány vs mennyi', back: 'hány = how many (countable); mennyi = how much', note: 'hány + noun(singular!); mennyi + noun' },
+    { front: 'Number + noun singular', back: 'After numerals, noun stays SINGULAR', note: 'három ház (not három házak!) — unlike English' },
+    { front: 'Possessive nouns', back: '-om/-em/-öm (I), -od/-ed (you), -a/-e (he/she), -unk/-ünk (we), -otok/-etek (you pl), -uk/-ük (they)', note: 'Possessive endings by person with vowel harmony' },
+    { front: 'Exception Nouns (possessive)', back: '-a/-e (not -ja/-je) in 3rd person', note: 'Some nouns skip the j: szeme, füle, keze' },
+    { front: 'Days of the week', back: '-n/-on/-en/-ön for "on a day"; -nként for "every"', note: 'hétfőn = on Monday, szerdánként = every Wednesday' },
+    { front: 'Important Dates in Hungarian History', back: '895-1000-1526-1848-1920-1956-1989', note: 'Arrival, kingdom, fall, revolution, loss, uprising, democracy' },
+    { front: 'EZ / AZ / EZEK / AZOK', back: 'this/that/these/those + article before nouns', note: 'ez a ház, az a könyv, ezek az emberek' },
+    { front: 'MÁR / MÉG', back: 'már = already/no longer; még = still/yet/more', note: 'már megint = again; még mindig = still continuing' },
+    { front: 'Present tense (indefinite)', back: '-ek/-ök/-ok; -sz; ∅; -ünk/-unk; -tek/-tök/-tok; -nek/-nak', note: 'Indefinite conjugation with vowel harmony' },
+    { front: 'Personal Pronouns — Subject vs Object', back: 'én→engem, te→téged, ő→őt, mi→minket, ti→titeket, ők→őket', note: 'Subject forms vs accusative object forms' },
+    { front: 'Tud (know/can)', back: 'tudok/tudsz/tud; tudom/tudod/tudja', note: 'Indefinite = can/know how; Definite = know (a fact)' },
+    { front: 'Possessive Exceptions', back: '-ja/-je is default; exceptions take -a/-e', note: 'Default: háza, but: szeme, keze, füle (no j)' },
+    { front: 'Common Prefixes (igekötők)', back: 'be- ki- fel- le- el- meg- oda- rá-', note: 'Verb prefixes change meaning: megy→elmegy (leaves), bemegy (enters)' },
+    { front: 'Definite vs. Indefinite', back: 'Use definite when object is specific (the, that, a name)', note: 'Látok egy házat (indef) vs Látom a házat (def)' },
+    { front: 'VAN / VANNAK', back: 'van = there is / he is; vannak = there are / they are', note: 'Dropped in "X is Y" sentences: Ő magyar (not Ő van magyar)' },
+    { front: 'Verb Classes - Present Tense', back: 'Regular (-ok), -ik verbs (lakik), irregular (van, megy, jön)', note: 'Three main verb classes with different endings' },
+    { front: 'Times of the Day', back: 'reggel, délelőtt, dél, délután, este, éjszaka, éjfél', note: 'Morning, late morning, noon, afternoon, evening, night, midnight' },
+    { front: 'Alphabet – Pronunciation', back: 'cs=ch, sz=s, s=sh, gy=dj, zs=zh, ny=canyon, ly=y', note: 'Key digraphs that trip up English speakers' },
+  ]},
+  // ── Notion: Sentences to Practice ──
+  { id: 'notion_sentences', emoji: '💬', title: 'Practice Sentences (Notion)', desc: '13 graded sentences with translations', color: 'sky', cards: [
+    { front: 'Korábban orvos voltam, most nyugdíjas vagyok.', back: 'I used to be a doctor, now I am retired.', note: 'Past tense + present: voltam vs vagyok' },
+    { front: 'Március tizenötödikén ünneplünk.', back: 'We celebrate on March 15th.', note: 'A2 — Dates with ordinals' },
+    { front: 'Január elsején születtem.', back: 'I was born on January 1st.', note: 'A2 — Dates with ordinals' },
+    { front: 'Annával beszélek.', back: 'I am speaking with Anna.', note: 'A1 — val/-vel assimilation' },
+    { front: 'Ez a ház nagy.', back: 'This house is big.', note: 'A1 — Demonstratives + article' },
+    { front: 'Hány könyv van az asztalon?', back: 'How many books are on the table?', note: 'A1 — hány vs mennyi' },
+    { front: 'Ez a negyedik feladat.', back: 'This is the fourth task.', note: 'A2 — Ordinal formation' },
+    { front: 'Mennyi pénz kell?', back: 'How much money is needed?', note: 'A1 — hány vs mennyi' },
+    { front: 'Busszal megyek.', back: 'I am going by bus.', note: 'A1 — val/-vel assimilation' },
+    { front: 'Napos az idő.', back: 'The weather is sunny.', note: 'A1 — Weather adjectives' },
+    { front: 'Ő a hatodik.', back: 'He/She is the sixth.', note: 'A2 — Ordinal formation' },
+    { front: 'Esős idő van.', back: 'It is rainy weather.', note: 'A1 — Weather adjectives' },
+    { front: 'Az a könyv érdekes.', back: 'That book is interesting.', note: 'A1 — Demonstratives + article' },
+  ]},
+  // ── Notion: Vocabulary ──
+  { id: 'notion_vocab', emoji: '📖', title: 'Vocabulary (Notion)', desc: 'Key words with meanings and examples', color: 'emerald', cards: [
+    { front: 'megye', back: 'county (Noun)', note: 'Budapest megyében = in Budapest county' },
+    { front: 'foglalkozik', back: 'to work as, to be occupied with (Verb)', note: 'Mivel foglalkozik az édesapja?' },
+    { front: 'dátum', back: 'date (Noun)', note: 'Kérem, mondja a dátumot: YYYY. MM. DD.' },
+    { front: 'család', back: 'family (Noun)', note: 'Az Ön családja melyik részről származik?' },
+    { front: 'lakik', back: 'lives, resides (Verb)', note: 'Los Angelesben lakom 2015 óta.' },
+    { front: 'mióta', back: 'since when (Other)', note: 'Mióta él ott?' },
+    { front: 'született', back: 'was born (Verb)', note: '1990. 05. 14-én születtem Budapesten.' },
+  ]},
 ];
 
 // Flashcard state
@@ -5619,15 +5683,27 @@ function renderFcDecks() {
     var grid = document.getElementById('fcDeckGrid');
     grid.textContent = '';
 
-    // Section: Grammar
+    // Section: Grammar (hardcoded suffix/pattern drills)
     var gramLabel = document.createElement('div');
     gramLabel.className = 'col-span-full text-xs font-bold text-slate-500 uppercase tracking-wider mt-1';
-    gramLabel.textContent = 'Grammar Patterns';
+    gramLabel.textContent = 'Grammar Drills';
     grid.appendChild(gramLabel);
 
-    fcDecks.forEach(function(d) {
+    fcDecks.filter(function(d) { return d.id.indexOf('notion_') !== 0; }).forEach(function(d) {
         grid.appendChild(makeDeckTile(d.emoji, d.title, d.desc, d.cards.length, function() { startFcDeck(d.id); }));
     });
+
+    // Section: From Notion
+    var notionDecks = fcDecks.filter(function(d) { return d.id.indexOf('notion_') === 0; });
+    if (notionDecks.length) {
+        var notionLabel = document.createElement('div');
+        notionLabel.className = 'col-span-full text-xs font-bold text-slate-500 uppercase tracking-wider mt-4';
+        notionLabel.textContent = 'From Notion';
+        grid.appendChild(notionLabel);
+        notionDecks.forEach(function(d) {
+            grid.appendChild(makeDeckTile(d.emoji, d.title, d.desc, d.cards.length, function() { startFcDeck(d.id); }));
+        });
+    }
 
     // Section: Phrase Bank
     var phraseLabel = document.createElement('div');
