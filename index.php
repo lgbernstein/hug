@@ -1426,16 +1426,17 @@ select option { background: #4a525a; color: #e8e6df; }
                                 <div id="fcFill" class="h-full bg-amber-500 rounded-full transition-all duration-300" style="width:0%"></div>
                             </div>
                         </div>
-                        <!-- Word list left + card right -->
-                        <div class="p-4 flex gap-4 items-start">
-                            <div id="fcWordList" class="hidden md:block w-[200px] shrink-0 max-h-[420px] overflow-y-auto text-sm space-y-0"></div>
+                        <!-- Card left + buttons right -->
+                        <div class="p-4 flex gap-4 items-center">
                             <div class="flex-1 flex flex-col items-center">
                                 <div id="fcCardArea" class="w-full min-h-[240px] flex flex-col items-center justify-center">
                                 </div>
-                                <div id="fcControls" class="flex gap-2 w-full mt-3">
-                                </div>
+                            </div>
+                            <div id="fcControls" class="flex flex-col gap-2 w-[130px] shrink-0">
                             </div>
                         </div>
+                        <!-- Show All table area -->
+                        <div id="fcShowAllArea" class="px-4 pb-4"></div>
                     </div>
                     <!-- Score tally -->
                     <div class="flex items-center justify-center gap-6 mt-3">
@@ -5379,7 +5380,14 @@ function renderProgressPhrases(data) {
 
 // ── Flashcard Decks ───────────────────────────────────────────────────
 var fcDecks = [
-  { id: 'conjugation', emoji: '🔄', title: 'Verb Conjugation', desc: 'Present tense for all 6 persons', color: 'amber', cards: [
+  { id: 'conjugation', emoji: '🔄', title: 'Verb Conjugation', desc: 'Present tense for all 6 persons', color: 'amber',
+    groups: [
+      { label: 'Indefinite — lakni (to live)', start: 0, count: 6 },
+      { label: 'Indefinite — dolgozni (to work)', start: 6, count: 3 },
+      { label: 'Indefinite — beszélni (to speak)', start: 9, count: 6 },
+      { label: 'Definite — szeretni (to love)', start: 15, count: 6 }
+    ],
+    cards: [
     { front: 'Én lakOK', back: 'I live', note: '-ok/-ek/-ök = I (back/front/rounded vowel)' },
     { front: 'Te lakSZ', back: 'You live (informal)', note: '-sz = you (informal)' },
     { front: 'Ő lakIK', back: 'He/She lives', note: '-ik for some verbs (lakik, dolgozik)' },
@@ -5704,58 +5712,40 @@ function renderFcCard() {
     wrapper.appendChild(inner);
     area.appendChild(wrapper);
 
-    // Speaker button
+    // Speaker button below card
     var speakBtn = document.createElement('button');
     speakBtn.style.cssText = 'margin-top:10px;padding:6px 16px;border-radius:8px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;font-size:13px;font-weight:600;cursor:pointer';
     speakBtn.textContent = '🔊 Listen';
     speakBtn.onclick = function(e) { e.stopPropagation(); elevenSpeak(card.front); };
     area.appendChild(speakBtn);
 
-    // Got It / Missed — always visible, right below card
+    // Right side: Got It, Missed, Show All
     var gotBtn = document.createElement('button');
-    gotBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-green-600 hover:bg-green-700 text-white';
+    gotBtn.className = 'w-full py-3 rounded-xl text-sm font-bold transition-all bg-green-600 hover:bg-green-700 text-white';
     gotBtn.textContent = '✓ Got It';
     gotBtn.onclick = function(e) { e.stopPropagation(); fcGot++; fcIdx++; renderFcCard(); };
 
     var missBtn = document.createElement('button');
-    missBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-red-600 hover:bg-red-700 text-white';
+    missBtn.className = 'w-full py-3 rounded-xl text-sm font-bold transition-all bg-red-600 hover:bg-red-700 text-white';
     missBtn.textContent = '✗ Missed';
     missBtn.onclick = function(e) { e.stopPropagation(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); fcIdx++; renderFcCard(); };
 
+    var showAllBtn = document.createElement('button');
+    showAllBtn.className = 'w-full py-2.5 rounded-xl text-xs font-bold transition-all text-amber-300 border border-amber-500/30 hover:bg-amber-500/10';
+    showAllBtn.textContent = fcShowAllOpen ? 'Hide All' : 'Show All';
+    showAllBtn.onclick = function(e) {
+        e.stopPropagation();
+        fcShowAllOpen = !fcShowAllOpen;
+        renderFcShowAll();
+        showAllBtn.textContent = fcShowAllOpen ? 'Hide All' : 'Show All';
+    };
+
     controls.appendChild(gotBtn);
     controls.appendChild(missBtn);
+    controls.appendChild(showAllBtn);
 
-    // Populate left word list (desktop)
-    var wordList = document.getElementById('fcWordList');
-    if (wordList) {
-        wordList.textContent = '';
-        var activeDeck = fcDecks.find(function(d) { return d.cards === fcCards; }) || fcDecks.find(function(d) {
-            return d.cards.some(function(c) { return c.front === fcCards[0].front; });
-        });
-        var allCards = activeDeck ? activeDeck.cards : fcCards;
-        allCards.forEach(function(c, i) {
-            var row = document.createElement('div');
-            row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px;cursor:pointer' +
-                (c.front === card.front ? ';background:rgba(99,102,241,0.15)' : '');
-            var spk = document.createElement('button');
-            spk.style.cssText = 'border:none;background:none;cursor:pointer;font-size:10px;color:#6366f1;flex-shrink:0;padding:0';
-            spk.textContent = '🔊';
-            (function(txt) { spk.onclick = function(ev) { ev.stopPropagation(); elevenSpeak(txt); }; })(c.front);
-            row.appendChild(spk);
-            var hu = document.createElement('span');
-            hu.style.cssText = 'font-size:12px;font-weight:600;color:#e2e8f0';
-            hu.appendChild(highlightSuffix(c.front));
-            row.appendChild(hu);
-            // Click row to jump to that card
-            (function(idx) {
-                row.onclick = function() { fcIdx = idx; renderFcCard(); };
-            })(i);
-            wordList.appendChild(row);
-        });
-        // Scroll current into view
-        var activeRow = wordList.children[fcIdx];
-        if (activeRow) activeRow.scrollIntoView({ block: 'nearest' });
-    }
+    // Render show-all if open
+    renderFcShowAll();
 }
 
 // Touch swipe for flashcards
@@ -5772,6 +5762,84 @@ document.addEventListener('touchend', function(e) {
     if (dx < 0 && fcIdx < fcCards.length - 1) { fcIdx++; renderFcCard(); }
     if (dx > 0 && fcIdx > 0) { fcIdx--; renderFcCard(); }
 });
+
+var fcShowAllOpen = false;
+
+function renderFcShowAll() {
+    var area = document.getElementById('fcShowAllArea');
+    if (!area) return;
+    area.textContent = '';
+    if (!fcShowAllOpen) return;
+
+    var activeDeck = fcDecks.find(function(d) { return d.cards === fcCards; }) || fcDecks.find(function(d) {
+        return d.cards.some(function(c) { return c.front === fcCards[0].front; });
+    });
+    if (!activeDeck) return;
+    var allCards = activeDeck.cards;
+    var groups = activeDeck.groups;
+    var currentCard = fcCards[fcIdx];
+
+    if (groups && groups.length) {
+        groups.forEach(function(g) {
+            // Group header
+            var header = document.createElement('div');
+            header.style.cssText = 'font-size:11px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 4px;margin-top:8px';
+            header.textContent = g.label;
+            area.appendChild(header);
+
+            // 2-column grid: én/te/ő left, mi/ti/ők right
+            var grid = document.createElement('div');
+            grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:2px 16px';
+            var cards = allCards.slice(g.start, g.start + g.count);
+            var half = Math.ceil(cards.length / 2);
+            var leftCol = cards.slice(0, half);
+            var rightCol = cards.slice(half);
+            var maxLen = Math.max(leftCol.length, rightCol.length);
+            for (var r = 0; r < maxLen; r++) {
+                [leftCol[r], rightCol[r]].forEach(function(c) {
+                    var cell = document.createElement('div');
+                    if (!c) { grid.appendChild(cell); return; }
+                    cell.style.cssText = 'display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:12px' +
+                        (currentCard && c.front === currentCard.front ? ';background:rgba(99,102,241,0.2)' : '');
+                    var spk = document.createElement('button');
+                    spk.style.cssText = 'border:none;background:none;cursor:pointer;font-size:10px;color:#6366f1;padding:0;flex-shrink:0';
+                    spk.textContent = '🔊';
+                    (function(txt) { spk.onclick = function(ev) { ev.stopPropagation(); elevenSpeak(txt); }; })(c.front);
+                    cell.appendChild(spk);
+                    var txt = document.createElement('span');
+                    txt.style.cssText = 'font-weight:600;color:#e2e8f0';
+                    txt.appendChild(highlightSuffix(c.front));
+                    cell.appendChild(txt);
+                    var globalIdx = allCards.indexOf(c);
+                    (function(idx) { cell.onclick = function() { fcIdx = idx; renderFcCard(); }; })(globalIdx);
+                    grid.appendChild(cell);
+                });
+            }
+            area.appendChild(grid);
+        });
+    } else {
+        // No groups — simple 2-column list
+        var grid = document.createElement('div');
+        grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:2px 16px';
+        allCards.forEach(function(c, i) {
+            var cell = document.createElement('div');
+            cell.style.cssText = 'display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:12px' +
+                (currentCard && c.front === currentCard.front ? ';background:rgba(99,102,241,0.2)' : '');
+            var spk = document.createElement('button');
+            spk.style.cssText = 'border:none;background:none;cursor:pointer;font-size:10px;color:#6366f1;padding:0;flex-shrink:0';
+            spk.textContent = '🔊';
+            (function(txt) { spk.onclick = function(ev) { ev.stopPropagation(); elevenSpeak(txt); }; })(c.front);
+            cell.appendChild(spk);
+            var txt = document.createElement('span');
+            txt.style.cssText = 'font-weight:600;color:#e2e8f0';
+            txt.appendChild(highlightSuffix(c.front));
+            cell.appendChild(txt);
+            (function(idx) { cell.onclick = function() { fcIdx = idx; renderFcCard(); }; })(i);
+            grid.appendChild(cell);
+        });
+        area.appendChild(grid);
+    }
+}
 
 function flipFc() {
     var el = document.getElementById('fcFlipCard');
