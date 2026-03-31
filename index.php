@@ -894,7 +894,7 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 .btn-primary:hover { background: #4f46e5; }
 .btn-primary:active { transform: scale(0.97); }
 .btn-secondary { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #9ca3af; color: #1f2937; border: none; transition: background 0.15s; cursor: pointer; }
-.btn-secondary:hover { background: #b0b7c3; }
+.btn-secondary:hover { background: #d1d5db; }
 .btn-secondary:active { transform: scale(0.97); }
 .btn-ghost { padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #9ca3af; background: transparent; border: none; transition: all 0.15s; cursor: pointer; }
 .btn-ghost:hover { color: #f5f4ef; background: rgba(255,255,255,0.08); }
@@ -3774,7 +3774,7 @@ function renderAudioStep(step, content, controls) {
     var b2 = document.createElement('button'); b2.className = 'btn-next'; b2.textContent = 'Next →'; b2.onclick = doNext; grid.appendChild(b2);
     var b3 = document.createElement('button'); b3.className = 'btn-teal'; b3.textContent = '🔊 Again'; b3.onclick = doSpeak; grid.appendChild(b3);
     var b4 = document.createElement('button'); b4.id = 'gridHearMe'; b4.textContent = '🎧 Hear Me'; b4.disabled = true; b4.onclick = playMyVoice;
-    b4.style.cssText = 'padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;cursor:default;background:#a78bfa;color:#4c1d95';
+    b4.style.cssText = 'padding:10px 20px;border-radius:12px;font-size:13px;font-weight:700;background:#a78bfa;color:#4c1d95;cursor:pointer';
     grid.appendChild(b4);
     var breakdownBtn = document.createElement('button'); breakdownBtn.className = 'btn-sky'; breakdownBtn.textContent = '📖 Break it Down'; var breakdownLoaded = false; grid.appendChild(breakdownBtn);
     var enBtn = document.createElement('button'); enBtn.className = 'btn-secondary'; enBtn.textContent = '🇬🇧 English';
