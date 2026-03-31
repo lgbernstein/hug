@@ -2740,14 +2740,14 @@ function processSpeechResult() {
     fd.append('strictness', strictness);
     if (targetAH) fd.append('expected_hu', targetAH);
 
-    // Send audio to Gemini for direct eval — skip for pronunciation mode (transcript is sufficient, saves 5-10s)
+    // Send audio to Gemini for direct eval (pronunciation needs actual audio)
     var audioPromise = Promise.resolve();
-    if (lastRecordingBlob && currentMode !== 'pronunciation') {
+    if (lastRecordingBlob) {
         audioPromise = new Promise(function(resolve) {
             var reader = new FileReader();
             reader.onload = function() {
                 var b64 = reader.result.split(',')[1];
-                if (b64 && b64.length < 150000) fd.append('audio', b64);
+                if (b64 && b64.length < 200000) fd.append('audio', b64);
                 resolve();
             };
             reader.onerror = function() { resolve(); };
