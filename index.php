@@ -1247,18 +1247,18 @@ tailwind.config = {
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { font-family: 'Inter', system-ui, sans-serif; }
-body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
+body { background: #0f172a; color: #e2e8f0; overflow-x: hidden; }
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #6b7280; border-radius: 3px; }
-.glass { background: #525a62; border: 1px solid #5e666e; box-shadow: none; }
-.glass-strong { background: #555d65; border: 1px solid #636b73; box-shadow: none; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+.glass { background: rgba(30,41,59,0.8); border: 1px solid rgba(148,163,184,0.1); backdrop-filter: blur(12px); }
+.glass-strong { background: rgba(30,41,59,0.95); border: 1px solid rgba(148,163,184,0.15); backdrop-filter: blur(16px); }
 .glow-accent { box-shadow: none; }
 .glow-red { box-shadow: 0 0 20px rgba(239,68,68,0.25); }
 .glow-green { box-shadow: 0 0 20px rgba(34,197,94,0.25); }
 @keyframes mic-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } }
 .mic-active { animation: mic-pulse 1.5s ease-in-out infinite; background: #dc2626 !important; }
-.progress-track { background: rgba(255,255,255,0.12); }
+.progress-track { background: rgba(255,255,255,0.08); }
 .progress-fill { background: linear-gradient(90deg, #6366f1, #a78bfa); transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; transition: all 0.3s; }
 .dot-off { background: #6b7280; }
@@ -1273,8 +1273,8 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 /* Pills */
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; transition: all 0.2s; cursor: pointer; user-select: none; }
 .pill-active { background: #6366f1; color: white; }
-.pill-inactive { color: #b0ada6; border: 1px solid rgba(255,255,255,0.15); }
-.pill-inactive:hover { color: #f5f4ef; background: rgba(255,255,255,0.08); }
+.pill-inactive { color: #94a3b8; border: 1px solid rgba(255,255,255,0.15); }
+.pill-inactive:hover { color: #e2e8f0; background: rgba(255,255,255,0.08); }
 /* Buttons — 3 tiers */
 .btn-primary { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #6366f1; color: #fff; transition: background 0.15s; cursor: pointer; }
 .btn-primary:hover { background: #4f46e5; }
@@ -1283,7 +1283,7 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 .btn-secondary:hover { background: #d1d5db; }
 .btn-secondary:active { transform: scale(0.97); }
 .btn-ghost { padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #9ca3af; background: transparent; border: none; transition: all 0.15s; cursor: pointer; }
-.btn-ghost:hover { color: #f5f4ef; background: rgba(255,255,255,0.08); }
+.btn-ghost:hover { color: #e2e8f0; background: rgba(255,255,255,0.08); }
 .btn-ghost:disabled { opacity: 0.35; cursor: default; }
 .btn-next { padding: 10px 20px; border-radius: 12px; font-size: 13px; font-weight: 700; background: #0ea5e9; color: #fff; transition: background 0.15s; cursor: pointer; }
 .btn-next:hover { background: #0284c7; }
@@ -1309,7 +1309,7 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 .mastery-known { background: #3b82f6; }
 .mastery-mastered { background: #22c55e; }
 /* Question text */
-.question-text { font-size: clamp(1.5rem, 5vw, 2.75rem); line-height: 1.2; font-weight: 800; letter-spacing: -0.02em; color: #f5f4ef; }
+.question-text { font-size: clamp(1.5rem, 5vw, 2.75rem); line-height: 1.2; font-weight: 800; letter-spacing: -0.02em; color: #f1f5f9; }
 .kbd { display: inline-flex; align-items: center; justify-content: center; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-family: monospace; background: rgba(255,255,255,0.05); color: #64748b; border: 1px solid rgba(255,255,255,0.1); }
 .quick-bar { display: flex; justify-content: space-around; align-items: center; padding: 6px 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; }
 @media (min-width: 768px) { .quick-bar { justify-content: center; gap: 4px; } }
