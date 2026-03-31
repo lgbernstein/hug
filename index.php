@@ -5700,7 +5700,26 @@ function renderFcCard() {
     wrapper.appendChild(inner);
     area.appendChild(wrapper);
 
-    // Controls: Got It / Missed (hidden until flipped)
+    // Speaker button — below card
+    var speakRow = document.createElement('div');
+    speakRow.style.cssText = 'display:flex;justify-content:center;gap:12px;margin-top:12px';
+    var speakBtn = document.createElement('button');
+    speakBtn.style.cssText = 'padding:8px 20px;border-radius:10px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px';
+    speakBtn.textContent = '🔊 Listen';
+    speakBtn.onclick = function(e) { e.stopPropagation(); elevenSpeak(card.front); };
+    speakRow.appendChild(speakBtn);
+    area.appendChild(speakRow);
+
+    // Navigation arrows + Got It / Missed
+    var navRow = document.createElement('div');
+    navRow.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%';
+
+    var prevBtn = document.createElement('button');
+    prevBtn.style.cssText = 'padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;font-size:18px;cursor:pointer';
+    prevBtn.textContent = '←';
+    prevBtn.onclick = function(e) { e.stopPropagation(); if (fcIdx > 0) { fcIdx--; renderFcCard(); } };
+    if (fcIdx === 0) { prevBtn.style.opacity = '0.3'; prevBtn.style.cursor = 'default'; }
+
     var gotBtn = document.createElement('button');
     gotBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-green-600 hover:bg-green-700 text-white';
     gotBtn.textContent = '✓ Got It';
@@ -5715,9 +5734,37 @@ function renderFcCard() {
     missBtn.style.display = 'none';
     missBtn.onclick = function(e) { e.stopPropagation(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); fcIdx++; renderFcCard(); };
 
+    var nextBtn = document.createElement('button');
+    nextBtn.style.cssText = 'padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;font-size:18px;cursor:pointer';
+    nextBtn.textContent = '→';
+    nextBtn.onclick = function(e) { e.stopPropagation(); if (fcIdx < fcCards.length - 1) { fcIdx++; renderFcCard(); } };
+
+    navRow.appendChild(prevBtn);
     controls.appendChild(gotBtn);
     controls.appendChild(missBtn);
+    controls.appendChild(document.createTextNode(' '));
+    // Put arrows outside controls, in area
+    var arrowRow = document.createElement('div');
+    arrowRow.style.cssText = 'display:flex;justify-content:space-between;width:100%;margin-top:8px';
+    arrowRow.appendChild(prevBtn);
+    arrowRow.appendChild(nextBtn);
+    area.appendChild(arrowRow);
 }
+
+// Touch swipe for flashcards
+var fcTouchStartX = 0;
+document.addEventListener('touchstart', function(e) {
+    var fc = document.getElementById('fcFlipCard');
+    if (fc && fc.contains(e.target)) fcTouchStartX = e.touches[0].clientX;
+});
+document.addEventListener('touchend', function(e) {
+    if (!fcTouchStartX) return;
+    var dx = e.changedTouches[0].clientX - fcTouchStartX;
+    fcTouchStartX = 0;
+    if (Math.abs(dx) < 50) return;
+    if (dx < 0 && fcIdx < fcCards.length - 1) { fcIdx++; renderFcCard(); }
+    if (dx > 0 && fcIdx > 0) { fcIdx--; renderFcCard(); }
+});
 
 function flipFc() {
     var el = document.getElementById('fcFlipCard');
