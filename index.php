@@ -2140,66 +2140,61 @@ recognition.onresult = function(event) {
             var fb = (data.feedback || '').split(/\.\s/)[0];
             if (fb.length > 80) fb = fb.substring(0, 77) + '...';
 
-            // Show result as a small floating popup — don't change the page
-            var oldPopup = document.getElementById('evalPopup');
-            if (oldPopup) oldPopup.remove();
+            // Toast notification — hands-free, auto-dismisses, no clicking needed
+            var oldToast = document.getElementById('evalToast');
+            if (oldToast) oldToast.remove();
 
-            var popup = document.createElement('div');
-            popup.id = 'evalPopup';
-            popup.className = 'fixed top-1/3 left-1/2 z-50 rounded-2xl p-5 shadow-2xl text-center max-w-sm w-[90%]';
-            popup.style.cssText = 'transform:translate(-50%,-50%);animation:fadeIn 0.2s ease-out;' +
-                (isPass ? 'background:#0f2818;border:1px solid rgba(34,197,94,0.3)' : 'background:#281010;border:1px solid rgba(239,68,68,0.3)');
-
-            // Badge
-            var badgeSpan = document.createElement('div');
-            badgeSpan.className = 'text-lg font-bold mb-2 ' + (isPass ? 'text-green-400' : 'text-red-400');
-            badgeSpan.textContent = isPass ? '✓ Pass' : '✗ Try Again';
-            popup.appendChild(badgeSpan);
-
-            // Feedback
-            if (fb) {
-                var fbEl = document.createElement('p');
-                fbEl.className = 'text-xs mb-2 ' + (isPass ? 'text-green-300/70' : 'text-red-300/70');
-                fbEl.textContent = fb;
-                popup.appendChild(fbEl);
-            }
-
-            // What Gemini heard (much more accurate than Web Speech API)
             var heardText = data.heard || result;
-            var said = document.createElement('p');
-            said.className = 'text-[11px] text-slate-500 italic mb-3';
-            said.textContent = 'Heard: "' + heardText + '"';
-            popup.appendChild(said);
 
-            // Buttons row
-            var btnRow = document.createElement('div');
-            btnRow.className = 'flex items-center justify-center gap-2';
+            var toast = document.createElement('div');
+            toast.id = 'evalToast';
+            toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:50;' +
+                'padding:12px 24px;border-radius:16px;max-width:500px;width:90%;text-align:center;' +
+                'animation:fadeIn 0.2s ease-out;box-shadow:0 4px 20px rgba(0,0,0,0.4);' +
+                (isPass ? 'background:#0a2e14;border:1px solid rgba(34,197,94,0.4)' : 'background:#2e0a0a;border:1px solid rgba(239,68,68,0.4)');
 
-            var retryBtn = document.createElement('button');
-            retryBtn.className = 'btn-primary text-xs';
-            retryBtn.textContent = isPass ? 'Next →' : '🎤 Retry';
-            retryBtn.onclick = function() {
-                popup.remove();
-                if (isPass) { sessionIdx++; renderSessionStep(); }
-                else { speak(currentSpeed); }
-            };
-            btnRow.appendChild(retryBtn);
+            // One line: badge + feedback + what was heard
+            var line = document.createElement('div');
+            line.className = 'flex items-center justify-center gap-3 flex-wrap';
+            var badge = document.createElement('span');
+            badge.className = 'font-bold text-sm ' + (isPass ? 'text-green-400' : 'text-red-400');
+            badge.textContent = isPass ? '✓' : '✗';
+            line.appendChild(badge);
+            if (fb) {
+                var fbSpan = document.createElement('span');
+                fbSpan.className = 'text-xs ' + (isPass ? 'text-green-300/80' : 'text-red-300/80');
+                fbSpan.textContent = fb;
+                line.appendChild(fbSpan);
+            }
+            var heard = document.createElement('span');
+            heard.className = 'text-[10px] text-slate-500 italic';
+            heard.textContent = '"' + heardText + '"';
+            line.appendChild(heard);
+            toast.appendChild(line);
+            document.body.appendChild(toast);
 
-            // Enable Hear Me if recording exists
+            // Enable Hear Me button
             var ghm = document.getElementById('gridHearMe');
             if (ghm && lastRecordingBlob) { ghm.disabled = false; ghm.style.opacity = '1'; }
 
-            popup.appendChild(btnRow);
-            document.body.appendChild(popup);
-
-            // Auto-flow: pass → next phrase, fail → auto-retry
+            // Hands-free auto-flow — no clicking needed
             if (activeSession) {
                 if (isPass) {
-                    setTimeout(function() { if (document.getElementById('evalPopup')) { popup.remove(); sessionIdx++; renderSessionStep(); } }, 2000);
+                    // Pass: green flash 1.5s → next phrase
+                    setTimeout(function() {
+                        var t = document.getElementById('evalToast'); if (t) t.remove();
+                        sessionIdx++; renderSessionStep();
+                    }, 1500);
                 } else {
-                    // Auto-retry on fail: dismiss popup, re-speak after 3s so user can read feedback
-                    setTimeout(function() { if (document.getElementById('evalPopup')) { popup.remove(); speak(currentSpeed); } }, 3000);
+                    // Fail: show feedback 3s → auto re-speak → auto-listen
+                    setTimeout(function() {
+                        var t = document.getElementById('evalToast'); if (t) t.remove();
+                        speak(currentSpeed);
+                    }, 3000);
                 }
+            } else {
+                // Non-session: dismiss after 4s
+                setTimeout(function() { var t = document.getElementById('evalToast'); if (t) { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(function() { if (t.parentNode) t.remove(); }, 300); } }, 4000);
             }
 
             if (!activeSession) {
@@ -2687,35 +2682,44 @@ function makeStatCard(label, value) {
 // ── Keyboard shortcuts ────────────────────────────────────────────────
 document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
-    if (e.key === ' ' && !e.ctrlKey && !e.metaKey) {
+
+    // Dismiss toast immediately on any key
+    var toast = document.getElementById('evalToast');
+    if (toast) toast.remove();
+
+    if (e.key === ' ' || e.key === 'Enter') {
+        // Space/Enter = Listen & Repeat (speak + auto-record)
         e.preventDefault();
-        toggleMic();
-    } else if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        nextQuestion();
-    } else if (e.key === 'Escape') {
-        if (isListening) { recognition.stop(); }
-        closeBrowse();
-        closeStats();
-    } else if (e.key === 's' || e.key === 'S') {
-        toggleSlow();
-    } else if (e.key === 't' || e.key === 'T') {
-        toggleTranslation();
-    } else if (e.key === 'p' || e.key === 'P') {
-        togglePhonetic();
-    } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        prevQuestion();
+        if (activeSession) {
+            speak(currentSpeed);
+        } else {
+            toggleMic();
+        }
     } else if (e.key === 'ArrowRight') {
+        // → = Next phrase
         e.preventDefault();
-        nextQuestion();
-    } else if (e.key === 'ArrowUp') {
+        if (activeSession && sessionSteps.length > 0) {
+            sessionIdx++; sessionTotalCount++; renderSessionStep();
+        } else {
+            nextQuestion();
+        }
+    } else if (e.key === 'ArrowLeft') {
+        // ← = Hear again (no recording)
         e.preventDefault();
         speak(currentSpeed, false);
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowUp') {
+        // ↑ = Hear myself
         e.preventDefault();
-        var d = document.getElementById('revealDetails');
-        d.open = !d.open;
+        playMyVoice();
+    } else if (e.key === 'ArrowDown') {
+        // ↓ = Toggle English translation
+        e.preventDefault();
+        var trans = document.querySelector('#sessionContent span[style*="blur"]');
+        if (trans) trans.style.filter = trans.style.filter.indexOf('blur') > -1 ? 'none' : 'blur(5px)';
+        else { var d = document.getElementById('revealDetails'); if (d) d.open = !d.open; }
+    } else if (e.key === 'Escape') {
+        if (isListening) recognition.stop();
+        closeBreakdownDrawer();
     }
 });
 
