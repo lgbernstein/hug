@@ -473,7 +473,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'breakdown') {
 
     $sentenceEsc = addslashes($sentence);
     $englishEsc = addslashes($english);
-    $prompt = "You are a friendly Hungarian tutor. Break down this phrase word by word for an American beginner.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"meaning\": \"simple English meaning\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. OHR-vosh)\",\n      \"note\": \"One helpful thing to know. Like: 'Hungarian doesn't distinguish he/she' or 'Comes AFTER the word it emphasizes' or '-ban = in (think: banned inside)'. Skip if the word is obvious.\"\n    }\n  ],\n  \"tip\": \"One memory trick for the whole phrase, under 15 words\"\n}\n\nRules:\n- Keep meanings to 2-4 words max\n- Notes should be conversational, like a tutor talking, not grammar textbook\n- Skip the note field entirely for simple words (a, the, and, etc)\n- For suffixes: show the suffix, what it means, and a mini example\n- Never use terms like 'locative', 'accusative', 'possessive' — just explain what it DOES";
+    $prompt = "Break down this Hungarian phrase word by word.\n\nPhrase: \"{$sentenceEsc}\"" . ($english ? "\nMeaning: {$englishEsc}" : "") . "\n\nReturn JSON:\n{\n  \"words\": [\n    {\n      \"word\": \"the word as it appears\",\n      \"meaning\": \"1-3 word English meaning\",\n      \"pronunciation\": \"English sounds in CAPS (e.g. OHR-vosh)\",\n      \"note\": \"Max 6 words. Only for suffixes or non-obvious grammar. Examples: '-ban = in', '-ból = out of', 'past tense of lát'. Omit for simple/obvious words.\"\n    }\n  ],\n  \"tip\": \"One sentence English translation\"\n}\n\nBe extremely brief. No full sentences in notes — fragments only. Skip note for names, articles, conjunctions.";
 
     $apiKey = $env['GEMINI_KEY'];
     $geminiUrl = "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash-lite:generateContent?key=" . urlencode($apiKey);
@@ -3319,18 +3319,11 @@ function renderBreakdown(data, container) {
 
             table.appendChild(row);
 
-            // Note hidden — tap row to toggle
             if (w.note) {
                 var noteRow = document.createElement('div');
-                noteRow.style.cssText = 'padding:0 12px 6px 30px;font-size:11px;color:#4338ca;line-height:1.3;display:none';
+                noteRow.style.cssText = 'padding:0 12px 6px 30px;font-size:11px;color:#4338ca;line-height:1.3';
                 noteRow.textContent = w.note;
                 table.appendChild(noteRow);
-                (function(nr) {
-                    row.onclick = function(e) {
-                        if (e.target.tagName === 'BUTTON') return;
-                        nr.style.display = nr.style.display === 'none' ? 'block' : 'none';
-                    };
-                })(noteRow);
             }
         });
         drawer.appendChild(table);
