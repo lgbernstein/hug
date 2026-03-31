@@ -74,33 +74,32 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'save_bio') {
 // AJAX: list all phrases for browser
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'phrases') {
     header('Content-Type: application/json');
-    $search = $conn->real_escape_string($_GET['search'] ?? '');
+    $search = $conn->real_escape_string(str_replace(['%','_'], ['\\%','\\_'], $_GET['search'] ?? ''));
     $tagFilter = $_GET['tag'] ?? '';
     $limitParam = (int)($_GET['limit'] ?? 0);
-    $ahuBrowse = $hasAnswerHu ? "COALESCE(answer_hu,'') AS a_hu," : "'' AS a_hu,";
-    $sql = "SELECT question_hu AS q, answer_en AS a, $ahuBrowse category FROM hungarian_prep";
+    $ahuBrowse = $hasAnswerHu ? "COALESCE(hp.answer_hu,'') AS a_hu," : "'' AS a_hu,";
+    $sql = "SELECT hp.question_hu AS q, hp.answer_en AS a, $ahuBrowse hp.category,
+            COALESCE(sh.pass_count, 0) AS pass_count, COALESCE(sh.fail_count, 0) AS fail_count, sh.next_review
+            FROM hungarian_prep hp
+            LEFT JOIN study_history sh ON sh.phrase = hp.question_hu AND sh.who = '$who_safe'";
     $wheres = [];
-    if ($search) $wheres[] = "(question_hu LIKE '%$search%' OR answer_en LIKE '%$search%')";
+    if ($search) $wheres[] = "(hp.question_hu LIKE '%$search%' OR hp.answer_en LIKE '%$search%')";
     if ($tagFilter) {
         $tagWhere = buildTagWhere($tagFilter, $conn);
         $wheres[] = $tagWhere;
     }
-    $whoFilter = ($who !== 'All') ? "(`who` = 'All' OR `who` = '$who_safe')" : '';
+    $whoFilter = ($who !== 'All') ? "(hp.`who` = 'All' OR hp.`who` = '$who_safe')" : '';
     if ($whoFilter) $wheres[] = $whoFilter;
     if ($wheres) $sql .= " WHERE " . implode(' AND ', $wheres);
-    $sql .= " ORDER BY " . ($tagFilter ? "RAND()" : "category, question_hu");
+    $sql .= " ORDER BY " . ($tagFilter ? "RAND()" : "hp.category, hp.question_hu");
     if ($limitParam > 0) $sql .= " LIMIT $limitParam";
     $result = $conn->query($sql);
     $rows = [];
-    if ($result) { while ($r = $result->fetch_assoc()) $rows[] = $r; }
-    foreach ($rows as &$row) {
-        $q_safe = $conn->real_escape_string($row['q']);
-        $sh = $conn->query("SELECT pass_count, fail_count, next_review FROM study_history WHERE phrase='$q_safe' AND who='$who_safe' LIMIT 1");
-        $srs = $sh ? $sh->fetch_assoc() : null;
-        $row['pass_count'] = (int)($srs['pass_count'] ?? 0);
-        $row['fail_count'] = (int)($srs['fail_count'] ?? 0);
-        $row['next_review'] = $srs['next_review'] ?? null;
-    }
+    if ($result) { while ($r = $result->fetch_assoc()) {
+        $r['pass_count'] = (int)$r['pass_count'];
+        $r['fail_count'] = (int)$r['fail_count'];
+        $rows[] = $r;
+    }}
     echo json_encode($rows);
     exit;
 }
@@ -128,7 +127,7 @@ function buildTagWhere($tagMatch, $conn) {
     $clauses = [];
     foreach ($tags as $t) {
         if ($t === '') continue;
-        $t = $conn->real_escape_string($t);
+        $t = str_replace(['%', '_'], ['\\%', '\\_'], $conn->real_escape_string($t));
         $clauses[] = "tags LIKE '%$t%'";
     }
     return $clauses ? '(' . implode(' OR ', $clauses) . ')' : '0';

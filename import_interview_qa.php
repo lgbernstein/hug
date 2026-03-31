@@ -4,7 +4,6 @@
 // Structured interview question-answer pairs for citizenship interview prep
 // Safe to re-run: ON DUPLICATE KEY UPDATE
 
-session_start();
 $env = parse_ini_file('.env');
 $conn = new mysqli($env['DB_HOST'], $env['DB_USER'], $env['DB_PASS'], $env['DB_NAME']);
 if ($conn->connect_error) { die('DB connection failed: ' . $conn->connect_error); }
@@ -84,8 +83,7 @@ $maria_qa = [
 // COMMON INTERVIEW PHRASES — both users
 // ============================================================
 $common = [
-    // Greetings
-    ['Jó napot kívánok!', 'Good day! (formal greeting)', '', 'prep', 'All', 'interview-qa,greeting,essential'],
+    // Greetings (Jó napot kívánok! already in tana import)
     ['Hogy van?', 'How are you? (formal)', 'Köszönöm, jól.', 'prep', 'All', 'interview-qa,greeting,essential'],
     ['Köszönöm, jól. És Ön?', 'Fine, thanks. And you?', '', 'prep', 'All', 'interview-qa,greeting,essential'],
     ['Örülök a találkozásnak.', 'Nice to meet you.', '', 'prep', 'All', 'interview-qa,greeting,essential'],

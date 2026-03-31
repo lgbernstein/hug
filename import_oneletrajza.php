@@ -4,7 +4,6 @@
 // These are the core sentences the interviewer will walk through section by section
 // Safe to re-run: ON DUPLICATE KEY UPDATE
 
-session_start();
 $env = parse_ini_file('.env');
 $conn = new mysqli($env['DB_HOST'], $env['DB_USER'], $env['DB_PASS'], $env['DB_NAME']);
 if ($conn->connect_error) { die('DB connection failed: ' . $conn->connect_error); }

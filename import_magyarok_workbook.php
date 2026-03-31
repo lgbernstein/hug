@@ -5,7 +5,6 @@
 // demonstratives, ordinals, months, seasons, -ba/-be, time, -val/-vel, definite/indefinite, colors, clothing, occupations
 // Safe to re-run: ON DUPLICATE KEY UPDATE
 
-session_start();
 $env = parse_ini_file('.env');
 $conn = new mysqli($env['DB_HOST'], $env['DB_USER'], $env['DB_PASS'], $env['DB_NAME']);
 if ($conn->connect_error) { die('DB connection failed: ' . $conn->connect_error); }
@@ -255,8 +254,7 @@ $ch4 = [
     ['Étterembe megyünk.', 'We\'re going to a restaurant.', '', 'prep', 'All', 'magyarok-ch4,ba-be,direction,beginner,level-1'],
     ['Hova mész?', 'Where are you going?', '', 'prep', 'All', 'magyarok-ch4,ba-be,question,beginner,level-1'],
 
-    // --- Dates ---
-    ['Mikor született?', 'When were you born?', '', 'prep', 'All', 'magyarok-ch4,date,question,beginner,level-1'],
+    // --- Dates --- (Mikor született? already in interview_qa with user-specific answers)
     ['1957. november 7-én születtem.', 'I was born on November 7, 1957.', '', 'prep', 'Larry', 'magyarok-ch4,date,beginner,level-1'],
     ['Augusztus 20-án van az államalapítás napja.', 'August 20 is the day of the state foundation.', '', 'prep', 'All', 'magyarok-ch4,date,culture,beginner,level-1'],
 ];
@@ -281,7 +279,6 @@ $ch5 = [
     ['házat', 'house (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
     ['könyvet', 'book (object)', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,beginner,level-2'],
     ['Jó reggelt kívánok!', 'Good morning!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
-    ['Jó napot kívánok!', 'Good day!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
     ['Jó estét kívánok!', 'Good evening!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
     ['Jó éjszakát kívánok!', 'Good night!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],
     ['Jó étvágyat kívánok!', 'Bon appétit!', '', 'prep', 'All', 'magyarok-ch5,targyrag-t,greeting,beginner,level-2'],

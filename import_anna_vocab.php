@@ -4,7 +4,6 @@
 // Curated vocabulary words + full sentences from Hungarian Solutions teacher Anna
 // Safe to re-run: ON DUPLICATE KEY UPDATE
 
-session_start();
 $env = parse_ini_file('.env');
 $conn = new mysqli($env['DB_HOST'], $env['DB_USER'], $env['DB_PASS'], $env['DB_NAME']);
 if ($conn->connect_error) { die('DB connection failed: ' . $conn->connect_error); }
@@ -326,7 +325,6 @@ $lesson10 = [
     // Sentences
     ['Itt van az útlevele?', 'Is your passport here? (formal)', '', 'prep', 'All', 'anna-L10,interview,sentence,beginner'],
     ['Igen, itt van az útlevelem.', 'Yes, here is my passport.', '', 'prep', 'All', 'anna-L10,interview,sentence,beginner'],
-    ['Mikor született?', 'When were you born?', '', 'prep', 'All', 'anna-L10,question,interview,sentence,beginner'],
     ['Hol végezte tanulmányait?', 'Where did you complete your studies?', '', 'prep', 'All', 'anna-L10,question,interview,sentence,beginner'],
     ['Jelenleg Californiában lakom.', 'I currently live in California.', '', 'prep', 'All', 'anna-L10,interview,sentence,essential'],
     ['Nyugdíjas orvos vagyok.', 'I am a retired doctor.', '', 'prep', 'All', 'anna-L10,interview,sentence,essential'],
@@ -389,7 +387,7 @@ $lesson12 = [
     ['Mert sok park, étterem van ott. És közel van az óceánhoz.', 'Because there are many parks, restaurants there. And it\'s close to the ocean.', '', 'prep', 'All', 'anna-L12,interview,sentence,beginner'],
     ['Mivel tölti a szabadidejét?', 'How do you spend your free time? (formal)', '', 'prep', 'All', 'anna-L12,question,interview,sentence,beginner'],
     ['Szeretek a számítógépen dolgozni, kertészkedni és teniszezni.', 'I like to work on the computer, garden, and play tennis.', '', 'prep', 'Larry', 'anna-L12,interview,sentence,essential'],
-    ['Járt már Magyarországon?', 'Have you been to Hungary?', '', 'prep', 'All', 'anna-L12,question,interview,sentence,essential'],
+    ['Járt már Magyarországon?', 'Have you been to Hungary?', '', 'prep', 'All', 'anna-L12,anna-L16,question,interview,sentence,essential'],
     ['Igen, voltam Magyarországon 2025 decemberében.', 'Yes, I was in Hungary in December 2025.', '', 'prep', 'All', 'anna-L12,interview,sentence,essential'],
 ];
 
@@ -499,7 +497,6 @@ $lesson16 = [
     ['Ez a város ma már Ukrajna része.', 'This city is now part of Ukraine.', '', 'prep', 'Larry', 'anna-L16,interview,sentence,essential'],
     ['Miért emigrált a nagyapja Amerikába?', 'Why did your grandfather emigrate to America?', '', 'prep', 'All', 'anna-L16,question,interview,sentence,essential'],
     ['Trianon és az antiszemitizmus miatt, mert zsidó volt.', 'Because of Trianon and antisemitism, because he was Jewish.', '', 'prep', 'Larry', 'anna-L16,interview,sentence,essential'],
-    ['Járt már Magyarországon?', 'Have you been to Hungary before?', '', 'prep', 'All', 'anna-L16,question,interview,sentence,essential'],
     ['Igen, 2025 decemberében jártam Budapesten.', 'Yes, I was in Budapest in December 2025.', '', 'prep', 'All', 'anna-L16,interview,sentence,essential'],
     ['Hogy tetszik Önnek Budapest?', 'How do you like Budapest? (formal)', '', 'prep', 'All', 'anna-L16,question,interview,sentence,essential'],
     ['Nagyon tetszik Budapest. Budapest szép város.', 'I really like Budapest. Budapest is a beautiful city.', '', 'prep', 'All', 'anna-L16,interview,sentence,essential'],
