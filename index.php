@@ -1030,12 +1030,15 @@ select option { background: #111a2e; color: #e2e8f0; }
                 <span class="text-[10px] text-slate-500 ml-1.5">v8.0</span>
             </div>
         </div>
-        <div class="flex items-center gap-2">
-        <button onclick="toggleTheme()" title="Toggle light/dark" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all">
-            <i data-lucide="sun" class="w-4 h-4" id="themeIcon"></i>
+        <div class="flex items-center gap-1.5">
+        <div id="headerSpeedBar" class="flex gap-px items-center"></div>
+        <input id="headerStrictSlider" type="range" min="1" max="5" step="1" class="w-12 h-1 accent-accent cursor-pointer" title="Grading strictness">
+        <span id="headerStrictLabel" class="text-[8px] font-bold text-accent-light w-10"></span>
+        <button onclick="toggleTheme()" title="Toggle light/dark" class="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="sun" class="w-3.5 h-3.5" id="themeIcon"></i>
         </button>
-        <a href="admin.php" title="Admin" class="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all">
-            <i data-lucide="settings" class="w-4 h-4"></i>
+        <a href="admin.php" title="Admin" class="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="settings" class="w-3.5 h-3.5"></i>
         </a>
         <div class="flex items-center gap-1 bg-surface-100 p-1 rounded-xl border border-white/5">
             <a href="?who=Maria&cat=<?php echo $cat; ?>" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all <?php echo $who == 'Maria' ? 'bg-accent text-white' : 'text-slate-500 hover:text-white'; ?>">Maria</a>
@@ -1103,14 +1106,9 @@ select option { background: #111a2e; color: #e2e8f0; }
     <!-- Active session card (hidden until a block is started) -->
     <div id="sessionCard" class="hidden">
         <div class="glass rounded-3xl overflow-hidden glow-accent">
-            <!-- Session header: badge + speed + grading + progress + close -->
-            <div class="flex items-center justify-between px-4 py-2 border-b border-white/5 flex-wrap gap-y-1">
-                <div class="flex items-center gap-2">
-                    <span id="sessionBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
-                    <div id="sessionSpeedBar" class="flex gap-0.5"></div>
-                    <input id="strictSlider" type="range" min="1" max="5" step="1" class="w-14 h-1 accent-accent cursor-pointer" title="Grading strictness">
-                    <span id="strictLabel" class="text-[9px] font-bold text-accent-light w-12"></span>
-                </div>
+            <!-- Session header: compact — badge + blur + progress + close -->
+            <div class="flex items-center justify-between px-4 py-1.5 border-b border-white/5">
+                <span id="sessionBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
                 <div class="flex items-center gap-2">
                     <button id="listenModeBtn" onclick="toggleListenMode()" title="Blur text" class="px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all"></button>
                     <span id="sessionProgress" class="text-[10px] text-slate-500 font-medium tabular-nums"></span>
@@ -1120,6 +1118,8 @@ select option { background: #111a2e; color: #e2e8f0; }
                 </div>
             </div>
             <div id="sessionToolbar" class="hidden"></div>
+            <div id="sessionSpeedBar" class="hidden"></div>
+            <input id="strictSlider" type="hidden" value="3">
             <!-- Session progress -->
             <div class="px-5 pt-2">
                 <div class="h-1.5 progress-track rounded-full overflow-hidden">
@@ -1127,7 +1127,7 @@ select option { background: #111a2e; color: #e2e8f0; }
                 </div>
             </div>
             <!-- Session content (rendered dynamically) -->
-            <div id="sessionContent" class="px-5 py-4 text-center min-h-[200px] flex flex-col items-center justify-center">
+            <div id="sessionContent" class="px-5 py-3 text-center flex flex-col items-center justify-center">
             </div>
             <!-- Session controls -->
             <div id="sessionControls" class="px-5 pb-5">
@@ -1491,38 +1491,46 @@ var strictLabels = { 1: 'Beginner', 2: 'Forgiving', 3: 'Interview', 4: 'Tough', 
 var strictColors = { 1: 'text-green-400', 2: 'text-blue-400', 3: 'text-accent-light', 4: 'text-amber-400', 5: 'text-red-400' };
 
 function initStrictSlider() {
-    var el = document.getElementById('strictSlider');
-    var label = document.getElementById('strictLabel');
-    if (!el || !label) return;
-    el.value = strictness;
-    label.textContent = strictLabels[strictness];
-    label.className = 'text-[10px] font-bold w-16 ' + (strictColors[strictness] || 'text-accent-light');
-    el.oninput = function() {
-        strictness = parseInt(this.value);
-        localStorage.setItem('hugStrict', strictness);
-        label.textContent = strictLabels[strictness];
-        label.className = 'text-[10px] font-bold w-16 ' + (strictColors[strictness] || 'text-accent-light');
-    };
+    // Sync both header and hidden session sliders
+    ['strictSlider', 'headerStrictSlider'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.value = strictness;
+        el.oninput = function() {
+            strictness = parseInt(this.value);
+            localStorage.setItem('hugStrict', strictness);
+            updateStrictLabel();
+        };
+    });
+    updateStrictLabel();
 }
 
 function initSessionToolbar() {
     initStrictSlider();
-    var bar = document.getElementById('sessionSpeedBar');
+    // Populate header speed bar
+    var bar = document.getElementById('headerSpeedBar');
     if (!bar) return;
     bar.textContent = '';
-    [0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0].forEach(function(s) {
+    [0.5, 0.7, 0.8, 1.0].forEach(function(s) {
         var pill = document.createElement('button');
-        pill.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ' + (currentSpeed === s ? 'bg-amber-500 text-white' : 'bg-surface-100 text-slate-500 hover:text-white');
-        pill.textContent = s === 1.0 ? '1.0' : s.toFixed(1);
+        pill.className = 'speed-btn px-1 py-0.5 rounded text-[8px] font-bold transition-all ' + (currentSpeed === s ? 'bg-amber-500 text-white' : 'text-slate-500 hover:text-white');
+        pill.textContent = s === 1.0 ? '1x' : s.toFixed(1);
         pill.onclick = function() {
             setSpeed(s);
             bar.querySelectorAll('button').forEach(function(p) {
                 var ps = parseFloat(p.textContent);
-                p.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ' + (ps === s ? 'bg-amber-500 text-white' : 'bg-surface-100 text-slate-500 hover:text-white');
+                p.className = 'speed-btn px-1 py-0.5 rounded text-[8px] font-bold transition-all ' + (ps === s ? 'bg-amber-500 text-white' : 'text-slate-500 hover:text-white');
             });
         };
         bar.appendChild(pill);
     });
+    // Sync header strict slider
+    var hs = document.getElementById('headerStrictSlider');
+    if (hs) { hs.value = strictness; hs.oninput = function() { strictness = parseInt(this.value); localStorage.setItem('hugStrict', strictness); updateStrictLabel(); }; }
+}
+function updateStrictLabel() {
+    var labels = {1:'Gentle',2:'Forgiving',3:'Interview',4:'Strict',5:'Harsh'};
+    ['headerStrictLabel','strictLabel'].forEach(function(id) { var el = document.getElementById(id); if (el) el.textContent = labels[strictness] || ''; });
 }
 
 function toggleRepeatFail() {
@@ -3670,14 +3678,17 @@ function renderAudioStep(step, content, controls) {
 
     // Listen & Speak button (above result card so it's always visible)
     var listenBtn = document.createElement('button');
-    listenBtn.className = 'w-full bg-accent/10 border border-accent/30 rounded-xl py-3 flex items-center justify-center gap-2 hover:bg-accent/20 hover:border-accent/50 transition-all active:scale-[0.98]';
+    // Compact button row: Listen & Repeat | Repeat | Next | Breakdown
+    var btnRow = document.createElement('div');
+    btnRow.className = 'flex items-center justify-center gap-2';
+
+    listenBtn.className = 'flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-accent text-white hover:bg-accent-dark transition-all active:scale-95';
     var speakerIcon = document.createElement('i');
     speakerIcon.setAttribute('data-lucide', 'volume-2');
-    speakerIcon.className = 'w-4 h-4 text-accent-light';
+    speakerIcon.className = 'w-3.5 h-3.5';
     listenBtn.appendChild(speakerIcon);
     var btnLabel = document.createElement('span');
-    btnLabel.className = 'text-xs font-bold text-accent-light';
-    btnLabel.textContent = isPron ? 'Listen & Repeat' : 'Hear Question & Answer';
+    btnLabel.textContent = isPron ? 'Listen & Repeat' : 'Listen & Answer';
     listenBtn.appendChild(btnLabel);
     listenBtn.onclick = function() {
         targetQ = step.q;
@@ -3686,21 +3697,19 @@ function renderAudioStep(step, content, controls) {
         currentMode = step.mode || 'pronunciation';
         speak(currentSpeed);
     };
-    controls.appendChild(listenBtn);
-
-    // Navigation: Repeat / Next / Break it down
-    var navRow = document.createElement('div');
-    navRow.className = 'flex items-center justify-center gap-3 mt-3';
+    btnRow.appendChild(listenBtn);
 
     var repeatBtn = document.createElement('button');
-    repeatBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-surface-50 border border-white/10 text-slate-300 hover:text-white hover:border-accent/30 transition-all';
-    repeatBtn.textContent = '🔁 Repeat';
+    repeatBtn.className = 'flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold bg-surface-50 border border-white/10 text-slate-300 hover:text-white transition-all active:scale-95';
+    repeatBtn.textContent = '🔁';
+    repeatBtn.title = 'Repeat (no recording)';
     repeatBtn.onclick = function() { speak(currentSpeed, false); };
-    navRow.appendChild(repeatBtn);
+    btnRow.appendChild(repeatBtn);
 
     var nextNavBtn = document.createElement('button');
-    nextNavBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold bg-accent/80 hover:bg-accent text-white transition-all';
-    nextNavBtn.textContent = 'Next →';
+    nextNavBtn.className = 'flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-bold bg-surface-50 border border-white/10 text-slate-300 hover:text-white transition-all active:scale-95';
+    nextNavBtn.textContent = '→';
+    nextNavBtn.title = 'Next phrase';
     nextNavBtn.onclick = function() {
         if (activeSession && sessionSteps.length > 0) {
             sessionIdx++;
@@ -3710,9 +3719,9 @@ function renderAudioStep(step, content, controls) {
             nextQuestion();
         }
     };
-    navRow.appendChild(nextNavBtn);
+    btnRow.appendChild(nextNavBtn);
 
-    controls.appendChild(navRow);
+    controls.appendChild(btnRow);
 
     var skipRow = document.createElement('div');
     skipRow.className = 'flex items-center justify-center mt-2';
