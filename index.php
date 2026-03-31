@@ -2192,9 +2192,14 @@ recognition.onresult = function(event) {
             popup.appendChild(btnRow);
             document.body.appendChild(popup);
 
-            // Auto-dismiss on pass after 2s
-            if (isPass && activeSession) {
-                setTimeout(function() { if (document.getElementById('evalPopup')) { popup.remove(); sessionIdx++; renderSessionStep(); } }, 2500);
+            // Auto-flow: pass → next phrase, fail → auto-retry
+            if (activeSession) {
+                if (isPass) {
+                    setTimeout(function() { if (document.getElementById('evalPopup')) { popup.remove(); sessionIdx++; renderSessionStep(); } }, 2000);
+                } else {
+                    // Auto-retry on fail: dismiss popup, re-speak after 3s so user can read feedback
+                    setTimeout(function() { if (document.getElementById('evalPopup')) { popup.remove(); speak(currentSpeed); } }, 3000);
+                }
             }
 
             if (!activeSession) {
