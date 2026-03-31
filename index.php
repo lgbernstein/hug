@@ -689,113 +689,214 @@ Give exactly 3 key facts and 3 quiz questions. Key facts should be in Hungarian 
     exit;
 }
 
-// AJAX: generate daily study plan
+// AJAX: generate daily study plan — evidence-based orchestrator
 if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     header('Content-Type: application/json');
-    $blocks = [];
-    $blockNum = 0;
 
-    // 1. Count SRS due items by type
-    $duePhrases = 0; $dueGrammar = 0; $dueKnowledge = 0;
-    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND (item_type='phrase' OR item_type IS NULL) AND next_review <= NOW()");
-    if ($r) $duePhrases = (int)($r->fetch_assoc()['c'] ?? 0);
-    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND item_type='grammar' AND next_review <= NOW()");
-    if ($r) $dueGrammar = (int)($r->fetch_assoc()['c'] ?? 0);
-    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND item_type='knowledge' AND next_review <= NOW()");
-    if ($r) $dueKnowledge = (int)($r->fetch_assoc()['c'] ?? 0);
+    // ── Settings ──
+    $blockDuration = 25; // minutes per active block
+    $breakDuration = 5;
+    $itemsPerBlock = 10; // ~2.5 min per item
+    $newItemsCap   = 18; // max new items per day
+    $availableMin  = 210; // 3.5 hours default
 
-    // 2. Check what was done today
+    // ── 1. What's done today? ──
     $todayMin = 0;
     $todayBlocks = [];
     $r = $conn->query("SELECT block_type, SUM(duration_min) AS mins FROM study_log WHERE who='$who_safe' AND DATE(completed_at) = CURDATE() GROUP BY block_type");
     if ($r) { while ($row = $r->fetch_assoc()) { $todayBlocks[$row['block_type']] = (int)$row['mins']; $todayMin += (int)$row['mins']; } }
+    $availableMin -= $todayMin;
 
-    // 3. Get available grammar patterns not yet mastered
-    $newGrammar = [];
-    $r = $conn->query("SELECT gp.id, gp.pattern, gp.explanation, gp.suffix_words FROM grammar_patterns gp LEFT JOIN study_history sh ON sh.item_type='grammar' AND sh.item_id=gp.id AND sh.who='$who_safe' WHERE sh.id IS NULL OR sh.pass_count < 3 ORDER BY CASE WHEN sh.id IS NULL THEN 0 ELSE 1 END, RAND() LIMIT 3");
-    if ($r) { while ($row = $r->fetch_assoc()) $newGrammar[] = $row; }
+    // ── 2. Count new items already introduced today ──
+    $r = $conn->query("SELECT COUNT(*) AS c FROM study_history WHERE who='$who_safe' AND DATE(last_seen) = CURDATE() AND pass_count + fail_count <= 1");
+    $newToday = $r ? (int)($r->fetch_assoc()['c'] ?? 0) : 0;
+    $newRemaining = max(0, $newItemsCap - $newToday);
 
-    // 4. Get knowledge categories with weak coverage
-    $knowledgeCats = [];
-    $r = $conn->query("SELECT category, COUNT(*) AS total FROM knowledge_cards GROUP BY category");
-    if ($r) { while ($row = $r->fetch_assoc()) $knowledgeCats[$row['category']] = (int)$row['total']; }
+    // ── 3. Fetch due review items (SRS) ──
+    $reviewPool = [];
 
-    // 5. Get external resources for rotation
+    // Due phrases
+    $whoFilter = ($who !== 'All') ? " AND (hp.`who` = 'All' OR hp.`who` = '$who_safe')" : "";
+    $r = $conn->query("SELECT sh.phrase AS q, hp.answer_en AS a, COALESCE(hp.answer_hu,'') AS a_hu, hp.category,
+            'phrase' AS item_type, sh.item_id, sh.is_leech, sh.recall_count
+            FROM study_history sh
+            LEFT JOIN hungarian_prep hp ON sh.phrase = hp.question_hu
+            WHERE sh.who='$who_safe' AND sh.item_type='phrase' AND sh.next_review <= NOW()
+            ORDER BY sh.next_review ASC LIMIT 30");
+    if ($r) { while ($row = $r->fetch_assoc()) $reviewPool[] = $row; }
+
+    // Due flashcards
+    $r = $conn->query("SELECT sh.phrase AS q, 'flashcard' AS item_type, sh.item_id, sh.is_leech, sh.recall_count
+            FROM study_history sh
+            WHERE sh.who='$who_safe' AND sh.item_type='flashcard' AND sh.next_review <= NOW()
+            ORDER BY sh.next_review ASC LIMIT 20");
+    if ($r) { while ($row = $r->fetch_assoc()) $reviewPool[] = $row; }
+
+    // Due grammar
+    $r = $conn->query("SELECT gp.pattern AS q, gp.explanation AS a, gp.suffix_words AS a_hu, 'Grammar' AS category,
+            'grammar' AS item_type, gp.id AS item_id, COALESCE(sh.is_leech,0) AS is_leech, COALESCE(sh.recall_count,0) AS recall_count
+            FROM grammar_patterns gp
+            INNER JOIN study_history sh ON sh.item_type='grammar' AND sh.item_id=gp.id AND sh.who='$who_safe'
+            WHERE sh.next_review <= NOW()
+            ORDER BY sh.next_review ASC LIMIT 10");
+    if ($r) { while ($row = $r->fetch_assoc()) $reviewPool[] = $row; }
+
+    // Due knowledge
+    $r = $conn->query("SELECT kc.title_hu AS q, kc.title_en AS a, kc.content_hu AS a_hu, kc.category,
+            'knowledge' AS item_type, kc.id AS item_id, COALESCE(sh.is_leech,0) AS is_leech, COALESCE(sh.recall_count,0) AS recall_count
+            FROM knowledge_cards kc
+            INNER JOIN study_history sh ON sh.item_type='knowledge' AND sh.item_id=kc.id AND sh.who='$who_safe'
+            WHERE sh.next_review <= NOW()
+            ORDER BY sh.next_review ASC LIMIT 10");
+    if ($r) { while ($row = $r->fetch_assoc()) $reviewPool[] = $row; }
+
+    shuffle($reviewPool);
+
+    // ── 4. Fetch new (unseen) items ──
+    $newPool = [];
+
+    // Unseen phrases
+    $r = $conn->query("SELECT hp.question_hu AS q, hp.answer_en AS a, COALESCE(hp.answer_hu,'') AS a_hu, hp.category,
+            'phrase' AS item_type, NULL AS item_id
+            FROM hungarian_prep hp
+            LEFT JOIN study_history sh ON sh.phrase = hp.question_hu AND sh.who='$who_safe'
+            WHERE sh.id IS NULL $whoFilter
+            ORDER BY RAND() LIMIT 15");
+    if ($r) { while ($row = $r->fetch_assoc()) $newPool[] = $row; }
+
+    // Unseen grammar patterns
+    $r = $conn->query("SELECT gp.pattern AS q, gp.explanation AS a, gp.suffix_words AS a_hu, 'Grammar' AS category,
+            'grammar' AS item_type, gp.id AS item_id
+            FROM grammar_patterns gp
+            LEFT JOIN study_history sh ON sh.item_type='grammar' AND sh.item_id=gp.id AND sh.who='$who_safe'
+            WHERE sh.id IS NULL
+            ORDER BY RAND() LIMIT 5");
+    if ($r) { while ($row = $r->fetch_assoc()) $newPool[] = $row; }
+
+    shuffle($newPool);
+
+    // ── 5. Check review load — if heavy, throttle new items ──
+    if (count($reviewPool) > 30) {
+        $newRemaining = min($newRemaining, 5); // heavy review day: limit new items
+    }
+
+    // ── 6. External resources ──
     $resources = [];
     $r = $conn->query("SELECT name, url, icon, category FROM learning_resources ORDER BY sort_order");
     if ($r) { while ($row = $r->fetch_assoc()) $resources[] = $row; }
 
-    // 6. Build blocks — 20 min max, alternating active/passive
-    $totalDue = $duePhrases + $dueGrammar + $dueKnowledge;
+    // ── 7. Build interleaved blocks ──
+    $blocks = [];
+    $blockNum = 0;
+    $reviewIdx = 0;
+    $newIdx = 0;
+    $newUsed = 0;
 
-    // Block 1: SRS Review (active, always first)
-    if ($totalDue > 0 && empty($todayBlocks['phrase_review'])) {
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_review', 'title' => 'Review Due Items', 'subtitle' => $totalDue . ' items due', 'duration' => min(20, max(10, $totalDue * 2)), 'icon' => 'rotate-ccw',
-            'session' => ['mode' => 'review', 'limit' => min(10, $totalDue), 'tag' => 'essential']];
-    }
+    while ($availableMin >= $blockDuration && ($reviewIdx < count($reviewPool) || ($newIdx < count($newPool) && $newUsed < $newRemaining))) {
+        $items = [];
 
-    // Block 2: External — Pimsleur (passive listening)
-    if (empty($todayBlocks['pimsleur'])) {
-        $pim = array_values(array_filter($resources, function($r) { return $r['name'] === 'Pimsleur'; }));
-        if ($pim) $blocks[] = ['type' => 'external', 'block_type' => 'pimsleur', 'title' => 'Pimsleur', 'subtitle' => 'Listening & speaking', 'duration' => 20, 'icon' => 'headphones', 'url' => $pim[0]['url'], 'emoji' => $pim[0]['icon']];
-    }
+        // 70% review (~7 items), 30% new (~3 items) per block
+        $reviewTarget = 7;
+        $newTarget = min(3, $newRemaining - $newUsed);
 
-    // Block 3: Grammar lesson (active)
-    if (!empty($newGrammar) && empty($todayBlocks['grammar_lesson'])) {
-        $g = $newGrammar[0];
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'grammar_lesson', 'title' => 'Grammar: ' . $g['pattern'], 'subtitle' => $g['explanation'] ? substr($g['explanation'], 0, 50) . '...' : 'Learn this pattern', 'duration' => 15, 'icon' => 'book-open',
-            'session' => ['mode' => 'grammar', 'pattern_id' => (int)$g['id']]];
-    }
-
-    // Break
-    if (count($blocks) >= 3) {
-        $blocks[] = ['type' => 'break', 'block_type' => 'break', 'title' => 'Break', 'subtitle' => 'Stretch, water, move', 'duration' => 5, 'icon' => 'coffee'];
-    }
-
-    // Block 4: Interview sim (active — speaking)
-    if (empty($todayBlocks['interview_sim'])) {
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'interview_sim', 'title' => 'Interview Practice', 'subtitle' => 'Answer personal questions', 'duration' => 15, 'icon' => 'message-square',
-            'session' => ['mode' => 'interview', 'cat' => 'bios', 'limit' => 8]];
-    }
-
-    // Block 5: External — Quizlet (passive flashcards)
-    if (empty($todayBlocks['quizlet'])) {
-        $qz = array_values(array_filter($resources, function($r) { return $r['name'] === 'Quizlet'; }));
-        if ($qz) $blocks[] = ['type' => 'external', 'block_type' => 'quizlet', 'title' => 'Quizlet', 'subtitle' => 'Vocabulary flashcards', 'duration' => 15, 'icon' => 'layers', 'url' => $qz[0]['url'], 'emoji' => $qz[0]['icon']];
-    }
-
-    // Block 6: Knowledge quiz (active)
-    if (empty($todayBlocks['knowledge_review'])) {
-        $weakCat = 'history';
-        foreach ($knowledgeCats as $cat => $total) {
-            if (!isset($todayBlocks['knowledge_' . $cat])) { $weakCat = $cat; break; }
+        // Fill review items, round-robin across types for interleaving
+        for ($i = 0; $i < $reviewTarget && $reviewIdx < count($reviewPool); $i++) {
+            $items[] = $reviewPool[$reviewIdx++];
         }
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'knowledge_review', 'title' => 'Knowledge: ' . ucfirst($weakCat), 'subtitle' => 'Quiz on ' . $weakCat . ' facts', 'duration' => 15, 'icon' => 'landmark',
-            'session' => ['mode' => 'knowledge', 'category' => $weakCat, 'limit' => 6]];
+
+        // Fill new items
+        for ($i = 0; $i < $newTarget && $newIdx < count($newPool) && $newUsed < $newRemaining; $i++) {
+            $items[] = $newPool[$newIdx++];
+            $newUsed++;
+        }
+
+        if (empty($items)) break;
+        shuffle($items); // interleave within block
+
+        // Determine block character from item types present
+        $types = array_unique(array_column($items, 'item_type'));
+        $typeLabels = ['phrase' => 'Phrases', 'flashcard' => 'Flashcards', 'grammar' => 'Grammar', 'knowledge' => 'Knowledge'];
+        $titleParts = [];
+        foreach ($types as $t) $titleParts[] = $typeLabels[$t] ?? ucfirst($t);
+        $blockTitle = implode(' + ', $titleParts);
+
+        $hasNew = false;
+        foreach ($items as $it) { if (!isset($it['recall_count'])) { $hasNew = true; break; } }
+
+        $blocks[] = [
+            'type' => 'in_app',
+            'block_type' => 'mixed_' . $blockNum,
+            'title' => $blockTitle,
+            'subtitle' => count($items) . ' items' . ($hasNew ? ' (includes new)' : ' (review)'),
+            'duration' => $blockDuration,
+            'icon' => 'layers',
+            'session' => ['mode' => 'interleaved', 'items' => $items]
+        ];
+
+        $availableMin -= $blockDuration;
+        $blockNum++;
+
+        // Break every 3 active blocks (Pomodoro: 3×25 + long break)
+        if ($blockNum % 3 === 0 && $availableMin >= $breakDuration + $blockDuration) {
+            $blocks[] = ['type' => 'break', 'block_type' => 'break_' . $blockNum,
+                'title' => 'Break', 'subtitle' => 'Stretch, water, move', 'duration' => $breakDuration, 'icon' => 'coffee'];
+            $availableMin -= $breakDuration;
+        }
     }
 
-    // Break
-    if (count($blocks) >= 6) {
-        $blocks[] = ['type' => 'break', 'block_type' => 'break2', 'title' => 'Break', 'subtitle' => 'Rest your brain', 'duration' => 5, 'icon' => 'coffee'];
+    // ── 8. Add interview practice block (speaking is its own skill) ──
+    if ($availableMin >= $blockDuration && empty($todayBlocks['interview_sim'])) {
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'interview_sim',
+            'title' => 'Interview Practice', 'subtitle' => 'Answer in Hungarian',
+            'duration' => $blockDuration, 'icon' => 'message-square',
+            'session' => ['mode' => 'interview', 'cat' => 'bios', 'limit' => 8]];
+        $availableMin -= $blockDuration;
     }
 
-    // Block 7: Phrase practice (active — pronunciation)
-    if (empty($todayBlocks['phrase_practice'])) {
-        $blocks[] = ['type' => 'in_app', 'block_type' => 'phrase_practice', 'title' => 'Phrase Practice', 'subtitle' => 'Mixed pronunciation', 'duration' => 20, 'icon' => 'mic',
+    // ── 9. Add external resources (passive listening blocks) ──
+    $extOrder = ['Pimsleur', 'HungarianPod101', 'Quizlet'];
+    foreach ($extOrder as $extName) {
+        if ($availableMin < 15) break;
+        $btKey = strtolower(str_replace(' ', '', $extName));
+        if (!empty($todayBlocks[$btKey])) continue;
+        $ext = array_values(array_filter($resources, function($r) use ($extName) { return $r['name'] === $extName; }));
+        if ($ext) {
+            // Insert a break before external if last block was active
+            if (!empty($blocks) && end($blocks)['type'] !== 'break') {
+                $blocks[] = ['type' => 'break', 'block_type' => 'break_ext_' . $btKey,
+                    'title' => 'Break', 'subtitle' => 'Switch modes', 'duration' => $breakDuration, 'icon' => 'coffee'];
+                $availableMin -= $breakDuration;
+            }
+            $blocks[] = ['type' => 'external', 'block_type' => $btKey,
+                'title' => $ext[0]['name'], 'subtitle' => 'Listening & immersion',
+                'duration' => 20, 'icon' => 'headphones', 'url' => $ext[0]['url'], 'emoji' => $ext[0]['icon']];
+            $availableMin -= 20;
+        }
+    }
+
+    // ── 10. Same-day re-review (PM only: items from this morning) ──
+    $currentHour = (int)date('G');
+    if ($currentHour >= 14 && $availableMin >= 15) {
+        $r = $conn->query("SELECT COUNT(*) AS c FROM study_history
+            WHERE who='$who_safe' AND DATE(last_seen) = CURDATE()
+            AND HOUR(last_seen) < 14 AND next_review <= NOW()");
+        $reReviewCount = $r ? (int)($r->fetch_assoc()['c'] ?? 0) : 0;
+        if ($reReviewCount > 0) {
+            // These items will be picked up by the review pool already (next_review <= NOW())
+            // but we add a labeled block so the user sees it as intentional
+            // No separate session needed — the interleaved blocks above already include them
+        }
+    }
+
+    // ── 11. Free practice as final block ──
+    if ($availableMin >= 15) {
+        $blocks[] = ['type' => 'in_app', 'block_type' => 'free_practice',
+            'title' => 'Free Practice', 'subtitle' => 'Weak areas & explore',
+            'duration' => min(25, $availableMin), 'icon' => 'target',
             'session' => ['mode' => 'practice', 'cat' => 'all', 'limit' => 10]];
     }
 
-    // Block 8: External — HungarianPod101 (passive listening)
-    if (empty($todayBlocks['hungarianpod'])) {
-        $hp = array_values(array_filter($resources, function($r) { return $r['name'] === 'HungarianPod101'; }));
-        if ($hp) $blocks[] = ['type' => 'external', 'block_type' => 'hungarianpod', 'title' => 'HungarianPod101', 'subtitle' => 'Podcast lesson', 'duration' => 20, 'icon' => 'radio', 'url' => $hp[0]['url'], 'emoji' => $hp[0]['icon']];
-    }
-
-    // Block 9: Free practice (active)
-    $blocks[] = ['type' => 'in_app', 'block_type' => 'free_practice', 'title' => 'Free Practice', 'subtitle' => 'Weak areas & explore', 'duration' => 20, 'icon' => 'target',
-        'session' => ['mode' => 'practice', 'cat' => 'all', 'limit' => 10]];
-
-    // Calculate streak
+    // ── Streak ──
     $streak = 0;
     $r = $conn->query("SELECT DISTINCT DATE(completed_at) AS d FROM study_log WHERE who='$who_safe' ORDER BY d DESC LIMIT 60");
     if ($r) {
@@ -808,7 +909,6 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
             } else { break; }
         }
     }
-    // Also count today if any study_history was updated today
     if ($streak === 0) {
         $r = $conn->query("SELECT 1 FROM study_history WHERE who='$who_safe' AND DATE(last_seen) = CURDATE() LIMIT 1");
         if ($r && $r->num_rows > 0) $streak = 1;
@@ -822,8 +922,13 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
         'streak' => $streak,
         'today_min' => $todayMin,
         'total_plan_min' => $totalPlanMin,
-        'due' => ['phrases' => $duePhrases, 'grammar' => $dueGrammar, 'knowledge' => $dueKnowledge],
-        'completed_blocks' => $todayBlocks
+        'due' => ['phrases' => count(array_filter($reviewPool, function($i) { return $i['item_type'] === 'phrase'; })),
+                  'grammar' => count(array_filter($reviewPool, function($i) { return $i['item_type'] === 'grammar'; })),
+                  'knowledge' => count(array_filter($reviewPool, function($i) { return $i['item_type'] === 'knowledge'; })),
+                  'flashcards' => count(array_filter($reviewPool, function($i) { return $i['item_type'] === 'flashcard'; }))],
+        'completed_blocks' => $todayBlocks,
+        'new_today' => $newToday,
+        'new_remaining' => $newRemaining - $newUsed
     ]);
     exit;
 }
@@ -3643,6 +3748,22 @@ function renderDailyPlan(data) {
         return;
     }
 
+    function getBlockColor(bt) {
+        if (bt.indexOf('mixed_') === 0) return 'border-indigo-500/20 bg-indigo-500/5';
+        if (bt.indexOf('break') === 0) return 'border-slate-500/20 bg-slate-500/5';
+        var m = { 'phrase_review': 'border-blue-500/20 bg-blue-500/5', 'grammar_lesson': 'border-purple-500/20 bg-purple-500/5',
+            'interview_sim': 'border-pink-500/20 bg-pink-500/5', 'knowledge_review': 'border-amber-500/20 bg-teal-500/5',
+            'phrase_practice': 'border-green-500/20 bg-green-500/5', 'free_practice': 'border-accent/20 bg-accent/5' };
+        return m[bt] || 'border-white/5 bg-surface-100 hover:border-accent/30';
+    }
+    function getBlockBadge(bt) {
+        if (bt.indexOf('mixed_') === 0) return 'bg-indigo-500/20 text-indigo-400';
+        if (bt.indexOf('break') === 0) return 'bg-slate-500/15 text-slate-400';
+        var m = { 'phrase_review': 'bg-blue-500/20 text-blue-400', 'grammar_lesson': 'bg-purple-500/20 text-purple-400',
+            'interview_sim': 'bg-pink-500/20 text-pink-400', 'knowledge_review': 'bg-teal-500/15 text-teal-400',
+            'phrase_practice': 'bg-green-500/20 text-green-400' };
+        return m[bt] || 'bg-white/5 text-slate-400';
+    }
     var blockColors = {
         'phrase_review': 'border-blue-500/20 bg-blue-500/5',
         'grammar_lesson': 'border-purple-500/20 bg-purple-500/5',
@@ -3666,14 +3787,14 @@ function renderDailyPlan(data) {
         var isDone = completedTypes[block.block_type];
         var tile = document.createElement('button');
         tile.className = 'rounded-xl border p-3 transition-all flex flex-col items-center gap-1.5 text-center min-h-[80px] justify-center active:scale-95 '
-            + (isDone ? 'opacity-40 border-white/5 bg-surface-50' : (blockColors[block.block_type] || 'border-white/5 bg-surface-100 hover:border-accent/30'));
+            + (isDone ? 'opacity-40 border-white/5 bg-surface-50' : getBlockColor(block.block_type));
 
         // Icon / emoji
         var iconWrap = document.createElement('div');
-        iconWrap.className = 'w-9 h-9 rounded-lg flex items-center justify-center ' + (blockBadgeColors[block.block_type] || 'bg-white/5 text-slate-400');
+        iconWrap.className = 'w-9 h-9 rounded-lg flex items-center justify-center ' + getBlockBadge(block.block_type);
         if (block.emoji) {
             iconWrap.textContent = block.emoji;
-            iconWrap.className = 'w-9 h-9 rounded-lg flex items-center justify-center text-lg ' + (blockBadgeColors[block.block_type] || 'bg-white/5');
+            iconWrap.className = 'w-9 h-9 rounded-lg flex items-center justify-center text-lg ' + getBlockBadge(block.block_type);
         } else {
             var lucideIcon = document.createElement('i');
             lucideIcon.setAttribute('data-lucide', block.icon || 'circle');
@@ -3774,7 +3895,8 @@ function startSessionBlock(block, blockIdx) {
         'practice': { emoji: '🎤', title: 'Phrase Practice', desc: 'Listen and repeat. Focus on clear pronunciation.' },
         'interview': { emoji: '💬', title: 'Interview Practice', desc: 'Answer each question in Hungarian.' },
         'grammar': { emoji: '📖', title: 'Grammar Lesson', desc: 'Review this grammar pattern and examples.' },
-        'knowledge': { emoji: '🧠', title: 'Knowledge Quiz', desc: 'Test your knowledge of Hungarian facts and culture.' }
+        'knowledge': { emoji: '🧠', title: 'Knowledge Quiz', desc: 'Test your knowledge of Hungarian facts and culture.' },
+        'interleaved': { emoji: '🔀', title: 'Mixed Practice', desc: 'Interleaved review — phrases, grammar, flashcards.' }
     };
     var intro = introMessages[mode] || { emoji: '📚', title: block.title, desc: 'Get ready!' };
     var content = document.getElementById('sessionContent');
@@ -3834,7 +3956,34 @@ function startSessionBlock(block, blockIdx) {
                 });
                 setTimeout(renderSessionStep, 1800);
             });
+    } else if (mode === 'interleaved') {
+        // Items pre-built by the orchestrator — convert to session steps
+        var rawItems = block.session.items || [];
+        sessionSteps = rawItems.map(function(item) {
+            if (item.item_type === 'flashcard') {
+                var card = findFcCardByFront(item.q);
+                return { type: 'flashcard', front: item.q, back: card ? card.back : '(flip to see)', note: card ? card.note : '', item_type: 'flashcard' };
+            } else if (item.item_type === 'phrase') {
+                return { type: 'audio', q: item.q, a: item.a || '', a_hu: item.a_hu || '', category: item.category || '', mode: 'pronunciation' };
+            } else if (item.item_type === 'grammar') {
+                return { type: 'flashcard', front: item.q, back: item.a || '', note: item.a_hu || '', item_type: 'grammar', item_id: item.item_id };
+            } else if (item.item_type === 'knowledge') {
+                return { type: 'flashcard', front: item.q, back: item.a || '', note: item.a_hu || '', item_type: 'knowledge', item_id: item.item_id };
+            }
+            return { type: 'audio', q: item.q || '?', a: item.a || '', a_hu: '', category: '', mode: 'pronunciation' };
+        });
+        setTimeout(renderSessionStep, 1800);
     }
+}
+
+// Find a flashcard card by its front text across all decks
+function findFcCardByFront(frontText) {
+    for (var i = 0; i < fcDecks.length; i++) {
+        for (var j = 0; j < fcDecks[i].cards.length; j++) {
+            if (fcDecks[i].cards[j].front === frontText) return fcDecks[i].cards[j];
+        }
+    }
+    return null;
 }
 
 function renderSessionStep() {
@@ -3860,6 +4009,8 @@ function renderSessionStep() {
         renderGrammarTeachStep(step, content, controls);
     } else if (step.type === 'suffix_quiz') {
         renderSuffixQuizStep(step, content, controls);
+    } else if (step.type === 'flashcard') {
+        renderFlashcardSessionStep(step, content, controls);
     }
     lucide.createIcons();
 }
@@ -4085,6 +4236,100 @@ function renderKnowledgeStep(step, content, controls) {
     actionRow.appendChild(gotIt);
     actionRow.appendChild(again);
     controls.appendChild(actionRow);
+}
+
+function renderFlashcardSessionStep(step, content, controls) {
+    var flipped = false;
+    var itemType = step.item_type || 'flashcard';
+    var itemId = step.item_id || null;
+
+    // Card container
+    var wrapper = document.createElement('div');
+    wrapper.className = 'fc-card';
+    wrapper.style.cursor = 'pointer';
+    var inner = document.createElement('div');
+    inner.className = 'fc-inner';
+
+    // Front
+    var front = document.createElement('div');
+    front.className = 'fc-front';
+    var fText = document.createElement('div');
+    fText.className = 'text-xl font-bold text-white text-center leading-relaxed';
+    fText.appendChild(highlightSuffix(step.front));
+    front.appendChild(fText);
+    var tapHint = document.createElement('div');
+    tapHint.className = 'text-[10px] text-slate-500 mt-4';
+    tapHint.textContent = 'Tap to flip';
+    front.appendChild(tapHint);
+
+    // Back
+    var back = document.createElement('div');
+    back.className = 'fc-back';
+    var bTrans = document.createElement('div');
+    bTrans.className = 'text-lg font-bold text-indigo-300 text-center mb-2';
+    bTrans.textContent = step.back;
+    back.appendChild(bTrans);
+    if (step.note) {
+        var bNote = document.createElement('div');
+        bNote.className = 'text-xs text-slate-300 text-center leading-relaxed mt-1 px-2';
+        bNote.textContent = step.note;
+        back.appendChild(bNote);
+    }
+
+    inner.appendChild(front);
+    inner.appendChild(back);
+    wrapper.appendChild(inner);
+    content.appendChild(wrapper);
+
+    // Listen button
+    var listenBtn = document.createElement('button');
+    listenBtn.className = 'btn-secondary mx-auto block mt-2';
+    listenBtn.textContent = '🔊 Listen';
+    listenBtn.onclick = function(e) { e.stopPropagation(); speakHu(step.front); };
+    content.appendChild(listenBtn);
+
+    // Got It / Missed buttons (hidden until flipped)
+    var btnRow = document.createElement('div');
+    btnRow.className = 'flex gap-2';
+    btnRow.style.display = 'none';
+
+    var gotBtn = document.createElement('button');
+    gotBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-green-600 hover:bg-green-700 text-white transition-all';
+    gotBtn.textContent = '✓ Got It';
+    gotBtn.onclick = function(e) {
+        e.stopPropagation();
+        sessionPassCount++;
+        sessionTotalCount++;
+        recordSRSUnified(step.front, itemType, itemId, true);
+        sessionIdx++;
+        renderSessionStep();
+    };
+
+    var missBtn = document.createElement('button');
+    missBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-all';
+    missBtn.textContent = '✗ Missed';
+    missBtn.onclick = function(e) {
+        e.stopPropagation();
+        sessionTotalCount++;
+        recordSRSUnified(step.front, itemType, itemId, false);
+        sessionIdx++;
+        renderSessionStep();
+    };
+
+    btnRow.appendChild(gotBtn);
+    btnRow.appendChild(missBtn);
+    controls.appendChild(btnRow);
+
+    // Flip handler
+    wrapper.onclick = function() {
+        flipped = !flipped;
+        if (flipped) {
+            wrapper.classList.add('flipped');
+            btnRow.style.display = 'flex';
+        } else {
+            wrapper.classList.remove('flipped');
+        }
+    };
 }
 
 function renderSuffixQuizStep(step, content, controls) {
