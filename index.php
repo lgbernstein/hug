@@ -1763,9 +1763,11 @@ function elevenSpeak(text, onEnd) {
     // Stop any currently playing audio to prevent echo
     if (currentTtsAudio) { currentTtsAudio.pause(); currentTtsAudio.currentTime = 0; currentTtsAudio = null; }
     window.speechSynthesis.cancel();
+    var speed = currentSpeed || 1.0;
     // Check cache first
     if (ttsCache[text]) {
         var a = new Audio(ttsCache[text]);
+        a.playbackRate = speed;
         currentTtsAudio = a;
         if (onEnd) a.onended = function() { currentTtsAudio = null; onEnd(); };
         a.play();
@@ -1780,14 +1782,15 @@ function elevenSpeak(text, onEnd) {
                 var url = 'data:audio/mpeg;base64,' + data.audio;
                 ttsCache[text] = url;
                 var a = new Audio(url);
+                a.playbackRate = speed;
                 currentTtsAudio = a;
                 if (onEnd) a.onended = function() { currentTtsAudio = null; onEnd(); };
                 a.play();
             } else {
-                webSpeechFallback(text, 1.0, onEnd);
+                webSpeechFallback(text, speed, onEnd);
             }
         })
-        .catch(function() { webSpeechFallback(text, 1.0, onEnd); });
+        .catch(function() { webSpeechFallback(text, speed, onEnd); });
 }
 
 function webSpeechFallback(text, rate, onEnd) {
