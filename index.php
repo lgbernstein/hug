@@ -941,6 +941,15 @@ body { background: #4a525a; color: #e8e6df; overflow-x: hidden; }
 .tag-pill { display: inline-flex; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(99,102,241,0.1); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.15); }
 .tag-pill-active { background: rgba(99,102,241,0.35); border-color: rgba(99,102,241,0.5); color: #fff; }
 select option { background: #4a525a; color: #e8e6df; }
+/* Flashcard flip */
+.fc-card { perspective: 800px; cursor: pointer; width: 100%; max-width: 400px; }
+.fc-inner { position: relative; width: 100%; min-height: 220px; transition: transform 0.45s ease; transform-style: preserve-3d; }
+.fc-card.flipped .fc-inner { transform: rotateY(180deg); }
+.fc-front, .fc-back { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+.fc-front { background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(217,119,6,0.06)); border: 1px solid rgba(245,158,11,0.25); }
+.fc-back { background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(79,70,229,0.06)); border: 1px solid rgba(99,102,241,0.25); transform: rotateY(180deg); }
+.fc-deck-tile { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; transition: all 0.2s; cursor: pointer; }
+.fc-deck-tile:hover { border-color: rgba(245,158,11,0.4); background: rgba(255,255,255,0.1); transform: translateY(-1px); }
 </style>
 </head>
 <body class="min-h-screen flex flex-col items-center pb-6" style="-webkit-font-smoothing:subpixel-antialiased;-moz-osx-font-smoothing:auto">
@@ -1175,6 +1184,7 @@ select option { background: #4a525a; color: #e8e6df; }
         <!-- Sub-nav -->
         <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
             <button onclick="showStudySub('scenarios')" id="studySub-scenarios" class="pill pill-active whitespace-nowrap">Scenarios</button>
+            <button onclick="showStudySub('flashcards')" id="studySub-flashcards" class="pill pill-inactive whitespace-nowrap">Flashcards</button>
             <button onclick="showStudySub('grammar')" id="studySub-grammar" class="pill pill-inactive whitespace-nowrap">Grammar</button>
             <button onclick="showStudySub('knowledge')" id="studySub-knowledge" class="pill pill-inactive whitespace-nowrap">Knowledge</button>
             <button onclick="showStudySub('resources')" id="studySub-resources" class="pill pill-inactive whitespace-nowrap">Resources</button>
@@ -1321,6 +1331,59 @@ select option { background: #4a525a; color: #e8e6df; }
         </div>
 
         </div><!-- end study-sub-scenarios -->
+
+        <!-- ═══ Flashcards sub-view ═══ -->
+        <div id="study-sub-flashcards" style="display:none">
+            <div class="space-y-4">
+                <!-- Deck picker (shown when no deck active) -->
+                <div id="fcDeckPicker">
+                    <h2 class="text-lg font-bold text-white mb-1">Grammar Flashcards</h2>
+                    <p class="text-xs text-slate-400 mb-4">Tap a deck to start drilling. Flip cards to check yourself.</p>
+                    <div id="fcDeckGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+                </div>
+                <!-- Active flashcard session -->
+                <div id="fcSession" class="hidden">
+                    <div class="glass rounded-2xl overflow-hidden border border-amber-500/20">
+                        <!-- Header -->
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-amber-500/5">
+                            <h2 id="fcDeckTitle" class="text-base font-bold text-amber-300 flex items-center gap-2"></h2>
+                            <div class="flex items-center gap-2">
+                                <span id="fcProgress" class="text-[11px] text-slate-500 font-medium tabular-nums"></span>
+                                <button onclick="fcShuffle()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" title="Shuffle">
+                                    <i data-lucide="shuffle" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="closeFcSession()" class="p-1.5 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                                    <i data-lucide="x" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Progress bar -->
+                        <div class="px-4 pt-2">
+                            <div class="h-1.5 progress-track rounded-full overflow-hidden">
+                                <div id="fcFill" class="h-full bg-amber-500 rounded-full transition-all duration-300" style="width:0%"></div>
+                            </div>
+                        </div>
+                        <!-- Card area -->
+                        <div id="fcCardArea" class="p-5 min-h-[280px] flex flex-col items-center justify-center">
+                        </div>
+                        <!-- Controls -->
+                        <div id="fcControls" class="px-5 pb-5 flex gap-2">
+                        </div>
+                    </div>
+                    <!-- Score tally -->
+                    <div class="flex items-center justify-center gap-6 mt-3">
+                        <div class="flex items-center gap-1.5">
+                            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                            <span id="fcGotIt" class="text-xs text-slate-400 tabular-nums">0 got it</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                            <span id="fcMissed" class="text-xs text-slate-400 tabular-nums">0 missed</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- ═══ Grammar sub-view ═══ -->
         <div id="study-sub-grammar" style="display:none">
@@ -3310,13 +3373,14 @@ function renderDrillSummary() {
 var studySub = 'scenarios';
 function showStudySub(sub) {
     studySub = sub;
-    ['scenarios', 'grammar', 'knowledge', 'resources', 'phrases'].forEach(function(s) {
+    ['scenarios', 'flashcards', 'grammar', 'knowledge', 'resources', 'phrases'].forEach(function(s) {
         var el = document.getElementById('study-sub-' + s);
         if (el) el.style.display = s === sub ? 'block' : 'none';
         var btn = document.getElementById('studySub-' + s);
         if (btn) btn.className = 'pill ' + (s === sub ? 'pill-active' : 'pill-inactive');
     });
     if (sub === 'scenarios') { loadScenarios(); loadMustNail(); loadRecommendedGrammar(); }
+    if (sub === 'flashcards') renderFcDecks();
     if (sub === 'grammar') loadGrammarPatterns();
     if (sub === 'knowledge') loadKnowledgeCards();
     if (sub === 'resources') loadResources();
@@ -5079,6 +5143,427 @@ function renderProgressPhrases(data) {
         list.appendChild(item);
     });
 }
+
+// ── Flashcard Decks ───────────────────────────────────────────────────
+var fcDecks = [
+  { id: 'conjugation', emoji: '🔄', title: 'Verb Conjugation', desc: 'Present tense for all 6 persons', color: 'amber', cards: [
+    { front: 'Én lakOK', back: 'I live', note: '-ok/-ek/-ök = I (back/front/rounded vowel)' },
+    { front: 'Te lakSZ', back: 'You live (informal)', note: '-sz = you (informal)' },
+    { front: 'Ő lakIK', back: 'He/She lives', note: '-ik for some verbs (lakik, dolgozik)' },
+    { front: 'Mi lakUNK', back: 'We live', note: '-unk/-ünk = we' },
+    { front: 'Ti lakTOK', back: 'You all live', note: '-tok/-tek/-tök = you (plural)' },
+    { front: 'Ők lakNAK', back: 'They live', note: '-nak/-nek = they' },
+    { front: 'Én dolgozOM', back: 'I work', note: 'Definite conjugation: -om/-em/-öm' },
+    { front: 'Te dolgozOL', back: 'You work', note: '-ol/-el/-öl = you (indefinite)' },
+    { front: 'Ő dolgozIK', back: 'He/She works', note: '-ik verbs: 3rd person ends in -ik' },
+    { front: 'Én beszélEK', back: 'I speak', note: 'Front vowel verb → -ek' },
+    { front: 'Te beszélSZ', back: 'You speak', note: '-sz for you, same all verbs' },
+    { front: 'Ő beszél', back: 'He/She speaks', note: '3rd person indefinite = bare stem (no suffix)' },
+    { front: 'Mi beszélÜNK', back: 'We speak', note: '-ünk for front vowels' },
+    { front: 'Ti beszélTEK', back: 'You all speak', note: '-tek for front vowels' },
+    { front: 'Ők beszélNEK', back: 'They speak', note: '-nek for front vowels' },
+    { front: 'Én szeretEM', back: 'I love (it/him/her)', note: 'Definite conj. when object is specific' },
+    { front: 'Te szeretED', back: 'You love it', note: 'Definite: -ed/-od' },
+    { front: 'Ő szeretI', back: 'He/She loves it', note: 'Definite: -i' },
+    { front: 'Mi szeretJÜK', back: 'We love it', note: 'Definite: -jük' },
+    { front: 'Ti szeretITEK', back: 'You all love it', note: 'Definite: -itek' },
+    { front: 'Ők szeretIK', back: 'They love it', note: 'Definite: -ik' },
+  ]},
+  { id: 'past', emoji: '⏪', title: 'Past Tense', desc: '-t/-tt endings + examples', color: 'violet', cards: [
+    { front: 'Én lakTAM', back: 'I lived', note: 'Past = stem + t + personal ending. -tam = I (back vowel)' },
+    { front: 'Te lakTÁL', back: 'You lived', note: '-tál/-tél = you (past)' },
+    { front: 'Ő lakOTT', back: 'He/She lived', note: '-ott/-ett/-ött = he/she (past)' },
+    { front: 'Mi lakTUNK', back: 'We lived', note: '-tunk/-tünk = we (past)' },
+    { front: 'Ti lakTATOK', back: 'You all lived', note: '-tatok/-tetek = you pl. (past)' },
+    { front: 'Ők lakTAK', back: 'They lived', note: '-tak/-tek = they (past)' },
+    { front: 'Én beszélTEM', back: 'I spoke', note: 'Front vowel: -tem' },
+    { front: 'Ő beszélT', back: 'He/She spoke', note: '-t alone if stem ends in vowel or l,n,r' },
+    { front: 'Én dolgozTAM', back: 'I worked', note: 'After z: -tam (insert t before ending)' },
+    { front: 'Én ettem', back: 'I ate', note: 'Irregular: enni → ettem, ettél, evett...' },
+    { front: 'Ő volt', back: 'He/She was', note: 'lenni → volt (most important irregular)' },
+    { front: 'Én voltam', back: 'I was', note: 'voltam, voltál, volt, voltunk, voltatok, voltak' },
+    { front: 'Ő ment', back: 'He/She went', note: 'menni → ment (irregular)' },
+    { front: 'Én jöttem', back: 'I came', note: 'jönni → jöttem (irregular)' },
+    { front: 'Ő csinálT', back: 'He/She did/made', note: 'Regular: csinálni → csinált' },
+    { front: 'Ő tanulT', back: 'He/She studied', note: 'tanulni → tanult' },
+  ]},
+  { id: 'possessive', emoji: '👤', title: 'Possessives', desc: 'My, your, his/her, our, their', color: 'pink', cards: [
+    { front: 'a házAM', back: 'my house', note: '-am/-em/-om/-öm = my' },
+    { front: 'a házAD', back: 'your house', note: '-ad/-ed/-od/-öd = your' },
+    { front: 'a házA', back: 'his/her house', note: '-a/-e/-ja/-je = his/her' },
+    { front: 'a házUNK', back: 'our house', note: '-unk/-ünk = our' },
+    { front: 'a házATOK', back: 'your (pl.) house', note: '-atok/-etek/-ötök = your pl.' },
+    { front: 'a házUK', back: 'their house', note: '-uk/-ük/-juk/-jük = their' },
+    { front: 'a nevEM', back: 'my name', note: 'Front vowel word: -em' },
+    { front: 'a nevED', back: 'your name', note: 'név → neve- (stem change before suffix)' },
+    { front: 'a nevE', back: 'his/her name', note: '-e for front vowel, 3rd person' },
+    { front: 'a gyerekEM', back: 'my child', note: 'gyerek = child' },
+    { front: 'a gyerekEIM', back: 'my children', note: 'Plural possessive: -eim/-aim' },
+    { front: 'a feleségEM', back: 'my wife', note: 'feleség = wife' },
+    { front: 'a férjEM', back: 'my husband', note: 'férj = husband' },
+    { front: 'a családOM', back: 'my family', note: 'család = family' },
+    { front: 'a szülEIM', back: 'my parents', note: 'szülő → szüleim (plural possessive)' },
+    { front: 'az országOM', back: 'my country', note: 'ország = country' },
+  ]},
+  { id: 'accusative', emoji: '🎯', title: 'Direct Object (-t)', desc: 'Accusative case: who/what receives the action', color: 'sky', cards: [
+    { front: 'Szeretem a kávéT', back: 'I love coffee', note: '-t after vowel: kávé → kávét' },
+    { front: 'Látom a házAT', back: 'I see the house', note: '-at after consonant (back): ház → házat' },
+    { front: 'Olvasom a könyvET', back: 'I am reading the book', note: '-et after consonant (front): könyv → könyvet' },
+    { front: 'Ismerem BudapestET', back: 'I know Budapest', note: 'Proper nouns also get -t' },
+    { front: 'Szeretem MagyarországOT', back: 'I love Hungary', note: '-ot after back vowel consonant' },
+    { front: 'Kérek egy vizET', back: 'I would like a water', note: 'víz → vizet (stem change)' },
+    { front: 'Beszélek magyarUL', back: 'I speak Hungarian', note: 'Languages use -ul/-ül, NOT -t!' },
+    { front: 'Megeszem az almáT', back: 'I eat the apple', note: 'alma → almát' },
+    { front: 'Nézem a filmET', back: 'I am watching the movie', note: 'film → filmet' },
+    { front: 'Keresem a kulcsOT', back: 'I am looking for the key', note: 'kulcs → kulcsot' },
+    { front: 'Eszem a levesT', back: 'I am eating the soup', note: 'leves → levest' },
+  ]},
+  { id: 'dative', emoji: '🤲', title: 'To/For (-nak/-nek)', desc: 'Indirect object: to whom, for whom', color: 'green', cards: [
+    { front: 'Adok egy könyvet MariNAK', back: 'I give a book to Mari', note: '-nak = to (back vowel names)' },
+    { front: 'Mondtam az anyámNAK', back: 'I told my mother', note: '-nak = to her (back vowel)' },
+    { front: 'Veszek virágot a feleségemNEK', back: 'I buy flowers for my wife', note: '-nek = for (front vowel)' },
+    { front: 'Köszönöm NEKED', back: 'I thank you', note: 'neked = for you / to you' },
+    { front: 'NEKEM van egy kutyám', back: 'I have a dog', note: 'nekem = to me. Hungarian "have" = nekem van' },
+    { front: 'NEKI van autója', back: 'He/She has a car', note: 'neki = to him/her' },
+    { front: 'NEKÜNK van házunk', back: 'We have a house', note: 'nekünk = to us' },
+    { front: 'NEKTEK van időtök?', back: 'Do you all have time?', note: 'nektek = to you (pl.)' },
+    { front: 'NEKIK van pénzük', back: 'They have money', note: 'nekik = to them' },
+    { front: 'Tetszik NEKEM', back: 'I like it (it pleases me)', note: 'tetszik + nekem = I like' },
+  ]},
+  { id: 'glue', emoji: '🔗', title: 'Glue Words', desc: 'de, hanem, mert, pedig, tehát...', color: 'teal', cards: [
+    { front: 'Szép, DE drága', back: 'Beautiful, but expensive', note: 'de = but (general contrast)' },
+    { front: 'Nem magyar, HANEM amerikai', back: 'Not Hungarian, but American', note: 'hanem = but rather (correcting a negative)' },
+    { front: 'Tanulok, MERT állampolgár akarok lenni', back: 'I study because I want to be a citizen', note: 'mert = because' },
+    { front: 'Én amerikai vagyok, ő PEDIG magyar', back: 'I am American, and she is Hungarian', note: 'pedig = whereas / and (contrast, goes AFTER subject)' },
+    { front: 'Tanultam magyarul, TEHÁT beszélek', back: 'I studied Hungarian, so I speak it', note: 'tehát = therefore / so' },
+    { front: 'VAGY kávét, VAGY teát kérek', back: 'I will have either coffee or tea', note: 'vagy...vagy = either...or' },
+    { front: 'ÉS a feleségem is jön', back: 'And my wife is coming too', note: 'és = and' },
+    { front: 'Nem kávét, SEM teát', back: 'Neither coffee, nor tea', note: 'sem = nor / neither' },
+    { front: 'HA lesz időm, megyek', back: 'If I have time, I will go', note: 'ha = if' },
+    { front: 'AMIKOR Budapesten voltam', back: 'When I was in Budapest', note: 'amikor = when (at the time when)' },
+    { front: 'HOGY van?', back: 'How are you?', note: 'hogy = how / that (conjunction)' },
+    { front: 'Tudom, HOGY magyar vagyok', back: 'I know that I am Hungarian', note: 'hogy = that (introducing a clause)' },
+    { front: 'EZÉRT tanulok', back: 'That is why I study', note: 'ezért = that is why / for this reason' },
+    { front: 'BÁR nehéz, szeretem', back: 'Although it is hard, I love it', note: 'bár = although' },
+    { front: 'Ő IS magyar', back: 'She is also Hungarian', note: 'is goes AFTER the word it emphasizes' },
+    { front: 'MÉG tanulok', back: 'I am still studying', note: 'még = still / yet' },
+    { front: 'MÁR beszélek magyarul', back: 'I already speak Hungarian', note: 'már = already' },
+  ]},
+  { id: 'question', emoji: '❓', title: 'Question Words (Mi-)', desc: 'mi, milyen, miért, mikor, hol, hogyan...', color: 'indigo', cards: [
+    { front: 'MI a neved?', back: 'What is your name?', note: 'mi = what' },
+    { front: 'MI az?', back: 'What is that?', note: 'mi = what' },
+    { front: 'MIT csinálsz?', back: 'What are you doing?', note: 'mit = what (accusative of mi)' },
+    { front: 'MILYEN az idő?', back: 'What is the weather like?', note: 'milyen = what kind of / what is...like' },
+    { front: 'MIÉRT tanulsz magyarul?', back: 'Why are you learning Hungarian?', note: 'miért = why (mi + ért = for what)' },
+    { front: 'MIKOR születtél?', back: 'When were you born?', note: 'mikor = when' },
+    { front: 'HOL laksz?', back: 'Where do you live?', note: 'hol = where (at)' },
+    { front: 'HOVÁ mész?', back: 'Where are you going?', note: 'hová = where to (direction)' },
+    { front: 'HONNAN jössz?', back: 'Where are you from?', note: 'honnan = where from' },
+    { front: 'HOGYAN vagy?', back: 'How are you?', note: 'hogyan / hogy = how' },
+    { front: 'KI vagy te?', back: 'Who are you?', note: 'ki = who' },
+    { front: 'KIT látsz?', back: 'Who(m) do you see?', note: 'kit = whom (accusative of ki)' },
+    { front: 'KINEK adod?', back: 'To whom are you giving it?', note: 'kinek = to whom (dative of ki)' },
+    { front: 'MELYIK a tied?', back: 'Which one is yours?', note: 'melyik = which one' },
+    { front: 'HÁNY éves vagy?', back: 'How old are you?', note: 'hány = how many (countable)' },
+    { front: 'MENNYI az idő?', back: 'What time is it?', note: 'mennyi = how much' },
+  ]},
+  { id: 'valvel', emoji: '🤝', title: '-val / -vel (With)', desc: 'Instrumental case + assimilation rules', color: 'rose', cards: [
+    { front: 'kávéVAL', back: 'with coffee', note: '-val after back vowel words ending in vowel' },
+    { front: 'tejJEL', back: 'with milk', note: 'Consonant ending: v assimilates! tej + vel = tejjel' },
+    { front: 'cukorRAL', back: 'with sugar', note: 'cukor + val → cukorral (v becomes r)' },
+    { front: 'kenyérREL', back: 'with bread', note: 'kenyér + vel → kenyérrel (v becomes r)' },
+    { front: 'a feleségemMEL', back: 'with my wife', note: 'm + vel → mmel (v assimilates to m)' },
+    { front: 'a férjemMEL', back: 'with my husband', note: 'Same: m + vel → mmel' },
+    { front: 'autóVAL', back: 'with a car / by car', note: 'Also means "by" (transportation)' },
+    { front: 'vonatTAL', back: 'by train', note: 'vonat + val → vonattal (v becomes t)' },
+    { front: 'repülőVEL', back: 'by plane', note: 'Vowel ending: just add -vel' },
+    { front: 'buszSZAL', back: 'by bus', note: 'busz + val → buszszal (v becomes sz)' },
+    { front: 'KIVEL mész?', back: 'Who are you going with?', note: 'ki + vel = kivel' },
+    { front: 'MIVEL utazol?', back: 'What are you traveling by?', note: 'mi + vel = mivel' },
+    { front: 'örömMEL', back: 'with joy / gladly', note: 'öröm + vel → örömmel' },
+  ]},
+  { id: 'postpositions', emoji: '📍', title: 'Postpositions', desc: 'mellett, előtt, mögött, alatt, fölött...', color: 'cyan', cards: [
+    { front: 'a ház MELLETT', back: 'next to the house', note: 'mellett = next to / beside' },
+    { front: 'a ház ELŐTT', back: 'in front of the house', note: 'előtt = in front of / before' },
+    { front: 'a ház MÖGÖTT', back: 'behind the house', note: 'mögött = behind' },
+    { front: 'a ház ALATT', back: 'under the house', note: 'alatt = under' },
+    { front: 'a ház FÖLÖTT', back: 'above the house', note: 'fölött = above / over' },
+    { front: 'a ház KÖZÖTT', back: 'between the houses', note: 'között = between / among' },
+    { front: 'az asztal KÖRÜL', back: 'around the table', note: 'körül = around' },
+    { front: 'a bolt FELÉ', back: 'toward the store', note: 'felé = toward' },
+    { front: 'a háború UTÁN', back: 'after the war', note: 'után = after' },
+    { front: 'a vizsga ELŐTT', back: 'before the exam', note: 'előtt also means "before" (time)' },
+    { front: 'MELLETTEM', back: 'next to me', note: 'Personal: mellett + em = mellettem' },
+    { front: 'ELŐTTEM', back: 'in front of me', note: 'előtt + em = előttem' },
+    { front: 'MÖGÖTTEM', back: 'behind me', note: 'mögött + em = mögöttem' },
+    { front: 'NÉLKÜL', back: 'without', note: 'kávé nélkül = without coffee' },
+    { front: 'SZERINT', back: 'according to', note: 'szerintem = in my opinion (according to me)' },
+    { front: 'MIATT', back: 'because of', note: 'az idő miatt = because of the weather' },
+    { front: 'HELYETT', back: 'instead of', note: 'kávé helyett teát = tea instead of coffee' },
+  ]},
+  { id: 'places', emoji: '🏠', title: 'Where? (-ban/-ben, -on/-en)', desc: 'In, on, at + place suffixes', color: 'emerald', cards: [
+    { front: 'BudapestEN', back: 'in Budapest', note: '-on/-en/-ön = on/in (surface, city name)' },
+    { front: 'MagyarországON', back: 'in Hungary', note: '-on for back vowel countries' },
+    { front: 'AmerikáBAN / az USA-BAN', back: 'in America', note: '-ban/-ben = in (inside)' },
+    { front: 'a házBAN', back: 'in the house', note: '-ban = in (back vowel word)' },
+    { front: 'az iskoláBAN', back: 'in the school', note: '-ban = in' },
+    { front: 'a kertBEN', back: 'in the garden', note: '-ben = in (front vowel word)' },
+    { front: 'BudapestRE', back: 'to Budapest', note: '-ra/-re = onto / to (direction)' },
+    { front: 'a házBA', back: 'into the house', note: '-ba/-be = into' },
+    { front: 'BudapestRŐL', back: 'from Budapest', note: '-ról/-ről = from (off of)' },
+    { front: 'a házBÓL', back: 'out of the house', note: '-ból/-ből = out of' },
+    { front: 'otthon', back: 'at home', note: 'otthon = at home (special word)' },
+    { front: 'itt / ott', back: 'here / there', note: 'itt = here, ott = there' },
+    { front: 'a munkahelyemEN', back: 'at my workplace', note: 'munkahely + em + en = at my workplace' },
+    { front: 'az utcáBAN', back: 'on the street', note: 'utca = street, -ban = in/on' },
+  ]},
+];
+
+// Flashcard state
+var fcActiveDeck = null;
+var fcCards = [];
+var fcIdx = 0;
+var fcGot = 0;
+var fcMiss = 0;
+var fcFlipped = false;
+var fcMissedPile = [];
+
+function renderFcDecks() {
+    var grid = document.getElementById('fcDeckGrid');
+    grid.textContent = '';
+    fcDecks.forEach(function(d) {
+        var tile = document.createElement('div');
+        tile.className = 'fc-deck-tile';
+        tile.onclick = function() { startFcDeck(d.id); };
+        var e1 = document.createElement('div');
+        e1.className = 'text-2xl mb-2';
+        e1.textContent = d.emoji;
+        var e2 = document.createElement('div');
+        e2.className = 'text-sm font-bold text-white mb-0.5';
+        e2.textContent = d.title;
+        var e3 = document.createElement('div');
+        e3.className = 'text-[11px] text-slate-400 line-clamp-2';
+        e3.textContent = d.desc;
+        var e4 = document.createElement('div');
+        e4.className = 'text-[10px] text-slate-500 mt-2';
+        e4.textContent = d.cards.length + ' cards';
+        tile.appendChild(e1);
+        tile.appendChild(e2);
+        tile.appendChild(e3);
+        tile.appendChild(e4);
+        grid.appendChild(tile);
+    });
+    lucide.createIcons();
+}
+
+function startFcDeck(deckId) {
+    var deck = fcDecks.find(function(d) { return d.id === deckId; });
+    if (!deck) return;
+    fcActiveDeck = deck;
+    fcCards = deck.cards.slice().sort(function() { return Math.random() - 0.5; });
+    fcIdx = 0;
+    fcGot = 0;
+    fcMiss = 0;
+    fcFlipped = false;
+    fcMissedPile = [];
+
+    document.getElementById('fcDeckPicker').classList.add('hidden');
+    document.getElementById('fcSession').classList.remove('hidden');
+    document.getElementById('fcDeckTitle').textContent = deck.emoji + ' ' + deck.title;
+    renderFcCard();
+    lucide.createIcons();
+}
+
+function closeFcSession() {
+    document.getElementById('fcSession').classList.add('hidden');
+    document.getElementById('fcDeckPicker').classList.remove('hidden');
+    fcActiveDeck = null;
+}
+
+function fcShuffle() {
+    fcCards = fcCards.sort(function() { return Math.random() - 0.5; });
+    fcIdx = 0;
+    fcGot = 0;
+    fcMiss = 0;
+    fcMissedPile = [];
+    fcFlipped = false;
+    renderFcCard();
+}
+
+function highlightSuffix(text) {
+    // Find UPPERCASE sequences and wrap them in a styled span
+    var parts = text.split(/([A-ZÁÉÍÓÖŐÚÜŰ]{2,})/g);
+    var container = document.createDocumentFragment();
+    parts.forEach(function(p) {
+        if (/^[A-ZÁÉÍÓÖŐÚÜŰ]{2,}$/.test(p)) {
+            var span = document.createElement('span');
+            span.className = 'text-amber-300 font-black';
+            span.textContent = p.toLowerCase();
+            container.appendChild(span);
+        } else {
+            container.appendChild(document.createTextNode(p));
+        }
+    });
+    return container;
+}
+
+function renderFcCard() {
+    var area = document.getElementById('fcCardArea');
+    var controls = document.getElementById('fcControls');
+    area.textContent = '';
+    controls.textContent = '';
+
+    document.getElementById('fcProgress').textContent = (fcIdx + 1) + ' / ' + fcCards.length;
+    document.getElementById('fcFill').style.width = (fcCards.length > 0 ? Math.round((fcIdx / fcCards.length) * 100) : 0) + '%';
+    document.getElementById('fcGotIt').textContent = fcGot + ' got it';
+    document.getElementById('fcMissed').textContent = fcMiss + ' missed';
+
+    if (fcIdx >= fcCards.length) {
+        renderFcSummary(area, controls);
+        return;
+    }
+
+    var card = fcCards[fcIdx];
+    fcFlipped = false;
+
+    // Build flip card
+    var wrapper = document.createElement('div');
+    wrapper.className = 'fc-card';
+    wrapper.id = 'fcFlipCard';
+    wrapper.onclick = function() { flipFc(); };
+
+    var inner = document.createElement('div');
+    inner.className = 'fc-inner';
+
+    // Front
+    var front = document.createElement('div');
+    front.className = 'fc-front';
+    var fText = document.createElement('div');
+    fText.className = 'text-xl font-bold text-white text-center leading-relaxed';
+    fText.appendChild(highlightSuffix(card.front));
+    front.appendChild(fText);
+    var tapHint = document.createElement('div');
+    tapHint.className = 'text-[10px] text-slate-500 mt-4';
+    tapHint.textContent = 'Tap to flip';
+    front.appendChild(tapHint);
+
+    // Back
+    var back = document.createElement('div');
+    back.className = 'fc-back';
+    var bTrans = document.createElement('div');
+    bTrans.className = 'text-lg font-bold text-indigo-300 text-center mb-2';
+    bTrans.textContent = card.back;
+    back.appendChild(bTrans);
+    if (card.note) {
+        var bNote = document.createElement('div');
+        bNote.className = 'text-xs text-slate-300 text-center leading-relaxed mt-1 px-2';
+        bNote.textContent = card.note;
+        back.appendChild(bNote);
+    }
+    // Show original Hungarian on back too
+    var bOrig = document.createElement('div');
+    bOrig.className = 'text-sm text-white/40 text-center mt-3';
+    bOrig.appendChild(highlightSuffix(card.front));
+    back.appendChild(bOrig);
+
+    inner.appendChild(front);
+    inner.appendChild(back);
+    wrapper.appendChild(inner);
+    area.appendChild(wrapper);
+
+    // Controls: Got It / Missed (hidden until flipped)
+    var gotBtn = document.createElement('button');
+    gotBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-green-600 hover:bg-green-700 text-white';
+    gotBtn.textContent = '✓ Got It';
+    gotBtn.id = 'fcGotBtn';
+    gotBtn.style.display = 'none';
+    gotBtn.onclick = function(e) { e.stopPropagation(); fcGot++; fcIdx++; renderFcCard(); };
+
+    var missBtn = document.createElement('button');
+    missBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold transition-all bg-red-600 hover:bg-red-700 text-white';
+    missBtn.textContent = '✗ Missed';
+    missBtn.id = 'fcMissBtn';
+    missBtn.style.display = 'none';
+    missBtn.onclick = function(e) { e.stopPropagation(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); fcIdx++; renderFcCard(); };
+
+    controls.appendChild(gotBtn);
+    controls.appendChild(missBtn);
+}
+
+function flipFc() {
+    var el = document.getElementById('fcFlipCard');
+    if (!el) return;
+    el.classList.toggle('flipped');
+    fcFlipped = !fcFlipped;
+    if (fcFlipped) {
+        document.getElementById('fcGotBtn').style.display = '';
+        document.getElementById('fcMissBtn').style.display = '';
+    }
+}
+
+function renderFcSummary(area, controls) {
+    document.getElementById('fcFill').style.width = '100%';
+    document.getElementById('fcProgress').textContent = 'Done!';
+
+    var total = fcGot + fcMiss;
+    var pct = total > 0 ? Math.round((fcGot / total) * 100) : 0;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'text-center';
+    wrap.style.animation = 'fadeIn 0.3s ease-out';
+
+    var emoji = document.createElement('div');
+    emoji.className = 'text-4xl mb-3';
+    emoji.textContent = pct >= 80 ? '🎉' : pct >= 50 ? '💪' : '📖';
+    wrap.appendChild(emoji);
+
+    var title = document.createElement('h3');
+    title.className = 'text-lg font-bold text-white mb-1';
+    title.textContent = 'Deck Complete!';
+    wrap.appendChild(title);
+
+    var score = document.createElement('p');
+    score.className = 'text-sm text-slate-400 mb-2';
+    score.textContent = fcGot + ' / ' + total + ' correct (' + pct + '%)';
+    wrap.appendChild(score);
+
+    area.appendChild(wrap);
+
+    if (fcMissedPile.length > 0) {
+        var retryBtn = document.createElement('button');
+        retryBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-all';
+        retryBtn.textContent = '🔁 Retry ' + fcMissedPile.length + ' Missed';
+        retryBtn.onclick = function() {
+            fcCards = fcMissedPile.sort(function() { return Math.random() - 0.5; });
+            fcIdx = 0;
+            fcGot = 0;
+            fcMiss = 0;
+            fcMissedPile = [];
+            renderFcCard();
+        };
+        controls.appendChild(retryBtn);
+    }
+
+    var restartBtn = document.createElement('button');
+    restartBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white transition-all';
+    restartBtn.textContent = '🔄 Restart';
+    restartBtn.onclick = function() { startFcDeck(fcActiveDeck.id); };
+    controls.appendChild(restartBtn);
+
+    var backBtn = document.createElement('button');
+    backBtn.className = 'flex-1 py-3 rounded-xl text-sm font-bold bg-surface-100 border border-white/10 text-white hover:bg-surface-200 transition-all';
+    backBtn.textContent = '← Decks';
+    backBtn.onclick = closeFcSession;
+    controls.appendChild(backBtn);
+}
+
+// Keyboard support for flashcards
+document.addEventListener('keydown', function(e) {
+    if (!fcActiveDeck || fcIdx >= fcCards.length) return;
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flipFc(); }
+    if (fcFlipped && (e.key === 'ArrowRight' || e.key === 'g')) { e.preventDefault(); fcGot++; fcIdx++; renderFcCard(); }
+    if (fcFlipped && (e.key === 'ArrowLeft' || e.key === 'm')) { e.preventDefault(); fcMiss++; fcMissedPile.push(fcCards[fcIdx]); fcIdx++; renderFcCard(); }
+});
 
 // ── Init ──────────────────────────────────────────────────────────────
 // Guard old practice card inits — elements may not exist in v8 layout
