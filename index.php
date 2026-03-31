@@ -1523,11 +1523,17 @@ select option { background: #4a525a; color: #e8e6df; }
         <div class="glass rounded-3xl overflow-hidden glow-accent">
             <!-- Session header: compact — badge + blur + progress + close -->
             <div class="flex items-center justify-between px-4 py-1.5 border-b border-white/5">
-                <span id="sessionBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="exitSession()" class="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-slate-400 hover:text-white hover:bg-white/10 transition-all" title="Back to plan (Esc)">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                        Back
+                    </button>
+                    <span id="sessionBadge" class="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent/20 text-accent-light">Review</span>
+                    <span id="sessionItemType" class="text-[9px] font-medium uppercase tracking-wider text-slate-500 hidden"></span>
+                </div>
                 <div class="flex items-center gap-2">
                     <span id="sessionProgress" class="text-[10px] text-slate-500 font-medium tabular-nums"></span>
                     <button id="pauseSessionBtn" onclick="togglePauseSession()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-teal-500 text-white hover:bg-teal-600 transition-all" title="Pause (P)">Pause</button>
-                    <button onclick="exitSession()" class="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-500 text-white hover:bg-red-600 transition-all" title="Stop & exit (Esc)">Stop</button>
                 </div>
             </div>
             <div id="sessionToolbar" class="hidden"></div>
@@ -4297,7 +4303,9 @@ function startSessionBlock(block, blockIdx) {
                 var card = findFcCardByFront(item.q);
                 return { type: 'flashcard', front: item.q, back: card ? card.back : '(flip to see)', note: card ? card.note : '', item_type: 'flashcard' };
             } else if (item.item_type === 'phrase') {
-                return { type: 'audio', q: item.q, a: item.a || '', a_hu: item.a_hu || '', category: item.category || '', mode: 'pronunciation' };
+                // Questions with answers → interview mode; standalone phrases → pronunciation
+                var phraseMode = item.a_hu ? 'interview' : 'pronunciation';
+                return { type: 'audio', q: item.q, a: item.a || '', a_hu: item.a_hu || '', category: item.category || '', mode: phraseMode };
             } else if (item.item_type === 'grammar') {
                 return { type: 'grammar_teach', pattern_id: item.item_id, pattern_name: item.q, explanation: item.a || '', suffix_words: item.a_hu || '' };
             } else if (item.item_type === 'knowledge') {
@@ -4333,6 +4341,14 @@ function renderSessionStep() {
     var pct = sessionSteps.length > 0 ? Math.round((sessionIdx / sessionSteps.length) * 100) : 0;
     document.getElementById('sessionProgressFill').style.width = pct + '%';
     document.getElementById('sessionProgress').textContent = (sessionIdx + 1) + ' / ' + sessionSteps.length;
+
+    // Show current item type indicator
+    var itemTypeEl = document.getElementById('sessionItemType');
+    var stepTypeLabels = { audio: '🎤 Phrase', flashcard: '🃏 Flashcard', grammar_teach: '📖 Grammar', grammar_quiz: '📖 Grammar' };
+    var label = stepTypeLabels[step.type] || '';
+    if (step.item_type === 'knowledge') label = '🧠 Knowledge';
+    if (label) { itemTypeEl.textContent = label; itemTypeEl.classList.remove('hidden'); }
+    else { itemTypeEl.classList.add('hidden'); }
 
     if (step.type === 'audio') {
         renderAudioStep(step, content, controls);
@@ -4769,6 +4785,26 @@ function launchSuffixQuiz() {
         .catch(function() { content.textContent = 'Error loading quiz'; });
 }
 
+// Parse **bold** and *italic* markdown into DOM nodes (safe — no innerHTML)
+function renderMarkdownText(el, text) {
+    el.textContent = '';
+    var parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    parts.forEach(function(part) {
+        if (part.match(/^\*\*(.+)\*\*$/)) {
+            var strong = document.createElement('strong');
+            strong.className = 'text-white font-semibold';
+            strong.textContent = part.slice(2, -2);
+            el.appendChild(strong);
+        } else if (part.match(/^\*(.+)\*$/)) {
+            var em = document.createElement('em');
+            em.textContent = part.slice(1, -1);
+            el.appendChild(em);
+        } else {
+            el.appendChild(document.createTextNode(part));
+        }
+    });
+}
+
 function renderGrammarTeachStep(step, content, controls) {
     content.textContent = '';
 
@@ -4860,7 +4896,7 @@ function renderGrammarTeachStep(step, content, controls) {
             paragraphs.forEach(function(para) {
                 var pEl = document.createElement('p');
                 pEl.className = 'text-sm text-slate-200 leading-relaxed';
-                pEl.textContent = para;
+                renderMarkdownText(pEl, para);
                 lessonEl.appendChild(pEl);
             });
 
@@ -4872,7 +4908,7 @@ function renderGrammarTeachStep(step, content, controls) {
                     exRow.className = 'text-sm';
                     var huSpan = document.createElement('span');
                     huSpan.className = 'text-white font-medium';
-                    huSpan.textContent = ex.hu || ex;
+                    renderMarkdownText(huSpan, ex.hu || ex);
                     exRow.appendChild(huSpan);
                     if (ex.en) {
                         var enSpan = document.createElement('span');
@@ -4888,7 +4924,7 @@ function renderGrammarTeachStep(step, content, controls) {
             if (data.tip) {
                 var tip = document.createElement('p');
                 tip.className = 'text-xs text-sky-200 bg-sky-500/5 rounded-lg p-3 border border-sky-400/15';
-                tip.textContent = data.tip;
+                renderMarkdownText(tip, data.tip);
                 lessonEl.appendChild(tip);
             }
             content.appendChild(lessonEl);
@@ -4951,7 +4987,7 @@ function renderGrammarTeachStep(step, content, controls) {
 
             var gotBtn = document.createElement('button');
             gotBtn.className = 'flex-1 py-3 bg-green-600 hover:bg-green-500 rounded-xl text-sm font-bold text-white transition-all';
-            gotBtn.textContent = 'Got It — Next';
+            gotBtn.textContent = 'Got It — Next →';
             gotBtn.onclick = function() {
                 sessionPassCount++;
                 sessionTotalCount++;
@@ -4962,7 +4998,7 @@ function renderGrammarTeachStep(step, content, controls) {
 
             var missBtn = document.createElement('button');
             missBtn.className = 'flex-1 py-3 bg-red-600/80 hover:bg-red-600 rounded-xl text-sm font-bold text-white transition-all';
-            missBtn.textContent = 'Need Practice';
+            missBtn.textContent = '← Need Practice';
             missBtn.onclick = function() {
                 sessionTotalCount++;
                 recordSRSUnified(patternName || sessionBlockInfo.title, 'grammar', step.pattern_id, false);
@@ -4970,9 +5006,17 @@ function renderGrammarTeachStep(step, content, controls) {
                 renderSessionStep();
             };
 
-            btnRow.appendChild(gotBtn);
             btnRow.appendChild(missBtn);
+            btnRow.appendChild(gotBtn);
             controls.appendChild(btnRow);
+            // Keyboard: Enter or right arrow = Got It, left arrow = Need Practice
+            function grammarKeyHandler(e) {
+                if (e.target.tagName === 'INPUT') return;
+                if (e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); document.removeEventListener('keydown', grammarKeyHandler); gotBtn.click(); }
+                else if (e.key === 'ArrowLeft') { e.preventDefault(); document.removeEventListener('keydown', grammarKeyHandler); missBtn.click(); }
+            }
+            document.addEventListener('keydown', grammarKeyHandler);
+            gotBtn.focus();
         })
         .catch(function(err) { content.textContent = 'Error loading lesson: ' + err.message; });
 }
