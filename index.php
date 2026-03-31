@@ -1610,7 +1610,7 @@ function startVolume() {
             analyser.getByteFrequencyData(data);
             var vol = Math.min(100, (data.reduce(function(a, b) { return a + b; }) / data.length) * 5);
             volFill.style.width = vol + '%';
-            if (!isListening || (Date.now() - listenStartTime) < 700) return;
+            if (!isListening || (Date.now() - listenStartTime) < 200) return;
             if (vol > VAD_THRESHOLD) {
                 vadLastSpeech = Date.now();
                 vadSpeaked    = true;
@@ -1973,7 +1973,7 @@ recognition.onstart = function() {
 };
 
 recognition.onresult = function(event) {
-    if (Date.now() - listenStartTime < 700) return;
+    if (Date.now() - listenStartTime < 200) return;
     if (!isListening) return;
     clearTimeout(recTimeout);
     recognition.stop();
