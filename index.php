@@ -1448,6 +1448,9 @@ select option { background: #4a525a; color: #e8e6df; }
         <!-- ═══ Grammar sub-view ═══ -->
         <div id="study-sub-grammar" style="display:none">
             <div class="space-y-4">
+                <button onclick="launchSuffixQuiz()" class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="puzzle" class="w-4 h-4"></i> Suffix Quiz — Conjugations, Cases &amp; Possessives
+                </button>
                 <div class="flex items-center gap-2 bg-surface-50 rounded-xl px-3 py-2 border border-white/5">
                     <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
                     <input id="grammarSearch2" type="text" placeholder="Search patterns..." oninput="searchGrammar()"
