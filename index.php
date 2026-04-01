@@ -2281,7 +2281,7 @@ function startVolume() {
                 vadLastSpeech = Date.now();
                 vadSpeaked    = true;
             } else if (vadSpeaked && (Date.now() - vadLastSpeech) > VAD_SILENCE) {
-                vadSpeaked = false;
+                // Don't reset vadSpeaked here — onend needs to see it was true
                 if (isListening) recognition.stop();
             }
         }, 50);
@@ -2387,12 +2387,14 @@ function webSpeechFallback(text, rate, onEnd) {
     window.speechSynthesis.speak(msg);
 }
 
+var pdSkipOnend = false; // Set by speak() so onend ignores the abort
 function speak(rate, autoRecord) {
     if (breakdownOpen) return;
     if (autoRecord === undefined) autoRecord = true;
     window.speechSynthesis.cancel();
     isListening = false;
-    vadSpeaked = false; // Reset so abort→onend doesn't re-trigger phrase drill eval
+    pdSkipOnend = true; // Next onend is from abort, not user speech
+    vadSpeaked = false;
     clearTimeout(recTimeout);
     clearTimeout(advanceTimeout);
     try { recognition.abort(); } catch(e) {}
@@ -2968,6 +2970,7 @@ recognition.onend = function() {
     try { setRecordIcon('mic'); } catch(e) {}
     // Process accumulated speech results now that recording is done
     var isPd = activeSession && sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
+    if (pdSkipOnend) { pdSkipOnend = false; isPractice = false; return; } // Abort from speak(), ignore
     if (isPd && !isPractice && vadSpeaked) {
         // Phrase drill: user actually spoke — send audio to Gemini
         pendingResult = { result: '(audio-only)', alternatives: [] };
