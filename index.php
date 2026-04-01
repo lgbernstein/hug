@@ -2967,20 +2967,25 @@ recognition.onend = function() {
     try { setRecordIcon('mic'); } catch(e) {}
     // Process accumulated speech results now that recording is done
     var isPd = activeSession && sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
-    if (isPd && !isPractice) {
-        // Phrase drill: ignore Chrome transcript, send audio to Gemini
-        // Wait for mediaRecorder to produce the blob before processing
+    if (isPd && !isPractice && vadSpeaked) {
+        // Phrase drill: user actually spoke — send audio to Gemini
         pendingResult = { result: '(audio-only)', alternatives: [] };
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            var origOnStop = mediaRecorder.onstop;
-            mediaRecorder.onstop = function(e) {
-                if (origOnStop) origOnStop.call(mediaRecorder, e);
+        // Stop recorder and wait for blob before sending
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.addEventListener('stop', function pdStop() {
+                mediaRecorder.removeEventListener('stop', pdStop);
                 processSpeechResult();
-            };
+            });
             try { mediaRecorder.stop(); } catch(ex) { processSpeechResult(); }
         } else {
             processSpeechResult();
         }
+    } else if (isPd && !isPractice && !vadSpeaked) {
+        // Phrase drill: no speech detected — auto-replay
+        setTimeout(function() {
+            if (sessionPaused || breakdownOpen) return;
+            speak(currentSpeed);
+        }, 1000);
     } else if (pendingResult) {
         processSpeechResult();
     }
