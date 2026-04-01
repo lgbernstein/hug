@@ -4807,7 +4807,8 @@ function renderAudioStep(step, content, controls) {
     currentMode = step.mode || 'pronunciation';
 
     // Auto-play: brief reading pause then speak + listen
-    if (sessionIdx > 0) {
+    var pdMode = sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
+    if (sessionIdx > 0 || pdMode) {
         setTimeout(function() { speak(currentSpeed); }, 1200);
     }
 }
