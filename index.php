@@ -4494,7 +4494,7 @@ function handlePhraseDrillResult(isPass, evalData) {
                 speak(currentSpeed);
             }, 3000);
         } else {
-            // Second fail: move on, queue for retry round
+            // Second fail: replay correct pronunciation, then move on
             pdDotResults[pdIdx] = 'fail';
             sessionTotalCount++;
             pdRetryQueue.push(step);
@@ -4502,8 +4502,14 @@ function handlePhraseDrillResult(isPass, evalData) {
             pdAdvanceTimer = setTimeout(function() {
                 if (breakdownOpen || sessionPaused) return;
                 var t = document.getElementById('evalToast'); if (t) t.remove();
-                sessionIdx++;
-                renderSessionStep();
+                // Play the phrase one last time so they hear the correct version
+                elevenSpeak(step.q, function() {
+                    setTimeout(function() {
+                        if (sessionPaused) return;
+                        sessionIdx++;
+                        renderSessionStep();
+                    }, 500);
+                });
             }, 2000);
         }
     }

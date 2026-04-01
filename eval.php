@@ -112,7 +112,8 @@ if ($mode === 'interview') {
             . 'PASS: The words are recognisably the right Hungarian words — a Hungarian speaker would understand them. Minor accent or mispronunciation is fine. '
             . 'FAIL: Key words are missing, replaced with wrong words, or so mispronounced they would confuse a listener. '
             . "\n\n"
-            . 'Be specific about what was wrong. Name the exact word that was mispronounced or missing, and show the correction (e.g. "hívnak → hívják (á sound, not a)" or "missed üljön at the end"). 1-2 short sentences max. '
+            . 'TONE: Be encouraging and specific — this is a learner doing their best. Never say "perfect" unless it truly is. Never say "completely unintelligible" or harsh negatives. '
+            . 'Instead, name the specific word that needs work and give a concrete tip (e.g. "hívnak → hívják (á sound, not a)" or "Close — missed üljön at the end"). 1-2 short sentences max. '
             . 'Reply ONLY with valid JSON: {"pass":true/false,"feedback":"short feedback","correct":"the exact target phrase","pronunciation_poor":true/false}';
 }
 
@@ -123,7 +124,10 @@ if ($audioData) {
     if ($mode === 'pronunciation') {
         $parts = [
             ['inlineData' => ['mimeType' => 'audio/webm', 'data' => $audioData]],
-            ['text' => 'Target: "' . $target . '". Grade ' . $strictness . '/5. PASS=recognizable, FAIL=missing/wrong words. JSON only: {"pass":bool,"feedback":"<10 words","heard":"transcription","pronunciation_poor":bool}']
+            ['text' => 'Target: "' . $target . '". Grade ' . $strictness . '/5. PASS=recognizable Hungarian, FAIL=missing/wrong words or silence. '
+                . 'TONE: Be encouraging and specific. Never say "perfect" unless it truly is. Never say "completely unintelligible" — say what specific word needs work. '
+                . 'Examples: "Good! Watch the gy sound in nagy", "Close — stress the first syllable in köszönöm", "Try the ö sound more rounded". '
+                . 'JSON only: {"pass":bool,"feedback":"brief encouraging tip","heard":"transcription","pronunciation_poor":bool}']
         ];
     } else {
         // Interview mode
