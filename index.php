@@ -1024,7 +1024,7 @@ if (isset($_GET['ajax']) && ($_GET['action'] ?? '') === 'daily_plan') {
     $phraseDrillBlock = null;
     $newUsedForDrill = 0;
     $phraseDrillDone = !empty($todayBlocks['phrase_drill']);
-    if (!$phraseDrillDone) {
+    if (true) { // Always build phrase drill block (re-runnable)
         $pdReview = [];
         $pdRemoveIdx = [];
         foreach ($reviewPool as $ri => $item) {
@@ -4264,15 +4264,13 @@ function renderDailyPlan(data) {
         dur.textContent = isDone ? '✓' : block.duration + 'm';
         tile.appendChild(dur);
 
-        // Click handler
-        if (!isDone) {
-            if (block.type === 'external') {
-                (function(b) { tile.onclick = function() { openExternalBlock(b); }; })(block);
-            } else if (block.type === 'break') {
-                (function(b) { tile.onclick = function() { logBlock(b.block_type, b.title, b.duration, 0, 0); }; })(block);
-            } else {
-                (function(b, i) { tile.onclick = function() { startSessionBlock(b, i); }; })(block, idx);
-            }
+        // Click handler — completed in-app blocks can be re-run
+        if (block.type === 'external') {
+            if (!isDone) (function(b) { tile.onclick = function() { openExternalBlock(b); }; })(block);
+        } else if (block.type === 'break') {
+            if (!isDone) (function(b) { tile.onclick = function() { logBlock(b.block_type, b.title, b.duration, 0, 0); }; })(block);
+        } else {
+            (function(b, i) { tile.onclick = function() { startSessionBlock(b, i); }; })(block, idx);
         }
 
         list.appendChild(tile);
