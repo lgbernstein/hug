@@ -2392,6 +2392,7 @@ function speak(rate, autoRecord) {
     if (autoRecord === undefined) autoRecord = true;
     window.speechSynthesis.cancel();
     isListening = false;
+    vadSpeaked = false; // Reset so abort→onend doesn't re-trigger phrase drill eval
     clearTimeout(recTimeout);
     clearTimeout(advanceTimeout);
     try { recognition.abort(); } catch(e) {}
