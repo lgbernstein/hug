@@ -2967,15 +2967,21 @@ recognition.onend = function() {
     try { setRecordIcon('mic'); } catch(e) {}
     // Process accumulated speech results now that recording is done
     var isPd = activeSession && sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
-    if (pendingResult) {
-        if (isPd && !isPractice) {
-            // Phrase drill: ignore Chrome transcript, let Gemini handle from audio
-            pendingResult = { result: '(audio-only)', alternatives: [] };
-        }
-        processSpeechResult();
-    } else if (isPd && !isPractice) {
-        // Chrome caught nothing — still send audio to Gemini for transcription + eval
+    if (isPd && !isPractice) {
+        // Phrase drill: ignore Chrome transcript, send audio to Gemini
+        // Wait for mediaRecorder to produce the blob before processing
         pendingResult = { result: '(audio-only)', alternatives: [] };
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            var origOnStop = mediaRecorder.onstop;
+            mediaRecorder.onstop = function(e) {
+                if (origOnStop) origOnStop.call(mediaRecorder, e);
+                processSpeechResult();
+            };
+            try { mediaRecorder.stop(); } catch(ex) { processSpeechResult(); }
+        } else {
+            processSpeechResult();
+        }
+    } else if (pendingResult) {
         processSpeechResult();
     }
     isPractice = false;
