@@ -4463,17 +4463,25 @@ function findFcCardByFront(frontText) {
 
 // ── Phrase Drill: fail-handling, re-queue, progress dots, summary ──
 
+var pdAdvanceTimer = null;
+
 function handlePhraseDrillResult(isPass, evalData) {
     var step = sessionSteps[sessionIdx];
     var pdIdx = step.pd_index;
+
+    // Kill any prior mic/audio to prevent echo bleed into next phrase
+    if (isListening) { try { recognition.abort(); } catch(e) {} }
+    isListening = false;
+    cleanupAudio();
 
     if (isPass) {
         pdDotResults[pdIdx] = (pdFailMap[pdIdx] ? 'retry' : 'pass');
         sessionTotalCount++;
         sessionPassCount++;
         recordSRSUnified(step.q, 'phrase', null, true);
-        setTimeout(function() {
-            if (breakdownOpen) return;
+        clearTimeout(pdAdvanceTimer);
+        pdAdvanceTimer = setTimeout(function() {
+            if (breakdownOpen || sessionPaused) return;
             var t = document.getElementById('evalToast'); if (t) t.remove();
             sessionIdx++;
             renderSessionStep();
@@ -4484,8 +4492,9 @@ function handlePhraseDrillResult(isPass, evalData) {
 
         if (fails === 1) {
             // First fail: replay, let user try again
-            setTimeout(function() {
-                if (breakdownOpen) return;
+            clearTimeout(pdAdvanceTimer);
+            pdAdvanceTimer = setTimeout(function() {
+                if (breakdownOpen || sessionPaused) return;
                 var t = document.getElementById('evalToast'); if (t) t.remove();
                 questionAttempted = false;
                 speak(currentSpeed);
@@ -4495,8 +4504,9 @@ function handlePhraseDrillResult(isPass, evalData) {
             pdDotResults[pdIdx] = 'fail';
             sessionTotalCount++;
             pdRetryQueue.push(step);
-            setTimeout(function() {
-                if (breakdownOpen) return;
+            clearTimeout(pdAdvanceTimer);
+            pdAdvanceTimer = setTimeout(function() {
+                if (breakdownOpen || sessionPaused) return;
                 var t = document.getElementById('evalToast'); if (t) t.remove();
                 sessionIdx++;
                 renderSessionStep();
@@ -5482,6 +5492,7 @@ function togglePauseSession() {
         if (isListening) { try { recognition.stop(); } catch(e) {} }
         clearTimeout(recTimeout);
         clearTimeout(advanceTimeout);
+        clearTimeout(pdAdvanceTimer);
         cleanupAudio();
         isListening = false;
         var toast = document.getElementById('evalToast'); if (toast) toast.remove();
