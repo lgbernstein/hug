@@ -2401,12 +2401,7 @@ function speak(rate, autoRecord) {
     var ms = document.getElementById('matchScore'); if (ms) ms.textContent = '';
     var tr = document.getElementById('transcript'); if (tr) tr.textContent = '';
     var pb = document.getElementById('playbackBtn'); if (pb) pb.classList.add('hidden');
-    var micDelay = (sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill') ? 800 : 350;
-    var onEnd = autoRecord ? function() {
-        fluencyQuestionTime = Date.now(); fluencyFirstSpeech = 0;
-        // Ensure TTS audio element is fully dead before mic starts
-        if (currentTtsAudio) { currentTtsAudio.pause(); currentTtsAudio = null; }
-        setTimeout(toggleMic, micDelay);
+    var onEnd = autoRecord ? function() { fluencyQuestionTime = Date.now(); fluencyFirstSpeech = 0; setTimeout(toggleMic, 350);
     } : null;
     elevenSpeak(targetQ, onEnd);
 }
@@ -2976,9 +2971,6 @@ recognition.onend = function() {
 
 function toggleMic() {
     if (!isListening) {
-        // Kill any lingering TTS to prevent echo pickup
-        if (currentTtsAudio) { currentTtsAudio.pause(); currentTtsAudio = null; }
-        window.speechSynthesis.cancel();
         var warmInd = document.getElementById('readyIndicator') || indicator; warmInd.className = 'status-dot dot-warmup'; indicator = warmInd;
         try { recognition.start(); } catch(e) { console.log('rec start error:', e); }
     } else {
@@ -4475,11 +4467,6 @@ var pdAdvanceTimer = null;
 function handlePhraseDrillResult(isPass, evalData) {
     var step = sessionSteps[sessionIdx];
     var pdIdx = step.pd_index;
-
-    // Stop recognition cleanly — don't destroy audio infrastructure (startVolume recreates it)
-    if (isListening) { try { recognition.abort(); } catch(e) {} }
-    isListening = false;
-    clearTimeout(recTimeout);
 
     if (isPass) {
         pdDotResults[pdIdx] = (pdFailMap[pdIdx] ? 'retry' : 'pass');
