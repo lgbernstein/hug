@@ -2965,6 +2965,12 @@ recognition.onend = function() {
     // Process accumulated speech results now that recording is done
     if (pendingResult) {
         processSpeechResult();
+    } else if (activeSession && sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill' && !isPractice) {
+        // No speech captured — auto-replay so the user can try again
+        setTimeout(function() {
+            if (sessionPaused || breakdownOpen) return;
+            speak(currentSpeed);
+        }, 1000);
     }
     isPractice = false;
 };
