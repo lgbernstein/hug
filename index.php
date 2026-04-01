@@ -2976,6 +2976,9 @@ recognition.onend = function() {
 
 function toggleMic() {
     if (!isListening) {
+        // Kill any lingering TTS to prevent echo pickup
+        if (currentTtsAudio) { currentTtsAudio.pause(); currentTtsAudio = null; }
+        window.speechSynthesis.cancel();
         var warmInd = document.getElementById('readyIndicator') || indicator; warmInd.className = 'status-dot dot-warmup'; indicator = warmInd;
         try { recognition.start(); } catch(e) { console.log('rec start error:', e); }
     } else {
@@ -4585,24 +4588,27 @@ function renderPdProgressDots() {
 }
 
 function showPhraseDrillSummary() {
-    var passed = 0, retried = 0, failed = 0;
+    var firstPass = 0, retried = 0, failed = 0;
     for (var i = 0; i < pdOriginalCount; i++) {
-        if (pdDotResults[i] === 'pass') passed++;
-        else if (pdDotResults[i] === 'retry') { retried++; passed++; }
+        if (pdDotResults[i] === 'pass') firstPass++;
+        else if (pdDotResults[i] === 'retry') retried++;
         else if (pdDotResults[i] === 'fail') failed++;
     }
+    var totalPassed = firstPass + retried; // eventually got it right
     document.getElementById('sessionCard').classList.add('hidden');
     document.getElementById('sessionSummary').classList.remove('hidden');
     var elapsed = Math.round((new Date() - sessionStartTime) / 60000);
-    document.getElementById('summaryScore').textContent = passed + '/' + pdOriginalCount;
+    document.getElementById('summaryScore').textContent = firstPass + '/' + pdOriginalCount;
     document.getElementById('summaryItems').textContent = pdOriginalCount;
     document.getElementById('summaryTime').textContent = elapsed + 'm';
-    var subtitle = pdOriginalCount + ' phrases done';
-    if (retried > 0) subtitle += ' — ' + retried + ' retried';
-    if (failed > 0) subtitle += (retried > 0 ? ', ' : ' — ') + failed + ' still tricky';
+    var parts = [];
+    if (firstPass > 0) parts.push(firstPass + ' nailed');
+    if (retried > 0) parts.push(retried + ' retried');
+    if (failed > 0) parts.push(failed + ' still tricky');
+    var subtitle = pdOriginalCount + ' phrases — ' + parts.join(', ');
     document.getElementById('summarySubtitle').textContent = subtitle;
     if (sessionBlockInfo) {
-        logBlock(sessionBlockInfo.block_type, sessionBlockInfo.title, elapsed || sessionBlockInfo.duration, pdOriginalCount, passed);
+        logBlock(sessionBlockInfo.block_type, sessionBlockInfo.title, elapsed || sessionBlockInfo.duration, pdOriginalCount, totalPassed);
     }
 }
 
