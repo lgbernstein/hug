@@ -2843,11 +2843,14 @@ function processSpeechResult() {
                 fbDiv.textContent = fb;
                 toast.appendChild(fbDiv);
             }
-            // What was heard
-            var heard = document.createElement('div');
-            heard.style.cssText = 'font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic';
-            heard.textContent = 'Heard: "' + heardText + '"';
-            toast.appendChild(heard);
+            // Show "Heard" only outside phrase drill (not useful during drill)
+            var isPdToast = sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
+            if (!isPdToast) {
+                var heard = document.createElement('div');
+                heard.style.cssText = 'font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic';
+                heard.textContent = 'Heard: "' + heardText + '"';
+                toast.appendChild(heard);
+            }
             // Fluency metrics
             if (fluencyQuestionTime && fluencyFirstSpeech) {
                 var latency = ((fluencyFirstSpeech - fluencyQuestionTime) / 1000).toFixed(1);
