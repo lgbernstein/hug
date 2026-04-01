@@ -4476,10 +4476,10 @@ function handlePhraseDrillResult(isPass, evalData) {
     var step = sessionSteps[sessionIdx];
     var pdIdx = step.pd_index;
 
-    // Kill any prior mic/audio to prevent echo bleed into next phrase
+    // Stop recognition cleanly — don't destroy audio infrastructure (startVolume recreates it)
     if (isListening) { try { recognition.abort(); } catch(e) {} }
     isListening = false;
-    cleanupAudio();
+    clearTimeout(recTimeout);
 
     if (isPass) {
         pdDotResults[pdIdx] = (pdFailMap[pdIdx] ? 'retry' : 'pass');
