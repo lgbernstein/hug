@@ -2401,7 +2401,13 @@ function speak(rate, autoRecord) {
     var ms = document.getElementById('matchScore'); if (ms) ms.textContent = '';
     var tr = document.getElementById('transcript'); if (tr) tr.textContent = '';
     var pb = document.getElementById('playbackBtn'); if (pb) pb.classList.add('hidden');
-    var onEnd = autoRecord ? function() { fluencyQuestionTime = Date.now(); fluencyFirstSpeech = 0; setTimeout(toggleMic, 350); } : null;
+    var micDelay = (sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill') ? 800 : 350;
+    var onEnd = autoRecord ? function() {
+        fluencyQuestionTime = Date.now(); fluencyFirstSpeech = 0;
+        // Ensure TTS audio element is fully dead before mic starts
+        if (currentTtsAudio) { currentTtsAudio.pause(); currentTtsAudio = null; }
+        setTimeout(toggleMic, micDelay);
+    } : null;
     elevenSpeak(targetQ, onEnd);
 }
 
