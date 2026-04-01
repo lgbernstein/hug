@@ -2963,14 +2963,17 @@ recognition.onend = function() {
     if (rl) rl.textContent = 'Mic';
     try { setRecordIcon('mic'); } catch(e) {}
     // Process accumulated speech results now that recording is done
+    var isPd = activeSession && sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
     if (pendingResult) {
+        if (isPd && !isPractice) {
+            // Phrase drill: ignore Chrome transcript, let Gemini handle from audio
+            pendingResult = { result: '(audio-only)', alternatives: [] };
+        }
         processSpeechResult();
-    } else if (activeSession && sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill' && !isPractice) {
-        // No speech captured — auto-replay so the user can try again
-        setTimeout(function() {
-            if (sessionPaused || breakdownOpen) return;
-            speak(currentSpeed);
-        }, 1000);
+    } else if (isPd && !isPractice) {
+        // Chrome caught nothing — still send audio to Gemini for transcription + eval
+        pendingResult = { result: '(audio-only)', alternatives: [] };
+        processSpeechResult();
     }
     isPractice = false;
 };
