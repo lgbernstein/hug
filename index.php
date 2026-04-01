@@ -4497,7 +4497,7 @@ function handlePhraseDrillResult(isPass, evalData) {
             var t = document.getElementById('evalToast'); if (t) t.remove();
             sessionIdx++;
             renderSessionStep();
-        }, 1500);
+        }, 2500);
     } else {
         var fails = (pdFailMap[pdIdx] || 0) + 1;
         pdFailMap[pdIdx] = fails;
@@ -4830,10 +4830,11 @@ function renderAudioStep(step, content, controls) {
     targetAH = step.a_hu || '';
     currentMode = step.mode || 'pronunciation';
 
-    // Auto-play: brief reading pause then speak + listen
+    // Auto-play: reading pause then speak + listen
     var pdMode = sessionBlockInfo && sessionBlockInfo.session && sessionBlockInfo.session.mode === 'phrase_drill';
+    var readDelay = pdMode ? 2000 : 1200; // phrase drill: more time to read before TTS
     if (sessionIdx > 0 || pdMode) {
-        setTimeout(function() { speak(currentSpeed); }, 1200);
+        setTimeout(function() { if (!sessionPaused) speak(currentSpeed); }, readDelay);
     }
 }
 
